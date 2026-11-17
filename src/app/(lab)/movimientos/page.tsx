@@ -1,3 +1,4 @@
+import { FocusMode } from "@/components/focus-mode";
 import { MovementsScreen } from "@/components/movements-screen";
 import { StateView } from "@/components/state-view";
 import { isAppError } from "@/lib/errors";
@@ -5,12 +6,13 @@ import { formatUsd } from "@/lib/money";
 import { canReview } from "@/lib/permissions";
 import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
+import { focusQueue } from "@/server/focus";
 import { getHome, getMovement, getReceiptContext, listCategoryTree, listMovements, movementCounts } from "@/server/queries";
 
 export default async function MovementsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filtro?: string; q?: string; movimiento?: string; error?: string; fila?: string; recibo?: string }>;
+  searchParams: Promise<{ filtro?: string; q?: string; movimiento?: string; error?: string; fila?: string; recibo?: string; vista?: string; actual?: string }>;
 }) {
   const session = await pageContext();
   const params = await searchParams;
@@ -18,11 +20,36 @@ export default async function MovementsPage({
   const filter = params.filtro || "todos";
   const q = params.q || "";
   try {
-    const [rows, counts, home, tree] = await Promise.all([
+    const tree = await listCategoryTree(db(), session.actor, session.companyId);
+    const categories = tree.map((parent) => ({
+      name: parent.name,
+      children: parent.children.map((child) => ({ id: child.id, name: child.name })),
+    }));
+    if (params.vista === "enfoque") {
+      const home = await getHome(db(), session.actor, session.companyId);
+      const focus = await focusQueue(db(), session.actor, session.companyId, params.actual);
+      return (
+        <FocusMode
+          data={{
+            companyName: home.company.name,
+            canReview: canReview(session.actor, session.companyId),
+            total: focus.total,
+            pending: focus.pending,
+            merchantPending: focus.merchantPending,
+            suggestions: focus.suggestions,
+            choices: focus.choices,
+            categories,
+            error: params.error,
+            current: focus.current,
+            ticket: focus.ticket,
+          }}
+        />
+      );
+    }
+    const [rows, counts, home] = await Promise.all([
       listMovements(db(), session.actor, session.companyId, filter, q),
       movementCounts(db(), session.actor, session.companyId),
       getHome(db(), session.actor, session.companyId),
-      listCategoryTree(db(), session.actor, session.companyId),
     ]);
     let detail = null;
     let receipt = null;
@@ -43,10 +70,7 @@ export default async function MovementsPage({
         detail={detail}
         receipt={receipt}
         canReview={canReview(session.actor, session.companyId)}
-        categories={tree.map((parent) => ({
-          name: parent.name,
-          children: parent.children.map((child) => ({ id: child.id, name: child.name })),
-        }))}
+        categories={categories}
       />
     );
   } catch (error) {

@@ -18,6 +18,7 @@ import {
   sealTransaction,
 } from "@/server/domain";
 import { accountBreakdowns, companyReport, documentBoard, firmQueue, getFirm, getHome, getMovement, loadActor, reviewBoard } from "@/server/queries";
+import { applyMerchantCategory, confirmFocus, focusQueue, skipFocus } from "@/server/focus";
 import { invoiceDesk, invoicePanel, linkInvoice, markInvoiceFollowUp } from "@/server/invoices";
 import { seedInvoices } from "@/server/invoice-seed";
 import { seedDatabase } from "@/server/seed";
@@ -384,4 +385,55 @@ it("las carpetas de facturas no mezclan empresas y el vínculo no mueve el banco
   await markInvoiceFollowUp(prisma, padrino, "inv_ruiz_102");
   expect(await prisma.auditEvent.count({ where: { action: "invoice_follow_up", companyId: COMPANY.qpl } })).toBe(audits);
   await expect(markInvoiceFollowUp(prisma, luis, "inv_ruiz_102")).rejects.toMatchObject({ code: "COMPANY_FORBIDDEN" });
+});
+
+it("el modo enfoque categoriza sin aprobar ni conciliar, y la regla no toca el sello", async () => {
+  const padrino = await loadActor(prisma, USER.padrino);
+  const carlos = await loadActor(prisma, USER.carlos);
+  const luis = await loadActor(prisma, USER.luis);
+  if (!padrino || !carlos || !luis) throw new Error("faltan perfiles");
+  const queue = await focusQueue(prisma, padrino, COMPANY.qpl);
+  expect(queue.pendingIds).toContain(TX.brian);
+  expect(queue.pendingIds).not.toContain(TX.fs15012);
+  expect(queue.pendingIds).not.toContain(TX.ace);
+  expect(queue.suggestions.every((item) => item.subcategoryId.startsWith("cat_qpl"))).toBe(true);
+  await expect(focusQueue(prisma, luis, COMPANY.qpl)).rejects.toMatchObject({ code: "COMPANY_FORBIDDEN" });
+
+  const before = await prisma.bankTransaction.findUnique({ where: { id: TX.brian } });
+  const balances = await prisma.bankAccount.findMany({ select: { id: true, availableBalanceCents: true }, orderBy: { id: "asc" } });
+  await expect(confirmFocus(prisma, padrino, TX.fs15012, { subcategoryId: CAT.qpl.peajes })).rejects.toMatchObject({ code: "SEALED" });
+  await confirmFocus(prisma, padrino, TX.brian, { subcategoryId: CAT.qpl.honorarios });
+  const after = await prisma.bankTransaction.findUnique({ where: { id: TX.brian }, include: { classification: true } });
+  expect(after?.classification?.subcategoryId).toBe(CAT.qpl.honorarios);
+  expect(after?.accountingState).toBe("Proposed");
+  expect(after?.reviewState).toBe(before?.reviewState);
+  expect(after?.reviewState).not.toBe("Approved");
+  expect(after?.reconciliationState).toBe(before?.reconciliationState);
+  expect(after?.documentState).toBe(before?.documentState);
+  expect(await prisma.bankAccount.findMany({ select: { id: true, availableBalanceCents: true }, orderBy: { id: "asc" } })).toEqual(balances);
+  expect(await prisma.auditEvent.findFirst({ where: { transactionId: TX.brian, action: "classification_changed", actorId: USER.padrino } })).not.toBeNull();
+  expect(await prisma.auditEvent.findFirst({ where: { transactionId: TX.brian, action: "serbell_matched" } })).toBeNull();
+
+  await expect(applyMerchantCategory(prisma, carlos, TX.sunpass27, { subcategoryId: CAT.qpl.combustible })).rejects.toMatchObject({ code: "JUSTIFICATION_REQUIRED" });
+  const sunBefore = await prisma.bankTransaction.findUnique({ where: { id: TX.sunpass03 } });
+  await applyMerchantCategory(prisma, padrino, TX.sunpass27, { subcategoryId: CAT.qpl.combustible });
+  const suns = await prisma.bankTransaction.findMany({ where: { id: { in: [TX.sunpass03, TX.sunpass27] } }, include: { classification: true } });
+  expect(suns.every((row) => row.classification?.subcategoryId === CAT.qpl.combustible)).toBe(true);
+  expect(suns.every((row) => row.documentState === "Suggested")).toBe(true);
+  expect(suns.find((row) => row.id === TX.sunpass03)?.reconciliationState).toBe(sunBefore?.reconciliationState);
+  const rule = await prisma.classificationRule.findFirst({ where: { transactionId: TX.sunpass27, applied: true } });
+  expect(rule?.afterJson).toContain(CAT.qpl.combustible);
+  expect(rule?.afterJson).not.toContain(TX.fs15012);
+  expect(await prisma.auditEvent.findFirst({ where: { action: "classification_rule_applied", transactionId: TX.sunpass27, actorId: USER.padrino } })).not.toBeNull();
+  const sealed = await prisma.bankTransaction.findUnique({ where: { id: TX.fs15012 }, include: { classification: true } });
+  expect(sealed?.classification?.subcategoryId).toBe(CAT.qpl.combustible);
+  expect(sealed?.sealedAt).toBeTruthy();
+
+  const shell = await prisma.bankTransaction.findUnique({ where: { id: "tx_qpl_demo_shell" } });
+  await skipFocus(prisma, padrino, "tx_qpl_demo_shell");
+  const skipped = await prisma.bankTransaction.findUnique({ where: { id: "tx_qpl_demo_shell" } });
+  expect(skipped?.accountingState).toBe(shell?.accountingState);
+  expect(skipped?.reconciliationState).toBe(shell?.reconciliationState);
+  expect(await prisma.auditEvent.findFirst({ where: { action: "focus_skipped", transactionId: "tx_qpl_demo_shell", actorId: USER.padrino } })).not.toBeNull();
+  await expect(skipFocus(prisma, luis, "tx_qpl_demo_shell")).rejects.toMatchObject({ code: "COMPANY_FORBIDDEN" });
 });

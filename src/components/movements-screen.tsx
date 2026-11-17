@@ -125,6 +125,10 @@ export function MovementsScreen({
             <h1 className="text-2xl font-semibold">Movimientos</h1>
             <p className="text-sm text-slate-500">{balanceLabel}</p>
           </div>
+          <div className="mt-3 flex gap-2">
+            <Link href="/movimientos?vista=enfoque" className="rounded-full border border-border px-3 py-1.5 text-xs text-slate-600">Modo enfoque</Link>
+            <span className="rounded-full bg-slate-900 px-3 py-1.5 text-xs text-white">Vista detallada</span>
+          </div>
           <p className="mt-1 text-sm text-slate-500">Un clic en Conciliar deja la fila conciliada. Marca varias filas abiertas y concílialas juntas. El comprobante se abre a la derecha.</p>
         </div>
         <div className="flex flex-wrap gap-2 px-4 py-3">
