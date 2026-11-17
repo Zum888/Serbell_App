@@ -20,6 +20,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     companyReport(db(), session.actor, session.companyId),
   ]);
   const reading = reportReading({ ...report, accountCount: report.accounts.length }).slice(0, 3);
+  const periodLabel = report.firstDay && report.lastDay ? `${report.firstDay} a ${report.lastDay}` : null;
   return (
     <div className="space-y-3">
       {error ? <StateView variant="error" title={error} testId="server-error" /> : null}
@@ -32,6 +33,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         duplicates={duplicates}
         reading={reading}
         dailyNet={report.daily.map((point) => point.net)}
+        netCents={report.net}
+        outflowsCents={report.outflows}
+        uncategorizedCount={report.uncategorizedCount}
+        uncategorizedExpenseCents={report.uncategorizedExpenseCents}
+        periodLabel={periodLabel}
       />
       <p className="sr-only">Saldo disponible {formatUsd(home.balanceCents)}</p>
     </div>

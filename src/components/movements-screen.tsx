@@ -85,6 +85,7 @@ const filters = [
 
 export function MovementsScreen({
   companyName,
+  companyId,
   balanceLabel,
   rows,
   counts,
@@ -97,6 +98,7 @@ export function MovementsScreen({
   categories,
 }: {
   companyName: string;
+  companyId: string;
   balanceLabel: string;
   rows: Row[];
   counts: { todos: number; sinCategoria: number; sinComprobante: number; porRevisar: number; aprobados: number };
@@ -106,7 +108,7 @@ export function MovementsScreen({
   detail: Detail | null;
   receipt: Receipt | null;
   canReview: boolean;
-  categories: { name: string; children: { id: string; name: string }[] }[];
+  categories: { id: string; name: string; children: { id: string; name: string }[] }[];
 }) {
   const countFor: Record<string, number> = {
     todos: counts.todos,
@@ -152,7 +154,7 @@ export function MovementsScreen({
             <StateView variant="empty" title="No hay movimientos con este filtro." />
           </div>
         ) : (
-          <MovementsTable rows={rows} categories={categories} canReview={canReview} filter={filter} q={q} />
+          <MovementsTable rows={rows} categories={categories} canReview={canReview} filter={filter} q={q} companyId={companyId} />
         )}
         <p className="px-4 py-3 text-xs text-slate-500">{rows.length} movimientos en esta vista</p>
       </section>

@@ -1379,9 +1379,10 @@ export async function addCategory(
       throw new AppError("La subcategoría tiene que depender de una categoría de esta empresa.", 400, "CATEGORY_INVALID");
     }
   }
-  await db.accountingCategory.create({
+  const created = await db.accountingCategory.create({
     data: { id: nid("cat"), companyId: input.companyId, parentId: input.parentId, name },
   });
+  return { id: created.id, name: created.name, parentId: created.parentId };
 }
 
 export async function renameCategory(db: Db, actor: Actor, categoryId: string, name: string) {

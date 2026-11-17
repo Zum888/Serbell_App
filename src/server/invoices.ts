@@ -1,4 +1,5 @@
 import { agingKey, todayKey, type AgingKey } from "@/lib/aging";
+import { type Approval, nextApproval, normalizeApproval } from "@/lib/approval";
 import { dayKey } from "@/lib/dates";
 import { AppError } from "@/lib/errors";
 import { evaluateMatch } from "@/lib/matching";
@@ -28,9 +29,18 @@ export type InvoiceCard = {
   dueOn: string;
   amountCents: number;
   status: string;
+  approval: Approval;
   followUpAt: string | null;
   aging: AgingKey | null;
   movement: { id: string; merchant: string; postedOn: string; amountCents: number } | null;
+};
+
+export type DeskSummary = {
+  totalCents: number;
+  openCents: number;
+  matchedCents: number;
+  invoiceCount: number;
+  counts: Record<Approval, number>;
 };
 
 const emptyAging = (): AgingTotals => ({ current: 0, d30: 0, d60: 0, d60plus: 0 });
@@ -180,6 +190,13 @@ export async function invoiceDesk(
     orderBy: [{ party: { name: "asc" } }, { dueOn: "asc" }],
   });
   const byParty = new Map<string, InvoiceFolder & { invoices: InvoiceCard[] }>();
+  const summary: DeskSummary = {
+    totalCents: 0,
+    openCents: 0,
+    matchedCents: 0,
+    invoiceCount: 0,
+    counts: { por_autorizar: 0, autorizada: 0, en_proceso: 0, conciliada: 0 },
+  };
   for (const row of rows) {
     const folder = byParty.get(row.partyId) ?? {
       partyId: row.partyId,
@@ -193,6 +210,7 @@ export async function invoiceDesk(
     };
     const link = row.links[0] ?? null;
     const matched = row.status === "matched" && Boolean(link);
+    const approval: Approval = matched ? "conciliada" : normalizeApproval(row.approval);
     const due = dayKey(row.dueOn) ?? "";
     const bucket = matched ? null : agingKey(due, today);
     folder.invoiceCount += 1;
@@ -202,6 +220,11 @@ export async function invoiceDesk(
       folder.openCents += row.amountCents;
       if (bucket) folder.aging[bucket] += row.amountCents;
     }
+    summary.invoiceCount += 1;
+    summary.totalCents += row.amountCents;
+    if (matched) summary.matchedCents += row.amountCents;
+    else summary.openCents += row.amountCents;
+    summary.counts[approval] += 1;
     folder.invoices.push({
       id: row.id,
       number: row.number,
@@ -209,6 +232,7 @@ export async function invoiceDesk(
       dueOn: due,
       amountCents: row.amountCents,
       status: matched ? "matched" : "open",
+      approval,
       followUpAt: row.followUpAt?.toISOString() ?? null,
       aging: bucket,
       movement: link
@@ -222,7 +246,29 @@ export async function invoiceDesk(
     });
     byParty.set(row.partyId, folder);
   }
-  return [...byParty.values()].sort((a, b) => a.name.localeCompare(b.name, "es"));
+  const folders = [...byParty.values()].sort((a, b) => a.name.localeCompare(b.name, "es"));
+  return { folders, summary };
+}
+
+export async function advanceInvoiceApproval(db: Db, actor: Actor, invoiceId: string) {
+  const invoice = await loadInvoice(db, invoiceId);
+  assertCompanyAccess(actor, invoice.companyId);
+  if (invoice.status === "matched") {
+    throw new AppError("La factura ya está conciliada con el banco.", 409, "ALREADY_MATCHED");
+  }
+  const current = normalizeApproval(invoice.approval);
+  const target = nextApproval(current);
+  if (!target) throw new AppError("La factura ya avanzó todo lo que se puede a mano.", 409, "NO_NEXT_STEP");
+  await db.invoice.update({ where: { id: invoiceId }, data: { approval: target } });
+  await audit(db, {
+    companyId: invoice.companyId,
+    actorId: actor.id,
+    transactionId: invoice.links[0]?.transactionId ?? null,
+    action: "invoice_approval",
+    previous: { approval: current, number: invoice.number },
+    next: { approval: target, number: invoice.number },
+  });
+  return target;
 }
 
 export async function invoicePanel(db: Db, actor: Actor, invoiceId: string) {
@@ -252,6 +298,7 @@ export async function invoicePanel(db: Db, actor: Actor, invoiceId: string) {
     amountCents: invoice.amountCents,
     amountLabel: formatUsd(invoice.amountCents),
     status: invoice.status,
+    approval: (invoice.status === "matched" ? "conciliada" : normalizeApproval(invoice.approval)) as Approval,
     isDemonstration: invoice.isDemonstration,
     followUpAt: invoice.followUpAt?.toISOString() ?? null,
     aging: invoice.status === "matched" ? null : agingKey(dayKey(invoice.dueOn) ?? "", todayKey()),

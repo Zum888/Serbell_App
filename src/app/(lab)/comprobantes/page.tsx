@@ -1,15 +1,22 @@
 import { BoardViewer } from "@/components/board-viewer";
-import { DocumentBoard } from "@/components/document-board";
+import { DocumentGallery, type GalleryCard } from "@/components/document-gallery";
 import { StateView } from "@/components/state-view";
 import { isAppError } from "@/lib/errors";
 import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
 import { documentBoard, getBoardReceipt } from "@/server/queries";
 
+const COLUMN_LABEL: Record<string, string> = {
+  recibido: "Recibido",
+  procesado: "Procesado",
+  listo: "Listo para el contador",
+  sellado: "Aprobado y sellado",
+};
+
 export default async function DocumentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ recibo?: string; fila?: string; error?: string }>;
+  searchParams: Promise<{ recibo?: string; fila?: string; error?: string; foco?: string }>;
 }) {
   const session = await pageContext();
   const params = await searchParams;
@@ -17,6 +24,20 @@ export default async function DocumentsPage({
   const company = session.companies.find((item) => item.id === session.companyId);
   try {
     const groups = await documentBoard(db(), session.actor, session.companyId);
+    const cards: GalleryCard[] = (Object.keys(groups) as (keyof typeof groups)[]).flatMap((column) =>
+      groups[column].map((card) => ({
+        id: card.id,
+        fileName: card.fileName,
+        merchant: card.merchant,
+        amountLabel: card.amountLabel,
+        dateLabel: card.dateLabel,
+        duplicate: card.duplicate,
+        conflict: card.conflict,
+        status: column,
+        statusLabel: COLUMN_LABEL[column] ?? column,
+        movementId: card.movement?.id ?? null,
+      })),
+    );
     const viewer = params.recibo || params.fila
       ? await getBoardReceipt(db(), session.actor, { documentId: params.recibo, transactionId: params.fila })
       : null;
@@ -29,9 +50,9 @@ export default async function DocumentsPage({
         <section>
           <p className="text-xs text-slate-500">{company?.name}</p>
           <h1 className="text-2xl font-semibold">Comprobantes</h1>
-          <p className="mt-1 text-sm text-slate-500">Una tarjeta cambia de columna cuando confirmas el vínculo, cambias el comprobante o el contador lo sella.</p>
+          <p className="mt-1 text-sm text-slate-500">Busca, filtra y marca varios comprobantes a la vez. La vista previa se abre al lado sin recargar.</p>
           <div className="mt-4">
-            <DocumentBoard groups={groups} activeId={params.recibo} />
+            <DocumentGallery cards={cards} />
           </div>
         </section>
         {viewer ? (

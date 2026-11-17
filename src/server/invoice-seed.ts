@@ -14,6 +14,7 @@ type InvoiceSeed = {
   dueOn: string;
   amountCents: number;
   transactionId?: string;
+  approval?: "por_autorizar" | "autorizada" | "en_proceso";
 };
 
 const parties: PartySeed[] = [
@@ -33,15 +34,15 @@ const parties: PartySeed[] = [
 
 const invoices: InvoiceSeed[] = [
   { id: "inv_ruiz_101", companyId: COMPANY.qpl, partyId: "party_qpl_ruiz", number: "FAC-101", direction: "receivable", issuedOn: "2026-10-02", dueOn: "2026-10-14", amountCents: 125_000, transactionId: "tx_qpl_demo_ruiz" },
-  { id: "inv_ruiz_102", companyId: COMPANY.qpl, partyId: "party_qpl_ruiz", number: "FAC-102", direction: "receivable", issuedOn: "2026-10-20", dueOn: "2026-11-05", amountCents: 40_000 },
-  { id: "inv_ruiz_103", companyId: COMPANY.qpl, partyId: "party_qpl_ruiz", number: "FAC-103", direction: "receivable", issuedOn: "2026-11-01", dueOn: "2026-11-20", amountCents: 25_000 },
+  { id: "inv_ruiz_102", companyId: COMPANY.qpl, partyId: "party_qpl_ruiz", number: "FAC-102", direction: "receivable", issuedOn: "2026-10-20", dueOn: "2026-11-05", amountCents: 40_000, approval: "autorizada" },
+  { id: "inv_ruiz_103", companyId: COMPANY.qpl, partyId: "party_qpl_ruiz", number: "FAC-103", direction: "receivable", issuedOn: "2026-11-01", dueOn: "2026-11-20", amountCents: 25_000, approval: "en_proceso" },
   { id: "inv_dep_201", companyId: COMPANY.qpl, partyId: "party_qpl_deposito", number: "FAC-201", direction: "receivable", issuedOn: "2026-10-10", dueOn: "2026-10-18", amountCents: 45_000, transactionId: "tx_qpl_demo_deposit" },
   { id: "inv_dep_202", companyId: COMPANY.qpl, partyId: "party_qpl_deposito", number: "FAC-202", direction: "receivable", issuedOn: "2026-10-01", dueOn: "2026-10-10", amountCents: 18_000 },
   { id: "inv_and_301", companyId: COMPANY.qpl, partyId: "party_qpl_andina", number: "FAC-301", direction: "receivable", issuedOn: "2026-11-02", dueOn: "2026-11-25", amountCents: 72_000 },
   { id: "inv_and_302", companyId: COMPANY.qpl, partyId: "party_qpl_andina", number: "FAC-302", direction: "receivable", issuedOn: "2026-10-05", dueOn: "2026-10-20", amountCents: 15_000 },
   { id: "inv_fs_401", companyId: COMPANY.qpl, partyId: "party_qpl_fleet", number: "FAC-401", direction: "payable", issuedOn: "2026-10-01", dueOn: "2026-10-08", amountCents: 21_148, transactionId: TX.fs21148 },
-  { id: "inv_fs_402", companyId: COMPANY.qpl, partyId: "party_qpl_fleet", number: "FAC-402", direction: "payable", issuedOn: "2026-10-05", dueOn: "2026-10-12", amountCents: 20_394 },
-  { id: "inv_fs_403", companyId: COMPANY.qpl, partyId: "party_qpl_fleet", number: "FAC-403", direction: "payable", issuedOn: "2026-11-01", dueOn: "2026-11-22", amountCents: 9_600 },
+  { id: "inv_fs_402", companyId: COMPANY.qpl, partyId: "party_qpl_fleet", number: "FAC-402", direction: "payable", issuedOn: "2026-10-05", dueOn: "2026-10-12", amountCents: 20_394, approval: "autorizada" },
+  { id: "inv_fs_403", companyId: COMPANY.qpl, partyId: "party_qpl_fleet", number: "FAC-403", direction: "payable", issuedOn: "2026-11-01", dueOn: "2026-11-22", amountCents: 9_600, approval: "en_proceso" },
   { id: "inv_napa_501", companyId: COMPANY.qpl, partyId: "party_qpl_napa", number: "FAC-501", direction: "payable", issuedOn: "2026-10-20", dueOn: "2026-10-29", amountCents: 2_750, transactionId: "tx_qpl_demo_napa" },
   { id: "inv_om_601", companyId: COMPANY.qpl, partyId: "party_qpl_omega", number: "FAC-601", direction: "payable", issuedOn: "2026-10-01", dueOn: "2026-10-15", amountCents: 6_400 },
   { id: "inv_om_602", companyId: COMPANY.qpl, partyId: "party_qpl_omega", number: "FAC-602", direction: "payable", issuedOn: "2026-11-10", dueOn: "2026-11-28", amountCents: 2_100 },
@@ -84,6 +85,7 @@ export async function seedInvoices(db: Db) {
         amountCents: invoice.amountCents,
         currency: "USD",
         status: linked ? "matched" : "open",
+        approval: linked ? "conciliada" : (invoice.approval ?? "por_autorizar"),
         isDemonstration: true,
       },
     });

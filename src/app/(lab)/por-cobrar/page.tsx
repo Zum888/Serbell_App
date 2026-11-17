@@ -1,4 +1,4 @@
-import { InvoiceFolders, InvoiceList, InvoicePanel } from "@/components/invoice-desk";
+import { DeskTotals, InvoiceFolders, InvoiceList, InvoicePanel } from "@/components/invoice-desk";
 import { StateView } from "@/components/state-view";
 import { isAppError } from "@/lib/errors";
 import { db } from "@/server/db";
@@ -15,7 +15,7 @@ export default async function ReceivablesPage({
   const params = await searchParams;
   if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para ver sus facturas." />;
   const company = session.companies.find((item) => item.id === session.companyId);
-  const folders = await invoiceDesk(db(), session.actor, session.companyId, "receivable");
+  const { folders, summary } = await invoiceDesk(db(), session.actor, session.companyId, "receivable");
   const folder = folders.find((item) => item.partyId === params.parte) ?? null;
   let panel = null;
   let panelError = params.error;
@@ -40,6 +40,7 @@ export default async function ReceivablesPage({
         <p className="mt-1 text-sm text-slate-500">
           Carpetas de clientes con facturas de demostración. Vincular una factura anota el movimiento del banco; no cobra.
         </p>
+        <div className="mt-4"><DeskTotals summary={summary} label="Total por cobrar" /></div>
         {panelError && !panel ? <p className="mt-3 text-sm text-red-700" data-testid="server-error">{panelError}</p> : null}
         {folder ? (
           <div className="mt-4">

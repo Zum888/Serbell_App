@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { isAppError } from "@/lib/errors";
 
+/** True when the caller (a fetch from our client code) wants a JSON answer instead of a redirect. */
+export function wantsJson(req: Request): boolean {
+  return (req.headers.get("accept") ?? "").includes("application/json");
+}
+
 /** Keep the host the browser used. Next's request.url is often localhost even for 127.0.0.1. */
 export function originOf(req: Request) {
   const url = new URL(req.url);

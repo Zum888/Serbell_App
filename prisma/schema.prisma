@@ -403,6 +403,7 @@ model Invoice {
   amountCents     Int
   currency        String        @default("USD")
   status          String        @default("open")
+  approval        String        @default("por_autorizar")
   isDemonstration Boolean       @default(true)
   followUpAt      DateTime?
   company         Company       @relation(fields: [companyId], references: [id])

@@ -132,6 +132,124 @@ export async function insertQplDemonstrationAccounts(db: Db) {
   }
 }
 
+const EXTRA_QPL_TX: [string, string, string, string, number][] = [
+  ["tx_qpl_x01", "acct_qpl_boa", "2026-10-02", "RaceTrac", -4215],
+  ["tx_qpl_x02", "acct_qpl_boa", "2026-10-05", "Office Depot", -8930],
+  ["tx_qpl_x03", "acct_qpl_boa", "2026-10-07", "Cobro cliente Andina", 72000],
+  ["tx_qpl_x04", "acct_qpl_boa", "2026-10-11", "TA Travel Center", -7650],
+  ["tx_qpl_x05", "acct_qpl_boa", "2026-10-16", "Verizon", -3120],
+  ["tx_qpl_x06", "acct_qpl_boa", "2026-10-24", "Love's", -5890],
+  ["tx_qpl_x07", "acct_qpl_boa", "2026-10-28", "Cobro cliente Ruiz", 40000],
+  ["tx_qpl_x08", "acct_qpl_chase", "2026-10-03", "AutoZone", -6240],
+  ["tx_qpl_x09", "acct_qpl_chase", "2026-10-12", "Walmart", -4310],
+  ["tx_qpl_x10", "acct_qpl_chase", "2026-10-19", "Depósito en efectivo", 60000],
+  ["tx_qpl_x11", "acct_qpl_chase", "2026-10-25", "Comfort Inn", -11280],
+  ["tx_qpl_x12", "acct_qpl_wells", "2026-10-06", "Pep Boys", -3980],
+  ["tx_qpl_x13", "acct_qpl_wells", "2026-10-13", "FedEx", -2460],
+  ["tx_qpl_x14", "acct_qpl_wells", "2026-10-21", "Cobro cliente Andina", 30000],
+  ["tx_qpl_x15", "acct_qpl_amex", "2026-10-08", "Costco", -9120],
+  ["tx_qpl_x16", "acct_qpl_amex", "2026-10-18", "GoDaddy", -1899],
+  ["tx_qpl_x17", "acct_qpl_amex", "2026-10-27", "Flying J", -6730],
+];
+
+const EXTRA_RIV_TX: [string, string, string, number][] = [
+  ["tx_riv_x01", "2026-10-03", "Lowe's", -28940],
+  ["tx_riv_x02", "2026-10-07", "Anticipo Obra Sol", 300000],
+  ["tx_riv_x03", "2026-10-10", "United Rentals", -45600],
+  ["tx_riv_x04", "2026-10-13", "Sherwin-Williams", -12380],
+  ["tx_riv_x05", "2026-10-17", "Ferretería Lima", -22000],
+  ["tx_riv_x06", "2026-10-20", "Cobro Obra Sol", 120000],
+  ["tx_riv_x07", "2026-10-24", "Sunbelt Rentals", -33750],
+  ["tx_riv_x08", "2026-10-28", "Grainger", -8640],
+];
+
+const EXTRA_TICKETS: [string, string, string, string, number][] = [
+  ["doc_x_racetrac", COMPANY.qpl, "RaceTrac", "RaceTrac_1002.jpg", 4215],
+  ["doc_x_officedepot", COMPANY.qpl, "Office Depot", "OfficeDepot_1005.jpg", 8930],
+  ["doc_x_ta", COMPANY.qpl, "TA Travel Center", "TA_1011.jpg", 7650],
+  ["doc_x_verizon", COMPANY.qpl, "Verizon", "Verizon_1016.jpg", 3120],
+  ["doc_x_loves", COMPANY.qpl, "Love's", "Loves_1024.jpg", 5890],
+  ["doc_x_autozone", COMPANY.qpl, "AutoZone", "AutoZone_1003.jpg", 6240],
+  ["doc_x_walmart", COMPANY.qpl, "Walmart", "Walmart_1012.jpg", 4310],
+  ["doc_x_comfort", COMPANY.qpl, "Comfort Inn", "ComfortInn_1025.jpg", 11280],
+  ["doc_x_pepboys", COMPANY.qpl, "Pep Boys", "PepBoys_1006.jpg", 3980],
+  ["doc_x_fedex", COMPANY.qpl, "FedEx", "FedEx_1013.jpg", 2460],
+  ["doc_x_costco", COMPANY.qpl, "Costco", "Costco_1008.jpg", 9120],
+  ["doc_x_godaddy", COMPANY.qpl, "GoDaddy", "GoDaddy_1018.jpg", 1899],
+  ["doc_x_flyingj", COMPANY.qpl, "Flying J", "FlyingJ_1027.jpg", 6730],
+  ["doc_x_lowes", COMPANY.rivera, "Lowe's", "Lowes_1003.jpg", 28940],
+  ["doc_x_united", COMPANY.rivera, "United Rentals", "UnitedRentals_1010.jpg", 45600],
+  ["doc_x_sherwin", COMPANY.rivera, "Sherwin-Williams", "Sherwin_1013.jpg", 12380],
+  ["doc_x_lima", COMPANY.rivera, "Ferretería Lima", "Lima_1017.jpg", 22000],
+  ["doc_x_sunbelt", COMPANY.rivera, "Sunbelt Rentals", "Sunbelt_1024.jpg", 33750],
+  ["doc_x_grainger", COMPANY.rivera, "Grainger", "Grainger_1028.jpg", 8640],
+];
+
+async function insertExtraDemo(db: Db) {
+  for (const [id, accountId, day, merchant, amountCents] of EXTRA_QPL_TX) {
+    await db.bankTransaction.create({
+      data: {
+        id,
+        companyId: COMPANY.qpl,
+        accountId,
+        postedOn: noon(day),
+        merchant,
+        description: DEMO,
+        amountCents,
+        currency: "USD",
+        bankState: "Posted",
+        reconciliationState: "Unreconciled",
+        documentState: "Missing",
+        accountingState: "Uncategorized",
+        reviewState: "NeedsReview",
+        externalId: id,
+        isDemonstration: true,
+      },
+    });
+  }
+  for (const [id, day, merchant, amountCents] of EXTRA_RIV_TX) {
+    await db.bankTransaction.create({
+      data: {
+        id,
+        companyId: COMPANY.rivera,
+        accountId: ACCOUNT.rivera,
+        postedOn: noon(day),
+        merchant,
+        description: DEMO,
+        amountCents,
+        currency: "USD",
+        bankState: "Posted",
+        reconciliationState: "Unreconciled",
+        documentState: "Missing",
+        accountingState: "Uncategorized",
+        reviewState: "NeedsReview",
+        externalId: id,
+        isDemonstration: true,
+      },
+    });
+  }
+  for (const [id, companyId, merchant, fileName, amountCents] of EXTRA_TICKETS) {
+    const uploader = companyId === COMPANY.qpl ? USER.padrino : USER.luis;
+    const file = await store(companyId, `${id}.jpg`, Buffer.from(`serbell-lab-${id}`));
+    await db.document.create({
+      data: { id, companyId, uploadedById: uploader, fileName, mimeType: "image/jpeg", status: "pending", ...file },
+    });
+    await db.documentExtraction.create({
+      data: {
+        id: `ext_${id}`,
+        documentId: id,
+        merchant,
+        amountCents,
+        currency: "USD",
+        occurredOn: noon("2026-10-15"),
+        source: "user",
+        isDemonstration: true,
+        notice: "Comprobante de demostración en espera de conciliación.",
+      },
+    });
+  }
+}
+
 export async function seedDatabase(db: Db) {
   await db.accountingFirm.create({
     data: { id: FIRM_ID, name: "Despacho Contable" },
@@ -422,6 +540,7 @@ export async function seedDatabase(db: Db) {
     ],
   });
   await insertQplDemonstrationAccounts(db);
+  await insertExtraDemo(db);
   await stampReliableMatcherLinks(db);
   await db.accountingReview.create({
     data: {

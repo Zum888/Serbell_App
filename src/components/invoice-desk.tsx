@@ -1,10 +1,45 @@
 import { Folder } from "lucide-react";
 import Link from "next/link";
 import { AGING_LABEL, type AgingKey } from "@/lib/aging";
+import { ADVANCE_LABEL, APPROVAL_LABEL, APPROVAL_TONE, type Approval, nextApproval } from "@/lib/approval";
 import { formatDay } from "@/lib/dates";
 import { formatUsd } from "@/lib/money";
-import type { InvoiceCard, InvoiceFolder } from "@/server/invoices";
+import type { DeskSummary, InvoiceCard, InvoiceFolder } from "@/server/invoices";
 import { Button } from "@/components/ui/button";
+
+const APPROVAL_ORDER: Approval[] = ["por_autorizar", "autorizada", "en_proceso", "conciliada"];
+
+export function ApprovalChip({ approval }: { approval: Approval }) {
+  return (
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${APPROVAL_TONE[approval]}`}>
+      {APPROVAL_LABEL[approval]}
+    </span>
+  );
+}
+
+export function DeskTotals({ summary, label }: { summary: DeskSummary; label: string }) {
+  return (
+    <section className="rounded-2xl border border-border bg-white p-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
+          <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{formatUsd(summary.totalCents)}</p>
+          <p className="text-sm text-slate-500">
+            {summary.invoiceCount} facturas · Abierto {formatUsd(summary.openCents)} · Conciliado {formatUsd(summary.matchedCents)}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {APPROVAL_ORDER.map((approval) => (
+            <span key={approval} className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${APPROVAL_TONE[approval]}`}>
+              {APPROVAL_LABEL[approval]}
+              <span className="tabular-nums">{summary.counts[approval]}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function agingCaption(key: AgingKey | null) {
   if (!key) return "Conciliada con el banco";
@@ -93,7 +128,10 @@ export function InvoiceList({
                 Emitida {formatDay(invoice.issuedOn)} · Vence {formatDay(invoice.dueOn)}
               </p>
             </div>
-            <p className="font-semibold">{formatUsd(invoice.amountCents)}</p>
+            <div className="flex flex-col items-end gap-1">
+              <p className="font-semibold tabular-nums">{formatUsd(invoice.amountCents)}</p>
+              <ApprovalChip approval={invoice.approval} />
+            </div>
           </div>
           <p className="mt-2 text-xs text-slate-600">
             {invoice.status === "matched" ? "Conciliada con el banco" : agingCaption(invoice.aging)}
@@ -126,6 +164,7 @@ export function InvoicePanel({
     dueOn: string;
     aging: AgingKey | null;
     status: string;
+    approval: Approval;
     isDemonstration: boolean;
     followUpAt: string | null;
     movement: { id: string; merchant: string; postedOn: string; amountLabel: string; sealed: boolean } | null;
@@ -150,7 +189,16 @@ export function InvoicePanel({
       </div>
       <p className="mt-3 text-2xl font-semibold tracking-tight">{panel.amountLabel}</p>
       <p className="text-sm text-slate-500">Emitida {formatDay(panel.issuedOn)} · Vence {formatDay(panel.dueOn)}</p>
+      <div className="mt-2"><ApprovalChip approval={panel.approval} /></div>
       <p className="mt-2 text-sm text-slate-600">{panel.status === "matched" ? "Conciliada con el banco" : agingCaption(panel.aging)}</p>
+      {panel.status !== "matched" && nextApproval(panel.approval) ? (
+        <form action={`/api/invoices/${panel.id}/approval`} method="post" className="mt-3">
+          <input type="hidden" name="next" value={next} />
+          <Button type="submit" variant="outline" data-testid="advance-approval">
+            {ADVANCE_LABEL[nextApproval(panel.approval) as string]}
+          </Button>
+        </form>
+      ) : null}
       {panel.isDemonstration ? <p className="mt-2 text-xs text-amber-700">Demostración. No cobra ni paga.</p> : null}
       {error ? <p className="mt-2 text-sm text-red-700" data-testid="server-error">{error}</p> : null}
       {panel.movement ? (

@@ -22,6 +22,7 @@ export default async function MovementsPage({
   try {
     const tree = await listCategoryTree(db(), session.actor, session.companyId);
     const categories = tree.map((parent) => ({
+      id: parent.id,
       name: parent.name,
       children: parent.children.map((child) => ({ id: child.id, name: child.name })),
     }));
@@ -61,6 +62,7 @@ export default async function MovementsPage({
     return (
       <MovementsScreen
         companyName={home.company.name}
+        companyId={session.companyId}
         balanceLabel={`Disponible en las ${home.accountCount} cuentas · ${formatUsd(home.balanceCents)}`}
         rows={rows}
         counts={counts}

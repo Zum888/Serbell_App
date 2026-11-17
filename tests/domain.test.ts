@@ -354,7 +354,7 @@ it("las carpetas de facturas no mezclan empresas y el vínculo no mueve el banco
   await seedInvoices(prisma);
   expect(await prisma.invoice.count()).toBe(before);
 
-  const receivables = await invoiceDesk(prisma, padrino, COMPANY.qpl, "receivable", "2026-11-17");
+  const receivables = (await invoiceDesk(prisma, padrino, COMPANY.qpl, "receivable", "2026-11-17")).folders;
   expect(receivables.map((folder) => folder.name)).toEqual(["Cliente Ruiz", "Depósito de cliente", "Logística Andina"]);
   const ruiz = receivables[0];
   expect(ruiz.totalCents).toBe(190_000);
