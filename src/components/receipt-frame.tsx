@@ -73,7 +73,15 @@ export function ReceiptFrame({
             data-testid="receipt-file"
             className="max-w-none"
             style={{ width: `${zoom * 100}%` }}
-            onError={() => setFailed(true)}
+            onError={(event) => {
+              const image = event.currentTarget;
+              if (image.dataset.retry === "1") {
+                setFailed(true);
+                return;
+              }
+              image.dataset.retry = "1";
+              image.src = src;
+            }}
           />
         )}
       </div>

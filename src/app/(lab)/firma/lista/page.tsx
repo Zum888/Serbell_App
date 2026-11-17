@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { BoardViewer } from "@/components/board-viewer";
+import { ReviewBoard } from "@/components/review-board";
 import { StateView } from "@/components/state-view";
 import { isAppError } from "@/lib/errors";
 import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
-import { firmQueue } from "@/server/queries";
+import { firmQueue, getBoardReceipt, reviewBoard } from "@/server/queries";
 
 const TITLES: Record<string, string> = {
   revisar: "Movimientos por revisar",
@@ -14,11 +16,40 @@ const TITLES: Record<string, string> = {
   empresas: "Empresas asignadas",
 };
 
-export default async function FirmListPage({ searchParams }: { searchParams: Promise<{ tipo?: string }> }) {
+export default async function FirmListPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tipo?: string; movimiento?: string; error?: string }>;
+}) {
   const session = await pageContext();
   const params = await searchParams;
   const tipo = params.tipo && TITLES[params.tipo] ? params.tipo : "revisar";
   try {
+    if (tipo === "revisar") {
+      const groups = await reviewBoard(db(), session.actor);
+      const viewer = params.movimiento
+        ? await getBoardReceipt(db(), session.actor, { transactionId: params.movimiento })
+        : null;
+      const next = params.movimiento ? `/firma/lista?tipo=revisar&movimiento=${params.movimiento}` : "/firma/lista?tipo=revisar";
+      return (
+        <div className={viewer ? "grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]" : ""}>
+          <section>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-xs text-slate-500">Despacho</p>
+                <h1 className="text-2xl font-semibold tracking-tight">Revisión</h1>
+                <p className="mt-1 text-sm text-slate-500">Aprobar y sellar mueve la tarjeta a Sellado. Una aclaración la mueve a Esperando cliente.</p>
+              </div>
+              <Link href="/firma" className="text-sm font-medium text-primary">Volver al inicio</Link>
+            </div>
+            <div className="mt-4">
+              <ReviewBoard groups={groups} activeId={params.movimiento} />
+            </div>
+          </section>
+          {viewer ? <BoardViewer viewer={{ ...viewer, closeHref: "/firma/lista?tipo=revisar", next }} error={params.error} /> : null}
+        </div>
+      );
+    }
     const rows = await firmQueue(db(), session.actor, tipo);
     return (
       <section className="space-y-4">

@@ -17,7 +17,7 @@ import {
   saveJournalEntry,
   sealTransaction,
 } from "@/server/domain";
-import { accountBreakdowns, companyReport, firmQueue, getFirm, getHome, getMovement, loadActor } from "@/server/queries";
+import { accountBreakdowns, companyReport, documentBoard, firmQueue, getFirm, getHome, getMovement, loadActor, reviewBoard } from "@/server/queries";
 import { seedDatabase } from "@/server/seed";
 
 const databaseUrl = "file:/tmp/serbell-vitest.db";
@@ -312,4 +312,31 @@ it("reemplaza el comprobante y deja el anterior y el nuevo en la auditoría", as
   const count = await prisma.auditEvent.count({ where: { transactionId: TX.fs21148, action: "document_replaced" } });
   await replaceTransactionDocument(prisma, padrino, TX.fs21148, uploaded.id);
   expect(await prisma.auditEvent.count({ where: { transactionId: TX.fs21148, action: "document_replaced" } })).toBe(count);
+});
+
+it("arma el tablero con los estados guardados y no mezcla empresas", async () => {
+  const padrino = await loadActor(prisma, USER.padrino);
+  const carlos = await loadActor(prisma, USER.carlos);
+  const luis = await loadActor(prisma, USER.luis);
+  if (!padrino || !carlos || !luis) throw new Error("faltan perfiles");
+  const board = await documentBoard(prisma, padrino, COMPANY.qpl);
+  const columnOf = (id: string) => (Object.keys(board) as (keyof typeof board)[]).find((key) => board[key].some((card) => card.id === id));
+  expect(columnOf("doc_qpl_harbor")).toBe("recibido");
+  expect(columnOf("doc_qpl_sunpass")).toBe("procesado");
+  expect(columnOf("doc_qpl_dup_21148")).toBe("procesado");
+  expect(board.procesado.find((card) => card.id === "doc_qpl_dup_21148")?.duplicate).toBe(true);
+  expect(columnOf("doc_qpl_fs_15012")).toBe("sellado");
+  expect(columnOf("doc_riv_ace")).toBeUndefined();
+  await expect(documentBoard(prisma, luis, COMPANY.qpl)).rejects.toMatchObject({ code: "COMPANY_FORBIDDEN" });
+
+  const review = await reviewBoard(prisma, carlos);
+  const reviewOf = (id: string) => (Object.keys(review) as (keyof typeof review)[]).find((key) => review[key].some((card) => card.id === id));
+  expect(reviewOf(TX.brian)).toBe("cliente");
+  expect(reviewOf(TX.fs15012)).toBe("sellado");
+  expect(reviewOf(TX.ace)).toBe("revisar");
+  expect(review.revisar.find((card) => card.id === TX.ace)?.conflict).toBe(true);
+  expect(reviewOf(TX.shell)).toBe("aprobar");
+  expect(review.aprobar.find((card) => card.id === TX.shell)?.canSeal).toBe(true);
+  expect(review.sellado.find((card) => card.id === TX.fs15012)?.canSeal).toBe(false);
+  await expect(reviewBoard(prisma, padrino)).rejects.toMatchObject({ code: "FIRM_FORBIDDEN" });
 });

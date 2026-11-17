@@ -1,6 +1,8 @@
+import { documentColumn, reviewColumn, type DocumentColumn, type ReviewColumn } from "@/lib/board";
 import { dayKey, formatDateTime, formatDay } from "@/lib/dates";
 import { AppError } from "@/lib/errors";
 import { AUDIT_LABEL } from "@/lib/labels";
+import { formatUsd } from "@/lib/money";
 import { canReview, companyRole, type Actor, type MembershipRole } from "@/lib/permissions";
 import { localProviders } from "@/providers/local";
 import type { Db } from "@/server/db";
@@ -861,6 +863,210 @@ export async function listCategoryTree(db: Db, actor: Actor, companyId: string) 
       ...parent,
       children: categories.filter((category) => category.parentId === parent.id),
     }));
+}
+
+function moneyLabel(cents: number | null | undefined): string {
+  return cents === null || cents === undefined ? "Sin importe" : formatUsd(cents);
+}
+
+export async function documentBoard(db: Db, actor: Actor, companyId: string) {
+  if (!companyRole(actor, companyId)) {
+    throw new AppError("El servidor rechazó la solicitud: no tienes acceso a esta empresa.", 403, "COMPANY_FORBIDDEN");
+  }
+  const rows = await db.document.findMany({
+    where: { companyId },
+    include: {
+      extraction: true,
+      duplicateOf: true,
+      links: { where: { status: "confirmed" }, include: { transaction: true } },
+      candidates: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  const groups: Record<DocumentColumn, {
+    id: string;
+    fileName: string;
+    merchant: string;
+    amountLabel: string;
+    dateLabel: string;
+    duplicate: boolean;
+    conflict: boolean;
+    movement: { id: string; label: string } | null;
+    suggestionLabel: string | null;
+  }[]> = { recibido: [], procesado: [], listo: [], sellado: [] };
+  for (const row of rows) {
+    const link = row.links[0] ?? null;
+    const transaction = link?.transaction ?? null;
+    const duplicate = row.status === "duplicate" || Boolean(row.duplicateOfId);
+    const conflict = row.status === "conflict" || row.candidates.some((candidate) => candidate.decision === "conflict");
+    const hasSuggestion = row.candidates.length > 0 || row.status === "suggested" || row.status === "conflict";
+    const column = documentColumn({
+      linked: Boolean(transaction),
+      sealed: Boolean(transaction?.sealedAt),
+      reviewState: transaction?.reviewState ?? null,
+      hasSuggestion,
+      duplicate,
+      conflict,
+    });
+    const merchant = transaction?.merchant || row.extraction?.merchant || row.fileName;
+    const amountCents = transaction?.amountCents ?? row.extraction?.amountCents ?? null;
+    const dateLabel = formatDay(dayKey(transaction?.postedOn) ?? dayKey(row.extraction?.occurredOn));
+    groups[column].push({
+      id: row.id,
+      fileName: row.fileName,
+      merchant,
+      amountLabel: moneyLabel(amountCents),
+      dateLabel,
+      duplicate,
+      conflict,
+      movement: transaction
+        ? { id: transaction.id, label: `${transaction.merchant} · ${formatDay(dayKey(transaction.postedOn))}` }
+        : null,
+      suggestionLabel: !transaction && row.candidates.length
+        ? row.candidates.length === 1
+          ? "1 sugerencia"
+          : `${row.candidates.length} sugerencias`
+        : null,
+    });
+  }
+  return groups;
+}
+
+export async function reviewBoard(db: Db, actor: Actor) {
+  if (!actor.firmRole) {
+    throw new AppError("Esta pantalla es del despacho.", 403, "FIRM_FORBIDDEN");
+  }
+  const companyIds = actor.memberships.map((membership) => membership.companyId);
+  const companies = await db.company.findMany({ where: { id: { in: companyIds } } });
+  const companyName = new Map(companies.map((company) => [company.id, company.name]));
+  const rows = await db.bankTransaction.findMany({
+    where: { companyId: { in: companyIds } },
+    include: {
+      links: { where: { status: "confirmed" }, include: { document: true } },
+    },
+    orderBy: [{ postedOn: "desc" }, { merchant: "asc" }],
+  });
+  const groups: Record<ReviewColumn, {
+    id: string;
+    companyName: string;
+    merchant: string;
+    amountLabel: string;
+    dateLabel: string;
+    documentId: string | null;
+    documentName: string | null;
+    duplicate: boolean;
+    conflict: boolean;
+    canSeal: boolean;
+  }[]> = { revisar: [], cliente: [], aprobar: [], sellado: [] };
+  const reviewer = actor.firmRole === "ACCOUNTANT" || actor.firmRole === "FIRM_ADMIN";
+  for (const row of rows) {
+    const column = reviewColumn({
+      sealed: Boolean(row.sealedAt),
+      reviewState: row.reviewState,
+      documentState: row.documentState,
+    });
+    const document = row.links[0]?.document ?? null;
+    groups[column].push({
+      id: row.id,
+      companyName: companyName.get(row.companyId) ?? "",
+      merchant: row.merchant,
+      amountLabel: moneyLabel(row.amountCents),
+      dateLabel: formatDay(dayKey(row.postedOn)),
+      documentId: document?.id ?? null,
+      documentName: document?.fileName ?? null,
+      duplicate: document?.status === "duplicate" || Boolean(document?.duplicateOfId),
+      conflict: row.documentState === "Conflict" || document?.status === "conflict",
+      canSeal: reviewer && column === "aprobar",
+    });
+  }
+  return groups;
+}
+
+export async function getBoardReceipt(
+  db: Db,
+  actor: Actor,
+  input: { documentId?: string | null; transactionId?: string | null },
+) {
+  const transactionInclude = {
+    links: { where: { status: "confirmed" }, include: { document: { include: { extraction: true, duplicateOf: true, candidates: true } } } },
+    company: true,
+    audits: { where: { action: "document_replaced" }, orderBy: { createdAt: "desc" as const }, take: 1 },
+  };
+  let transaction = input.transactionId
+    ? await db.bankTransaction.findUnique({ where: { id: input.transactionId }, include: transactionInclude })
+    : null;
+  let document = transaction?.links[0]?.document ?? null;
+  if (input.documentId && (!document || document.id !== input.documentId)) {
+    const loaded = await db.document.findUnique({
+      where: { id: input.documentId },
+      include: {
+        extraction: true,
+        duplicateOf: true,
+        candidates: true,
+        links: { where: { status: "confirmed" }, include: { transaction: { include: transactionInclude } } },
+      },
+    });
+    if (!loaded) throw new AppError("No existe ese comprobante.", 404, "NOT_FOUND");
+    document = loaded;
+    transaction = loaded.links[0]?.transaction ?? transaction;
+  }
+  if (!document && !transaction) throw new AppError("No existe ese comprobante.", 404, "NOT_FOUND");
+  const companyId = document?.companyId ?? transaction?.companyId ?? "";
+  if (!companyRole(actor, companyId)) {
+    throw new AppError("El servidor rechazó la solicitud: no tienes acceso a esta empresa.", 403, "COMPANY_FORBIDDEN");
+  }
+  const candidates = document && !transaction
+    ? await Promise.all(document.candidates.filter((candidate) => !candidate.blocked && candidate.decision !== "conflict").map(async (candidate) => {
+        const match = await db.bankTransaction.findUnique({ where: { id: candidate.transactionId } });
+        if (!match || match.sealedAt) return null;
+        return {
+          transactionId: match.id,
+          merchant: match.merchant,
+          amountLabel: moneyLabel(match.amountCents),
+          dateLabel: formatDay(dayKey(match.postedOn)),
+        };
+      }))
+    : [];
+  const choices = transaction
+    ? (await db.document.findMany({
+        where: { companyId },
+        include: { links: { where: { status: "confirmed" }, select: { transactionId: true } } },
+        orderBy: { fileName: "asc" },
+      })).filter((item) => item.id !== document?.id && !item.links.some((link) => link.transactionId !== transaction?.id))
+        .map((item) => ({ id: item.id, fileName: item.fileName }))
+    : [];
+  const audit = transaction && "audits" in transaction ? transaction.audits[0] : null;
+  const merchant = transaction?.merchant || document?.extraction?.merchant || document?.fileName || "Sin datos";
+  const amountCents = transaction?.amountCents ?? document?.extraction?.amountCents ?? null;
+  const dateLabel = formatDay(dayKey(transaction?.postedOn) ?? dayKey(document?.extraction?.occurredOn));
+  return {
+    document: document
+      ? {
+          id: document.id,
+          fileName: document.fileName,
+          mimeType: document.mimeType,
+          merchant,
+          amountLabel: moneyLabel(amountCents),
+          dateLabel,
+        }
+      : null,
+    movement: transaction
+      ? {
+          id: transaction.id,
+          merchant: transaction.merchant,
+          amountLabel: moneyLabel(transaction.amountCents),
+          dateLabel: formatDay(dayKey(transaction.postedOn)),
+          sealed: Boolean(transaction.sealedAt),
+        }
+      : null,
+    candidates: candidates.filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate)),
+    choices,
+    duplicate: document?.status === "duplicate" || Boolean(document?.duplicateOfId),
+    duplicateOfName: document?.duplicateOf?.fileName ?? null,
+    conflict: document?.status === "conflict" || document?.candidates.some((candidate) => candidate.decision === "conflict") || transaction?.documentState === "Conflict",
+    canReview: canReview(actor, companyId),
+    auditNote: audit ? documentChangeNote(audit.action, audit.previousJson, audit.nextJson) : null,
+  };
 }
 
 export async function readDocumentFile(db: Db, actor: Actor, documentId: string) {

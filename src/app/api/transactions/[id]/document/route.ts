@@ -1,4 +1,5 @@
 import { AppError } from "@/lib/errors";
+import { safeNext } from "@/lib/utils";
 import { db } from "@/server/db";
 import { replaceTransactionDocument, uploadReplacementDocument } from "@/server/domain";
 import { redirectError, redirectTo } from "@/server/http";
@@ -15,6 +16,13 @@ function mimeOf(file: File): string {
 }
 
 function movementPath(id: string, form: FormData, documentId?: string) {
+  const requested = safeNext(String(form.get("next") ?? ""), "");
+  if (requested) {
+    const url = new URL(requested, "http://local");
+    if (documentId) url.searchParams.set("recibo", documentId);
+    url.searchParams.set("fila", id);
+    return `${url.pathname}${url.search}`;
+  }
   const params = new URLSearchParams();
   const filtro = String(form.get("filtro") ?? "");
   const q = String(form.get("q") ?? "");
