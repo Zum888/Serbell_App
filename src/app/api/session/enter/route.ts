@@ -1,19 +1,35 @@
 import { NextResponse } from "next/server";
 import { requireIdentity } from "../../../../../cursor/identity";
-import { PROFILE_COMPANY, PROFILES } from "@/lib/ids";
+import { PROFILES } from "@/lib/ids";
+import { isAppError } from "@/lib/errors";
 import { safeNext } from "@/lib/utils";
 import { originOf } from "@/server/http";
-import { COMPANY_COOKIE, USER_COOKIE, cookieOptions } from "@/server/session";
+import { isDemoOwner } from "@/server/owner";
+import { COMPANY_COOKIE, saveDemoBinding, USER_COOKIE } from "@/server/session";
 
 export async function GET(request: Request) {
   const identity = await requireIdentity(request);
   if (identity instanceof Response) return identity;
+  if (!isDemoOwner(identity)) {
+    return new NextResponse(null, { status: 403, headers: { "cache-control": "private, no-store" } });
+  }
   const url = new URL(request.url);
   const profile = PROFILES.find((item) => item.id === url.searchParams.get("user")) ?? PROFILES[0];
+  try {
+    await saveDemoBinding(identity, profile.id);
+  } catch (error) {
+    if (isAppError(error)) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status, headers: { "cache-control": "private, no-store" } },
+      );
+    }
+    throw error;
+  }
   const next = safeNext(url.searchParams.get("next"), profile.home);
   const response = NextResponse.redirect(new URL(next, `${originOf(request)}/`));
   response.headers.set("cache-control", "private, no-store");
-  response.cookies.set(USER_COOKIE, profile.id, cookieOptions);
-  response.cookies.set(COMPANY_COOKIE, PROFILE_COMPANY[profile.id], cookieOptions);
+  response.cookies.set(USER_COOKIE, "", { path: "/", httpOnly: true, sameSite: "lax", maxAge: 0 });
+  response.cookies.set(COMPANY_COOKIE, "", { path: "/", httpOnly: true, sameSite: "lax", maxAge: 0 });
   return response;
 }

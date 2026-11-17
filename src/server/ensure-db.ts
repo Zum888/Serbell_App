@@ -18,15 +18,22 @@ export function sqliteFileFromUrl(url: string): string | null {
 export async function ensureDemoDatabase() {
   if (!process.env.DATABASE_URL) process.env.DATABASE_URL = DEFAULT_DATABASE_URL;
   const file = sqliteFileFromUrl(process.env.DATABASE_URL);
-  if (!file || existsSync(/*turbopackIgnore: true*/ file)) return;
-
+  if (!file) return;
   const schema = path.join(process.cwd(), "prisma", "schema.prisma");
   const cli = path.join(process.cwd(), "node_modules", "prisma", "build", "index.js");
-  execFileSync(process.execPath, [cli, "db", "push", "--skip-generate", "--schema", schema], {
-    cwd: process.cwd(),
-    env: process.env,
-    stdio: "inherit",
-  });
+  const push = () => {
+    execFileSync(process.execPath, [cli, "db", "push", "--skip-generate", "--schema", schema], {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: "inherit",
+    });
+  };
+  if (existsSync(/*turbopackIgnore: true*/ file)) {
+    push();
+    return;
+  }
+
+  push();
 
   const prisma = new PrismaClient();
   try {

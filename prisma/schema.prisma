@@ -426,3 +426,11 @@ model InvoiceLink {
   @@unique([invoiceId, transactionId])
   @@index([transactionId])
 }
+
+/// Demo profile chosen by the app owner. Keyed by the signed-in viewer, never by an unsigned cookie.
+model DemoBinding {
+  viewerSub String   @id
+  profileId String
+  companyId String
+  updatedAt DateTime @updatedAt
+}
