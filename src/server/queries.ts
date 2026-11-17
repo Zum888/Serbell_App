@@ -551,6 +551,10 @@ export async function accountBreakdowns(db: Db, actor: Actor, companyId: string)
   });
   const transactions = await db.bankTransaction.findMany({
     where: { companyId },
+    include: {
+      classification: { include: { category: true, subcategory: true } },
+      links: { where: { status: "confirmed" }, include: { document: { select: { id: true, fileName: true } } } },
+    },
     orderBy: [{ postedOn: "desc" }, { merchant: "asc" }],
   });
   return accounts.map((account) => {
@@ -574,13 +578,26 @@ export async function accountBreakdowns(db: Db, actor: Actor, companyId: string)
       inflows,
       outflows,
       net: inflows + outflows,
+      reconciledCount: rows.filter((row) => row.reconciliationState === "Reconciled").length,
+      unreconciledCount: rows.filter((row) => row.reconciliationState !== "Reconciled").length,
+      origin: account.origin,
       movements: rows.map((row) => ({
         id: row.id,
+        day: dayKey(row.postedOn) ?? "",
         postedOn: formatDay(dayKey(row.postedOn)),
         merchant: row.merchant,
         description: row.description,
         amountCents: row.amountCents,
         isDemonstration: row.isDemonstration,
+        reconciliationState: row.reconciliationState,
+        documentState: row.documentState,
+        accountingState: row.accountingState,
+        reviewState: row.reviewState,
+        sealed: Boolean(row.sealedAt),
+        categoryLabel: row.classification?.category && row.classification.subcategory
+          ? `${row.classification.category.name} / ${row.classification.subcategory.name}`
+          : "Sin categoría",
+        documentName: row.links[0]?.document.fileName ?? null,
       })),
       series: [...rows]
         .sort((a, b) => a.postedOn.getTime() - b.postedOn.getTime() || a.merchant.localeCompare(b.merchant))

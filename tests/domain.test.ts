@@ -12,6 +12,8 @@ import {
   saveUploadedDocument,
   reconcileTransaction,
   reconcileTransactions,
+  createManualAccount,
+  setBankReconciliation,
   replaceTransactionDocument,
   reopenTransaction,
   saveJournalEntry,
@@ -436,4 +438,59 @@ it("el modo enfoque categoriza sin aprobar ni conciliar, y la regla no toca el s
   expect(skipped?.reconciliationState).toBe(shell?.reconciliationState);
   expect(await prisma.auditEvent.findFirst({ where: { action: "focus_skipped", transactionId: "tx_qpl_demo_shell", actorId: USER.padrino } })).not.toBeNull();
   await expect(skipFocus(prisma, luis, "tx_qpl_demo_shell")).rejects.toMatchObject({ code: "COMPANY_FORBIDDEN" });
+});
+
+it("una cuenta manual no cruza de empresa y conciliar solo toca el banco", async () => {
+  const padrino = await loadActor(prisma, USER.padrino);
+  const luis = await loadActor(prisma, USER.luis);
+  if (!padrino || !luis) throw new Error("faltan perfiles");
+  await expect(createManualAccount(prisma, padrino, COMPANY.rivera, {
+    institution: "Regions",
+    name: "Operativa manual",
+    mask: "4410",
+    kind: "bank",
+    openingBalanceCents: 25_000,
+  })).rejects.toMatchObject({ code: "COMPANY_FORBIDDEN" });
+  const id = await createManualAccount(prisma, padrino, COMPANY.qpl, {
+    institution: "Regions",
+    name: "Operativa manual",
+    mask: "4410",
+    kind: "bank",
+    openingBalanceCents: 25_000,
+  });
+  const created = await prisma.bankAccount.findUnique({ where: { id } });
+  expect(created?.companyId).toBe(COMPANY.qpl);
+  expect(created?.origin).toBe("manual");
+  expect(created?.isDemonstration).toBe(true);
+  expect(created?.availableBalanceCents).toBe(25_000);
+  expect(await prisma.bankTransaction.count({ where: { accountId: id } })).toBe(0);
+  const createdAudit = await prisma.auditEvent.findFirst({ where: { action: "account_created", actorId: USER.padrino, companyId: COMPANY.qpl } });
+  expect(createdAudit?.nextJson).toContain(id);
+  expect(createdAudit?.nextJson).toContain("manual");
+  expect(await prisma.bankAccount.findFirst({ where: { companyId: COMPANY.rivera, mask: "4410" } })).toBeNull();
+
+  const shell = await prisma.bankTransaction.findUnique({ where: { id: "tx_qpl_demo_shell" } });
+  await setBankReconciliation(prisma, padrino, "tx_qpl_demo_shell", "Reconciled");
+  const reconciled = await prisma.bankTransaction.findUnique({ where: { id: "tx_qpl_demo_shell" } });
+  expect(reconciled?.reconciliationState).toBe("Reconciled");
+  expect(reconciled?.documentState).toBe(shell?.documentState);
+  expect(reconciled?.accountingState).toBe(shell?.accountingState);
+  expect(reconciled?.reviewState).toBe(shell?.reviewState);
+  expect(reconciled?.sealedAt).toBeNull();
+  const audit = await prisma.auditEvent.findFirst({ where: { transactionId: "tx_qpl_demo_shell", action: "manual_reconcile", actorId: USER.padrino }, orderBy: { createdAt: "desc" } });
+  expect(audit?.previousJson).toContain("Unreconciled");
+  expect(audit?.previousJson).toContain(shell?.accountId ?? "");
+  expect(audit?.nextJson).toContain("Reconciled");
+  const count = await prisma.auditEvent.count({ where: { transactionId: "tx_qpl_demo_shell", action: "manual_reconcile" } });
+  await setBankReconciliation(prisma, padrino, "tx_qpl_demo_shell", "Reconciled");
+  expect(await prisma.auditEvent.count({ where: { transactionId: "tx_qpl_demo_shell", action: "manual_reconcile" } })).toBe(count);
+  await setBankReconciliation(prisma, padrino, "tx_qpl_demo_shell", "Unreconciled");
+  const undone = await prisma.bankTransaction.findUnique({ where: { id: "tx_qpl_demo_shell" } });
+  expect(undone?.reconciliationState).toBe("Unreconciled");
+  expect(undone?.documentState).toBe(shell?.documentState);
+  await expect(setBankReconciliation(prisma, padrino, TX.fs15012, "Reconciled")).rejects.toMatchObject({ code: "SEALED" });
+  await expect(setBankReconciliation(prisma, padrino, TX.fs15012, "Unreconciled")).rejects.toMatchObject({ code: "SEALED" });
+  const sealed = await prisma.bankTransaction.findUnique({ where: { id: TX.fs15012 } });
+  expect(sealed?.reconciliationState).toBe("Unreconciled");
+  expect(sealed?.sealedAt).toBeTruthy();
 });

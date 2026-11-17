@@ -53,6 +53,7 @@ export const AUDIT_LABEL: Record<string, string> = {
   invoice_follow_up: "Factura marcada para seguimiento",
   focus_skipped: "Movimiento omitido en el modo enfoque",
   classification_rule_applied: "Categoría aplicada a un comercio",
+  account_created: "Cuenta manual agregada",
 };
 
 export function greetingName(name: string): string {

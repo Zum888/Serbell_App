@@ -525,6 +525,55 @@ export async function confirmLink(db: Db, actor: Actor, documentId: string, tran
   }
 }
 
+export async function setBankReconciliation(
+  db: Db,
+  actor: Actor,
+  transactionId: string,
+  next: "Reconciled" | "Unreconciled",
+) {
+  const transaction = await requireTransaction(db, transactionId);
+  assertCanMutate(actor, transaction.companyId, transaction.sealedAt);
+  if (transaction.reconciliationState === next) return;
+  const previous = {
+    reconciliationState: transaction.reconciliationState,
+    accountId: transaction.accountId,
+    documentState: transaction.documentState,
+    accountingState: transaction.accountingState,
+    reviewState: transaction.reviewState,
+    sealedAt: transaction.sealedAt?.toISOString() ?? null,
+  };
+  await db.bankTransaction.update({
+    where: { id: transactionId },
+    data: { reconciliationState: next },
+  });
+  await audit(db, {
+    companyId: transaction.companyId,
+    actorId: actor.id,
+    transactionId,
+    action: "manual_reconcile",
+    previous: { reconciliationState: previous.reconciliationState, accountId: transaction.accountId },
+    next: { reconciliationState: next, accountId: transaction.accountId },
+  });
+  const after = await db.bankTransaction.findUnique({ where: { id: transactionId } });
+  if (!after) return;
+  if (
+    after.documentState !== previous.documentState ||
+    after.accountingState !== previous.accountingState ||
+    after.reviewState !== previous.reviewState ||
+    (after.sealedAt?.toISOString() ?? null) !== previous.sealedAt
+  ) {
+    await db.bankTransaction.update({
+      where: { id: transactionId },
+      data: {
+        documentState: previous.documentState,
+        accountingState: previous.accountingState,
+        reviewState: previous.reviewState,
+        sealedAt: transaction.sealedAt,
+      },
+    });
+  }
+}
+
 export async function reconcileTransactions(db: Db, actor: Actor, ids: string[]) {
   const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
   if (!unique.length) throw new AppError("Selecciona un movimiento.", 400, "NONE");
@@ -537,18 +586,7 @@ export async function reconcileTransactions(db: Db, actor: Actor, ids: string[])
   const reconciled: string[] = [];
   for (const transaction of transactions) {
     if (transaction.reconciliationState === "Reconciled") continue;
-    await db.bankTransaction.update({
-      where: { id: transaction.id },
-      data: { reconciliationState: "Reconciled" },
-    });
-    await audit(db, {
-      companyId: transaction.companyId,
-      actorId: actor.id,
-      transactionId: transaction.id,
-      action: "manual_reconcile",
-      previous: { reconciliationState: transaction.reconciliationState },
-      next: { reconciliationState: "Reconciled" },
-    });
+    await setBankReconciliation(db, actor, transaction.id, "Reconciled");
     reconciled.push(transaction.id);
   }
   return reconciled;
@@ -556,6 +594,81 @@ export async function reconcileTransactions(db: Db, actor: Actor, ids: string[])
 
 export async function reconcileTransaction(db: Db, actor: Actor, transactionId: string) {
   await reconcileTransactions(db, actor, [transactionId]);
+}
+
+export async function createManualAccount(
+  db: Db,
+  actor: Actor,
+  companyId: string,
+  input: { institution: string; name: string; mask: string; kind: string; openingBalanceCents: number },
+) {
+  assertCompanyAccess(actor, companyId);
+  const institution = input.institution.trim();
+  const name = input.name.trim();
+  const mask = input.mask.trim();
+  const kind = input.kind === "card" ? "card" : input.kind === "bank" ? "bank" : "";
+  if (institution.length < 2 || institution.length > 80) {
+    throw new AppError("Escribe la institución.", 400, "INSTITUTION_REQUIRED");
+  }
+  if (name.length < 2 || name.length > 80) {
+    throw new AppError("Escribe el nombre de la cuenta.", 400, "NAME_REQUIRED");
+  }
+  if (!/^\d{4}$/.test(mask)) {
+    throw new AppError("Los últimos 4 tienen que ser cuatro dígitos.", 400, "MASK_INVALID");
+  }
+  if (!kind) throw new AppError("Elige corriente o crédito.", 400, "KIND_INVALID");
+  if (!Number.isInteger(input.openingBalanceCents)) {
+    throw new AppError("El saldo inicial tiene que ser un importe en USD.", 400, "AMOUNT_INVALID");
+  }
+  const duplicate = await db.bankAccount.findFirst({ where: { companyId, institution, mask } });
+  if (duplicate) {
+    throw new AppError("Esta empresa ya tiene una cuenta con esa institución y esos últimos 4.", 409, "DUPLICATE_ACCOUNT");
+  }
+  const id = nid("acct");
+  await db.bankAccount.create({
+    data: {
+      id,
+      companyId,
+      institution,
+      productName: name,
+      name,
+      mask,
+      currency: "USD",
+      availableBalanceCents: input.openingBalanceCents,
+      kind,
+      origin: "manual",
+      isDemonstration: true,
+    },
+  });
+  await audit(db, {
+    companyId,
+    actorId: actor.id,
+    action: "account_created",
+    next: {
+      accountId: id,
+      institution,
+      name,
+      mask,
+      kind,
+      currency: "USD",
+      availableBalanceCents: input.openingBalanceCents,
+      origin: "manual",
+    },
+  });
+  return id;
+}
+
+export async function nextBankStep(db: Db, actor: Actor, transactionId: string) {
+  const transaction = await requireTransaction(db, transactionId);
+  assertCompanyAccess(actor, transaction.companyId);
+  const open = await db.bankTransaction.findMany({
+    where: { accountId: transaction.accountId, reconciliationState: "Unreconciled" },
+    orderBy: [{ postedOn: "asc" }, { id: "asc" }],
+    select: { id: true },
+  });
+  const next = open.find((row) => row.id !== transactionId) ?? open[0] ?? null;
+  if (!next || next.id === transactionId) return `/cuentas?cuenta=${transaction.accountId}`;
+  return `/cuentas?cuenta=${transaction.accountId}&paso=conciliar&actual=${next.id}`;
 }
 
 export async function replaceTransactionDocument(db: Db, actor: Actor, transactionId: string, documentId: string) {
