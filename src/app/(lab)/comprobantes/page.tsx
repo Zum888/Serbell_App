@@ -4,8 +4,17 @@ import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
 import { listDocuments } from "@/server/queries";
 
-export default async function DocumentsPage() {
+const STATUS: Record<string, string> = {
+  pending: "Pendiente",
+  suggested: "Sugerido",
+  linked: "Vinculado",
+  duplicate: "Duplicado",
+  conflict: "Conflicto",
+};
+
+export default async function DocumentsPage({ searchParams }: { searchParams: Promise<{ foco?: string }> }) {
   const session = await pageContext();
+  const { foco } = await searchParams;
   if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para ver sus comprobantes." />;
   const documents = await listDocuments(db(), session.actor, session.companyId);
   return (
@@ -24,16 +33,18 @@ export default async function DocumentsPage() {
               <th className="px-4 py-2 font-medium">Importe</th>
               <th className="px-4 py-2 font-medium">Fecha</th>
               <th className="px-4 py-2 font-medium">Estado</th>
+              <th className="px-4 py-2 font-medium">Duplicado de</th>
             </tr>
           </thead>
           <tbody>
             {documents.map((document) => (
-              <tr key={document.id} className="border-b border-border">
+              <tr id={document.id} key={document.id} className={foco === document.id ? "border-b border-border bg-amber-50" : "border-b border-border"}>
                 <td className="px-4 py-2">{document.fileName}</td>
                 <td className="px-4 py-2">{document.merchant ?? "Sin datos"}</td>
                 <td className="px-4 py-2">{document.amountCents !== null ? formatUsd(document.amountCents) : "—"}</td>
                 <td className="px-4 py-2">{document.occurredOn}</td>
-                <td className="px-4 py-2">{document.linked ? "Vinculado" : document.status}{document.isDemonstration ? " · demostración" : ""}</td>
+                <td className="px-4 py-2">{document.linked ? "Vinculado" : STATUS[document.status] ?? document.status}{document.isDemonstration ? " · demostración" : ""}</td>
+                <td className="px-4 py-2">{document.duplicateOfName ?? "—"}</td>
               </tr>
             ))}
           </tbody>

@@ -332,13 +332,128 @@ export async function getFirm(db: Db, actor: Actor) {
   };
 }
 
+function requireCompany(actor: Actor, companyId: string) {
+  if (!companyRole(actor, companyId)) {
+    throw new AppError("El servidor rechazó la solicitud: no tienes acceso a esta empresa.", 403, "COMPANY_FORBIDDEN");
+  }
+}
+
+const movementInclude = {
+  classification: { include: { category: true, subcategory: true } },
+} as const;
+
+export type ClassifiedMovement = {
+  id: string;
+  postedOn: string;
+  merchant: string;
+  description: string;
+  amountCents: number;
+  category: string;
+  subcategory: string;
+};
+
+async function classifiedMovements(db: Db, actor: Actor, companyId: string, direction: "in" | "out"): Promise<ClassifiedMovement[]> {
+  requireCompany(actor, companyId);
+  const rows = await db.bankTransaction.findMany({
+    where: { companyId, amountCents: direction === "out" ? { lt: 0 } : { gt: 0 } },
+    include: movementInclude,
+    orderBy: [{ postedOn: "desc" }, { merchant: "asc" }],
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    postedOn: formatDay(dayKey(row.postedOn)),
+    merchant: row.merchant,
+    description: row.description,
+    amountCents: row.amountCents,
+    category: row.classification?.category.name ?? "Sin categoría",
+    subcategory: row.classification?.subcategory.name ?? "Sin subcategoría",
+  }));
+}
+
+export async function expenseAnalysis(db: Db, actor: Actor, companyId: string) {
+  const rows = await classifiedMovements(db, actor, companyId, "out");
+  const groups = new Map<string, { category: string; subcategory: string; totalCents: number; count: number }>();
+  for (const row of rows) {
+    const key = `${row.category}\n${row.subcategory}`;
+    const current = groups.get(key) ?? { category: row.category, subcategory: row.subcategory, totalCents: 0, count: 0 };
+    current.totalCents += Math.abs(row.amountCents);
+    current.count += 1;
+    groups.set(key, current);
+  }
+  const grouped = [...groups.values()].sort((a, b) => b.totalCents - a.totalCents || a.category.localeCompare(b.category));
+  const totalCents = grouped.reduce((sum, group) => sum + group.totalCents, 0);
+  return { rows, grouped, totalCents };
+}
+
+export async function incomingMovements(db: Db, actor: Actor, companyId: string) {
+  const rows = await classifiedMovements(db, actor, companyId, "in");
+  const totalCents = rows.reduce((sum, row) => sum + row.amountCents, 0);
+  const tasks = await db.task.findMany({
+    where: { companyId, status: "open" },
+    orderBy: { createdAt: "asc" },
+  });
+  return { rows, totalCents, openTasks: tasks.map((task) => ({ id: task.id, title: task.title, kind: task.kind })) };
+}
+
+export async function bankSummary(db: Db, actor: Actor, companyId: string) {
+  requireCompany(actor, companyId);
+  const rows = await db.bankTransaction.findMany({
+    where: { companyId },
+    include: movementInclude,
+  });
+  let inflows = 0;
+  let outflows = 0;
+  for (const row of rows) {
+    if (row.amountCents > 0) inflows += row.amountCents;
+    if (row.amountCents < 0) outflows += row.amountCents;
+  }
+  return { count: rows.length, inflows, outflows, net: inflows + outflows };
+}
+
+export async function detectedDuplicates(db: Db, actor: Actor, companyId: string) {
+  requireCompany(actor, companyId);
+  const rows = await db.document.findMany({
+    where: { companyId, duplicateOfId: { not: null } },
+    include: { extraction: true, duplicateOf: true },
+    orderBy: { createdAt: "desc" },
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    fileName: row.fileName,
+    merchant: row.extraction?.merchant ?? null,
+    amountCents: row.extraction?.amountCents ?? null,
+    occurredOn: formatDay(dayKey(row.extraction?.occurredOn)),
+    originalId: row.duplicateOf?.id ?? null,
+    originalName: row.duplicateOf?.fileName ?? null,
+  }));
+}
+
+export async function companyProfile(db: Db, actor: Actor, companyId: string) {
+  requireCompany(actor, companyId);
+  const company = await db.company.findUnique({
+    where: { id: companyId },
+    include: { memberships: { include: { user: true }, orderBy: { user: { name: "asc" } } } },
+  });
+  if (!company) throw new AppError("No existe esa empresa.", 404, "NOT_FOUND");
+  return {
+    name: company.name,
+    industry: company.industry,
+    members: company.memberships.map((membership) => ({
+      id: membership.userId,
+      name: membership.user.name,
+      email: membership.user.email,
+      role: membership.role,
+    })),
+  };
+}
+
 export async function listDocuments(db: Db, actor: Actor, companyId: string) {
   if (!companyRole(actor, companyId)) {
     throw new AppError("El servidor rechazó la solicitud: no tienes acceso a esta empresa.", 403, "COMPANY_FORBIDDEN");
   }
   const rows = await db.document.findMany({
     where: { companyId },
-    include: { extraction: true, links: true },
+    include: { extraction: true, links: true, duplicateOf: true },
     orderBy: { createdAt: "desc" },
   });
   return rows.map((row) => ({
@@ -350,6 +465,7 @@ export async function listDocuments(db: Db, actor: Actor, companyId: string) {
     occurredOn: formatDay(dayKey(row.extraction?.occurredOn)),
     linked: row.links.some((link) => link.status === "confirmed"),
     isDemonstration: row.extraction?.isDemonstration ?? false,
+    duplicateOfName: row.duplicateOf?.fileName ?? null,
   }));
 }
 

@@ -37,12 +37,14 @@ export function HomeScreen({
   balanceCents,
   accountCount,
   accounts,
+  duplicates,
 }: {
   name: string;
   companyId: string;
   balanceCents: number;
   accountCount: number;
   accounts: { institution: string; mask: string }[];
+  duplicates: { id: string; fileName: string; merchant: string | null; amountCents: number | null; occurredOn: string; originalName: string | null }[];
 }) {
   const accountLine = accounts.map((account) => `${account.institution} ····${account.mask}`).join(" · ");
   return (
@@ -86,13 +88,13 @@ export function HomeScreen({
             </button>
           </form>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/no-implementado?tema=gastos" className="rounded-full border border-border bg-white px-3 py-2 text-sm text-slate-600">
+            <Link href="/gastos" className="rounded-full border border-border bg-white px-3 py-2 text-sm text-slate-600">
               Analizar mis gastos
             </Link>
             <Link href="/chat?subir=1" className="rounded-full border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-medium text-primary">
               Subir comprobantes
             </Link>
-            <Link href="/no-implementado?tema=cobros" className="rounded-full border border-border bg-white px-3 py-2 text-sm text-slate-600">
+            <Link href="/por-cobrar" className="rounded-full border border-border bg-white px-3 py-2 text-sm text-slate-600">
               Revisar mis cobros
             </Link>
           </div>
@@ -106,21 +108,41 @@ export function HomeScreen({
         <h2 className="flex items-center gap-2 text-base font-semibold">
           <Sparkles className="size-4 text-primary" /> Tu resumen de hoy
         </h2>
-        <p className="mt-2 text-sm text-slate-500">Estas dos tarjetas son datos de demostración. Cobrar y pagar no se ejecutan.</p>
-        <Link href="/no-implementado?tema=cobrar" className="mt-4 flex items-start gap-3 rounded-xl border border-border p-3 text-sm">
+        <p className="mt-2 text-sm text-slate-500">
+          La cifra de facturas vencidas es de demostración y no cobra nada. El duplicado, si aparece, sale de los comprobantes guardados.
+        </p>
+        <Link href="/no-implementado?tema=cobrar" data-testid="demo-overdue" className="mt-4 flex items-start gap-3 rounded-xl border border-border p-3 text-sm">
           <Clock className="mt-0.5 size-4 text-amber-600" />
           <span>
             <span className="block font-medium">USD 3,200 pendientes de recuperar</span>
-            <span className="text-slate-500">3 clientes tienen facturas vencidas. Demostración.</span>
+            <span className="text-slate-500">3 clientes tienen facturas vencidas. Demostración. Abrir no cobra.</span>
           </span>
         </Link>
-        <Link href="/no-implementado?tema=pagar" className="mt-3 flex items-start gap-3 rounded-xl border border-border p-3 text-sm">
-          <Layers className="mt-0.5 size-4 text-rose-500" />
-          <span>
-            <span className="block font-medium">Posible pago duplicado de USD 450</span>
-            <span className="text-slate-500">Dos operaciones con el mismo proveedor. Demostración.</span>
-          </span>
-        </Link>
+        {duplicates.length === 0 ? (
+          <Link href="/comprobantes" className="mt-3 flex items-start gap-3 rounded-xl border border-border p-3 text-sm">
+            <Layers className="mt-0.5 size-4 text-rose-500" />
+            <span>
+              <span className="block font-medium">No hay comprobantes duplicados</span>
+              <span className="text-slate-500">La búsqueda en los archivos de esta empresa no encontró una copia.</span>
+            </span>
+          </Link>
+        ) : (
+          <Link href={`/comprobantes?foco=${duplicates[0].id}`} data-testid="duplicate-card" className="mt-3 flex items-start gap-3 rounded-xl border border-border p-3 text-sm">
+            <Layers className="mt-0.5 size-4 text-rose-500" />
+            <span>
+              <span className="block font-medium">
+                Comprobante duplicado{duplicates[0].merchant ? `: ${duplicates[0].merchant}` : ""}
+                {duplicates[0].amountCents !== null ? ` · ${formatUsd(duplicates[0].amountCents)}` : ""}
+              </span>
+              <span className="text-slate-500">
+                {duplicates[0].fileName}
+                {duplicates[0].originalName ? ` es copia de ${duplicates[0].originalName}` : ""}.
+                {duplicates[0].occurredOn ? ` ${duplicates[0].occurredOn}.` : ""}
+                {duplicates.length > 1 ? ` Hay ${duplicates.length} duplicados.` : ""}
+              </span>
+            </span>
+          </Link>
+        )}
         <p className="mt-4 flex items-center gap-2 text-xs text-slate-400">
           <Users className="size-3" /> Última revisión ilustrativa. No es un dato de la base.
         </p>
