@@ -1,0 +1,372 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model AccountingFirm {
+  id          String           @id
+  name        String
+  createdAt   DateTime         @default(now())
+  memberships FirmMembership[]
+  companies   Company[]
+}
+
+model User {
+  id                 String                @id
+  name               String
+  email              String                @unique
+  createdAt          DateTime              @default(now())
+  memberships        CompanyMembership[]
+  firmMemberships    FirmMembership[]
+  messages           Message[]
+  auditEvents        AuditEvent[]
+  reviews            AccountingReview[]
+  rules              ClassificationRule[]
+  sealedTransactions BankTransaction[]     @relation("SealedBy")
+  uploadedDocuments  Document[]            @relation("UploadedBy")
+}
+
+model FirmMembership {
+  id     String         @id
+  firmId String
+  userId String
+  role   String
+  firm   AccountingFirm @relation(fields: [firmId], references: [id])
+  user   User           @relation(fields: [userId], references: [id])
+
+  @@unique([firmId, userId])
+}
+
+model Company {
+  id                     String                  @id
+  firmId                 String
+  name                   String
+  industry               String
+  createdAt              DateTime                @default(now())
+  firm                   AccountingFirm          @relation(fields: [firmId], references: [id])
+  memberships            CompanyMembership[]
+  accounts               BankAccount[]
+  transactions           BankTransaction[]
+  categories             AccountingCategory[]
+  documents              Document[]
+  conversations          Conversation[]
+  tasks                  Task[]
+  audits                 AuditEvent[]
+  rules                  ClassificationRule[]
+  journalEntries         JournalEntry[]
+  reconciliationPeriods  ReconciliationPeriod[]
+  periodCloses           PeriodClose[]
+  approvalPolicies       ApprovalPolicy[]
+}
+
+model CompanyMembership {
+  id        String  @id
+  companyId String
+  userId    String
+  role      String
+  company   Company @relation(fields: [companyId], references: [id])
+  user      User    @relation(fields: [userId], references: [id])
+
+  @@unique([companyId, userId])
+}
+
+model BankAccount {
+  id                    String            @id
+  companyId             String
+  institution           String
+  productName           String
+  mask                  String
+  name                  String
+  currency              String            @default("USD")
+  availableBalanceCents Int
+  company               Company           @relation(fields: [companyId], references: [id])
+  transactions          BankTransaction[]
+  statements            BankStatement[]
+}
+
+model BankTransaction {
+  id                  String                      @id
+  companyId           String
+  accountId           String
+  postedOn            DateTime
+  merchant            String
+  description         String
+  amountCents         Int
+  currency            String                      @default("USD")
+  bankState           String
+  reconciliationState String                      @default("Unreconciled")
+  documentState       String
+  accountingState     String
+  reviewState         String
+  externalId          String?
+  sealedAt            DateTime?
+  sealedById          String?
+  company             Company                     @relation(fields: [companyId], references: [id])
+  account             BankAccount                 @relation(fields: [accountId], references: [id])
+  sealedBy            User?                       @relation("SealedBy", fields: [sealedById], references: [id])
+  links               TransactionDocumentLink[]
+  candidates          MatchCandidate[]
+  classification      TransactionClassification?
+  reviews             AccountingReview[]
+  audits              AuditEvent[]
+  messages            Message[]
+  tasks               Task[]
+  reconciliationItems ReconciliationItem[]
+
+  @@index([companyId])
+}
+
+model Document {
+  id            String                   @id
+  companyId     String
+  uploadedById  String
+  fileName      String
+  mimeType      String
+  sizeBytes     Int
+  storagePath   String
+  fileHash      String?
+  status        String
+  duplicateOfId String?
+  createdAt     DateTime                 @default(now())
+  company       Company                  @relation(fields: [companyId], references: [id])
+  uploadedBy    User                     @relation("UploadedBy", fields: [uploadedById], references: [id])
+  duplicateOf   Document?                @relation("DocumentDuplicate", fields: [duplicateOfId], references: [id])
+  duplicates    Document[]               @relation("DocumentDuplicate")
+  extraction    DocumentExtraction?
+  links         TransactionDocumentLink[]
+  candidates    MatchCandidate[]
+  messages      Message[]
+  tasks         Task[]
+
+  @@index([companyId])
+}
+
+model DocumentExtraction {
+  id              String    @id
+  documentId      String    @unique
+  merchant        String?
+  amountCents     Int?
+  currency        String?
+  occurredOn      DateTime?
+  categoryId      String?
+  subcategoryId   String?
+  source          String
+  isDemonstration Boolean   @default(false)
+  notice          String?
+  verifiedAt      DateTime?
+  verifiedById    String?
+  document        Document  @relation(fields: [documentId], references: [id])
+}
+
+model TransactionDocumentLink {
+  id            String          @id
+  transactionId String
+  documentId    String
+  status        String
+  confirmedById String?
+  confirmedAt   DateTime?
+  transaction   BankTransaction @relation(fields: [transactionId], references: [id])
+  document      Document        @relation(fields: [documentId], references: [id])
+
+  @@unique([transactionId, documentId])
+}
+
+model MatchCandidate {
+  id                 String          @id
+  documentId         String
+  transactionId      String
+  decision           String
+  evidenceJson       String
+  reasonsForJson     String
+  reasonsAgainstJson String
+  blocked            Boolean         @default(false)
+  createdAt          DateTime        @default(now())
+  document           Document        @relation(fields: [documentId], references: [id])
+  transaction        BankTransaction @relation(fields: [transactionId], references: [id])
+
+  @@index([documentId])
+}
+
+model AccountingCategory {
+  id                           String                      @id
+  companyId                    String
+  parentId                     String?
+  name                         String
+  company                      Company                     @relation(fields: [companyId], references: [id])
+  parent                       AccountingCategory?         @relation("CategoryTree", fields: [parentId], references: [id])
+  children                     AccountingCategory[]        @relation("CategoryTree")
+  classificationsAsCategory    TransactionClassification[] @relation("ClassCategory")
+  classificationsAsSubcategory TransactionClassification[] @relation("ClassSubcategory")
+
+  @@index([companyId])
+}
+
+model TransactionClassification {
+  id            String              @id
+  transactionId String              @unique
+  categoryId    String?
+  subcategoryId String?
+  source        String
+  state         String
+  transaction   BankTransaction     @relation(fields: [transactionId], references: [id])
+  category      AccountingCategory? @relation("ClassCategory", fields: [categoryId], references: [id])
+  subcategory   AccountingCategory? @relation("ClassSubcategory", fields: [subcategoryId], references: [id])
+}
+
+model AccountingReview {
+  id            String          @id
+  transactionId String
+  actorId       String
+  action        String
+  previousJson  String?
+  nextJson      String?
+  justification String?
+  createdAt     DateTime        @default(now())
+  transaction   BankTransaction @relation(fields: [transactionId], references: [id])
+  actor         User            @relation(fields: [actorId], references: [id])
+}
+
+model Conversation {
+  id               String    @id
+  companyId        String
+  activeDocumentId String?
+  title            String
+  createdAt        DateTime  @default(now())
+  company          Company   @relation(fields: [companyId], references: [id])
+  messages         Message[]
+}
+
+model Message {
+  id             String           @id
+  conversationId String
+  authorId       String?
+  transactionId  String?
+  documentId     String?
+  role           String
+  body           String
+  intent         String?
+  createdAt      DateTime         @default(now())
+  conversation   Conversation     @relation(fields: [conversationId], references: [id])
+  author         User?            @relation(fields: [authorId], references: [id])
+  transaction    BankTransaction? @relation(fields: [transactionId], references: [id])
+  document       Document?        @relation(fields: [documentId], references: [id])
+
+  @@index([conversationId])
+  @@index([transactionId])
+  @@index([documentId])
+}
+
+model Task {
+  id            String           @id
+  companyId     String
+  transactionId String?
+  documentId    String?
+  kind          String
+  title         String
+  status        String
+  createdAt     DateTime         @default(now())
+  company       Company          @relation(fields: [companyId], references: [id])
+  transaction   BankTransaction? @relation(fields: [transactionId], references: [id])
+  document      Document?        @relation(fields: [documentId], references: [id])
+
+  @@index([companyId])
+}
+
+model AuditEvent {
+  id            String           @id
+  companyId     String
+  actorId       String?
+  transactionId String?
+  documentId    String?
+  action        String
+  previousJson  String?
+  nextJson      String?
+  justification String?
+  createdAt     DateTime         @default(now())
+  company       Company          @relation(fields: [companyId], references: [id])
+  actor         User?            @relation(fields: [actorId], references: [id])
+  transaction   BankTransaction? @relation(fields: [transactionId], references: [id])
+
+  @@index([companyId])
+  @@index([transactionId])
+}
+
+model ClassificationRule {
+  id            String   @id
+  companyId     String
+  actorId       String
+  transactionId String?
+  beforeJson    String
+  afterJson     String
+  justification String?
+  applied       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  company       Company  @relation(fields: [companyId], references: [id])
+  actor         User     @relation(fields: [actorId], references: [id])
+
+  @@index([companyId])
+}
+
+/// Prepared for a later ledger. This laboratory does not post journal entries.
+model JournalEntry {
+  id        String        @id
+  companyId String
+  memo      String?
+  createdAt DateTime      @default(now())
+  company   Company       @relation(fields: [companyId], references: [id])
+  lines     JournalLine[]
+}
+
+model JournalLine {
+  id          String       @id
+  entryId     String
+  accountName String
+  debitCents  Int          @default(0)
+  creditCents Int          @default(0)
+  entry       JournalEntry @relation(fields: [entryId], references: [id])
+}
+
+/// Prepared for statement close. This stage leaves every movement unreconciled.
+model ReconciliationPeriod {
+  id        String               @id
+  companyId String
+  label     String
+  status    String               @default("not_started")
+  company   Company              @relation(fields: [companyId], references: [id])
+  items     ReconciliationItem[]
+}
+
+model ReconciliationItem {
+  id            String                @id
+  periodId      String?
+  transactionId String?
+  note          String?
+  period        ReconciliationPeriod? @relation(fields: [periodId], references: [id])
+  transaction   BankTransaction?      @relation(fields: [transactionId], references: [id])
+}
+
+model BankStatement {
+  id          String      @id
+  accountId   String
+  periodLabel String
+  account     BankAccount @relation(fields: [accountId], references: [id])
+}
+
+model PeriodClose {
+  id          String  @id
+  companyId   String
+  periodLabel String
+  status      String  @default("not_started")
+  company     Company @relation(fields: [companyId], references: [id])
+}
+
+model ApprovalPolicy {
+  id        String  @id
+  companyId String
+  name      String
+  company   Company @relation(fields: [companyId], references: [id])
+}

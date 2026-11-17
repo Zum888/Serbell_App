@@ -1,0 +1,46 @@
+import { MovementsScreen } from "@/components/movements-screen";
+import { StateView } from "@/components/state-view";
+import { isAppError } from "@/lib/errors";
+import { formatUsd } from "@/lib/money";
+import { db } from "@/server/db";
+import { pageContext } from "@/server/context";
+import { getHome, getMovement, listMovements, movementCounts } from "@/server/queries";
+
+export default async function MovementsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filtro?: string; q?: string; movimiento?: string; error?: string }>;
+}) {
+  const session = await pageContext();
+  const params = await searchParams;
+  if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para ver sus movimientos." />;
+  const filter = params.filtro || "todos";
+  const q = params.q || "";
+  try {
+    const [rows, counts, home] = await Promise.all([
+      listMovements(db(), session.actor, session.companyId, filter, q),
+      movementCounts(db(), session.actor, session.companyId),
+      getHome(db(), session.actor, session.companyId),
+    ]);
+    let detail = null;
+    if (params.movimiento) {
+      detail = await getMovement(db(), session.actor, params.movimiento);
+    }
+    const account = home.accounts[0];
+    return (
+      <MovementsScreen
+        companyName={home.company.name}
+        balanceLabel={account ? `${account.institution} ····${account.mask} · ${formatUsd(home.balanceCents)}` : formatUsd(home.balanceCents)}
+        rows={rows}
+        counts={counts}
+        filter={filter}
+        q={q}
+        error={params.error}
+        detail={detail}
+      />
+    );
+  } catch (error) {
+    if (isAppError(error)) return <StateView variant="error" title={error.message} testId="server-error" />;
+    throw error;
+  }
+}
