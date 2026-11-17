@@ -21,7 +21,7 @@ export function Shell({
     <div className="flex min-h-screen bg-background text-foreground">
       <aside className="flex w-[232px] shrink-0 flex-col border-r border-border bg-white py-4">
         <Link href={actor.firmRole ? "/firma" : "/"} className="px-5 pb-5">
-          <img src="/brand/serbell-logo.png" alt="Serbell" className="h-8 w-auto" />
+          <img src="/brand/serbell-logo.png" alt="Serbell" width={68} height={32} className="h-8 w-auto" />
         </Link>
         <SideNav firm={Boolean(actor.firmRole)} />
       </aside>
