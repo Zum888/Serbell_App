@@ -4,6 +4,7 @@ import { ACCOUNT, CAT, COMPANY, FIRM_ID, TX, USER } from "@/lib/ids";
 import type { Db } from "@/server/db";
 import { sha256 } from "@/server/ids";
 import { stampReliableMatcherLinks } from "@/server/domain";
+import { seedInvoices } from "@/server/invoice-seed";
 
 const noon = (day: string) => new Date(`${day}T12:00:00.000Z`);
 
@@ -433,4 +434,5 @@ export async function seedDatabase(db: Db) {
       createdAt: noon("2026-10-23"),
     },
   });
+  await seedInvoices(db);
 }

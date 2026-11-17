@@ -49,6 +49,8 @@ export const AUDIT_LABEL: Record<string, string> = {
   document_replaced: "Comprobante reemplazado",
   serbell_matched: "Serbell concilió",
   asiento_saved: "Asiento registrado",
+  invoice_linked: "Factura vinculada al movimiento",
+  invoice_follow_up: "Factura marcada para seguimiento",
 };
 
 export function greetingName(name: string): string {

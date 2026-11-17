@@ -18,6 +18,8 @@ import {
   sealTransaction,
 } from "@/server/domain";
 import { accountBreakdowns, companyReport, documentBoard, firmQueue, getFirm, getHome, getMovement, loadActor, reviewBoard } from "@/server/queries";
+import { invoiceDesk, invoicePanel, linkInvoice, markInvoiceFollowUp } from "@/server/invoices";
+import { seedInvoices } from "@/server/invoice-seed";
 import { seedDatabase } from "@/server/seed";
 
 const databaseUrl = "file:/tmp/serbell-vitest.db";
@@ -339,4 +341,47 @@ it("arma el tablero con los estados guardados y no mezcla empresas", async () =>
   expect(review.aprobar.find((card) => card.id === TX.shell)?.canSeal).toBe(true);
   expect(review.sellado.find((card) => card.id === TX.fs15012)?.canSeal).toBe(false);
   await expect(reviewBoard(prisma, padrino)).rejects.toMatchObject({ code: "FIRM_FORBIDDEN" });
+});
+
+it("las carpetas de facturas no mezclan empresas y el vínculo no mueve el banco", async () => {
+  const padrino = await loadActor(prisma, USER.padrino);
+  const luis = await loadActor(prisma, USER.luis);
+  if (!padrino || !luis) throw new Error("faltan perfiles");
+  const before = await prisma.invoice.count();
+  await seedInvoices(prisma);
+  expect(await prisma.invoice.count()).toBe(before);
+
+  const receivables = await invoiceDesk(prisma, padrino, COMPANY.qpl, "receivable", "2026-11-17");
+  expect(receivables.map((folder) => folder.name)).toEqual(["Cliente Ruiz", "Depósito de cliente", "Logística Andina"]);
+  const ruiz = receivables[0];
+  expect(ruiz.totalCents).toBe(190_000);
+  expect(ruiz.openCents).toBe(65_000);
+  expect(ruiz.matchedCount).toBe(1);
+  expect(ruiz.aging).toEqual({ current: 25_000, d30: 40_000, d60: 0, d60plus: 0 });
+  await expect(invoiceDesk(prisma, padrino, COMPANY.rivera, "receivable")).rejects.toMatchObject({ code: "COMPANY_FORBIDDEN" });
+  await expect(invoicePanel(prisma, luis, "inv_ruiz_101")).rejects.toMatchObject({ code: "COMPANY_FORBIDDEN" });
+
+  const balances = await prisma.bankAccount.findMany({ select: { id: true, availableBalanceCents: true }, orderBy: { id: "asc" } });
+  const ace = await prisma.bankTransaction.findUnique({ where: { id: TX.ace } });
+  await expect(linkInvoice(prisma, padrino, "inv_fs_402", TX.fs15012)).rejects.toMatchObject({ code: "SEALED" });
+  await expect(linkInvoice(prisma, padrino, "inv_fs_402", TX.income200)).rejects.toMatchObject({ code: "NOT_A_CANDIDATE" });
+  await linkInvoice(prisma, luis, "inv_ace_1101", TX.ace);
+  const linked = await prisma.invoice.findUnique({ where: { id: "inv_ace_1101" } });
+  expect(linked?.status).toBe("matched");
+  const still = await prisma.bankTransaction.findUnique({ where: { id: TX.ace } });
+  expect(still?.amountCents).toBe(ace?.amountCents);
+  expect(still?.reconciliationState).toBe(ace?.reconciliationState);
+  const after = await prisma.bankAccount.findMany({ select: { id: true, availableBalanceCents: true }, orderBy: { id: "asc" } });
+  expect(after).toEqual(balances);
+  expect(await prisma.auditEvent.findFirst({ where: { action: "invoice_linked", transactionId: TX.ace, actorId: USER.luis } })).not.toBeNull();
+
+  await markInvoiceFollowUp(prisma, padrino, "inv_ruiz_102");
+  const followed = await prisma.invoice.findUnique({ where: { id: "inv_ruiz_102" } });
+  expect(followed?.status).toBe("open");
+  expect(followed?.amountCents).toBe(40_000);
+  expect(followed?.followUpAt).toBeTruthy();
+  const audits = await prisma.auditEvent.count({ where: { action: "invoice_follow_up", companyId: COMPANY.qpl } });
+  await markInvoiceFollowUp(prisma, padrino, "inv_ruiz_102");
+  expect(await prisma.auditEvent.count({ where: { action: "invoice_follow_up", companyId: COMPANY.qpl } })).toBe(audits);
+  await expect(markInvoiceFollowUp(prisma, luis, "inv_ruiz_102")).rejects.toMatchObject({ code: "COMPANY_FORBIDDEN" });
 });

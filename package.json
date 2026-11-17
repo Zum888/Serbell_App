@@ -9,6 +9,7 @@
     "lint": "eslint",
     "db:reset": "prisma generate && rm -f prisma/dev.db prisma/dev.db-journal && prisma db push && tsx prisma/seed.ts",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed-invoices": "tsx prisma/seed-invoices.ts",
     "test": "vitest run",
     "test:e2e": "playwright test"
   },

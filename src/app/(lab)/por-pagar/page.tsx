@@ -1,68 +1,67 @@
-import Link from "next/link";
+import { InvoiceFolders, InvoiceList, InvoicePanel } from "@/components/invoice-desk";
 import { StateView } from "@/components/state-view";
-import { formatUsd } from "@/lib/money";
+import { isAppError } from "@/lib/errors";
 import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
-import { expenseAnalysis } from "@/server/queries";
+import { invoiceDesk, invoicePanel } from "@/server/invoices";
+import Link from "next/link";
 
-export default async function PayablesPage() {
+export default async function PayablesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ parte?: string; factura?: string; error?: string }>;
+}) {
   const session = await pageContext();
-  if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa." />;
-  const analysis = await expenseAnalysis(db(), session.actor, session.companyId);
+  const params = await searchParams;
+  if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para ver sus facturas." />;
+  const company = session.companies.find((item) => item.id === session.companyId);
+  const folders = await invoiceDesk(db(), session.actor, session.companyId, "payable");
+  const folder = folders.find((item) => item.partyId === params.parte) ?? null;
+  let panel = null;
+  let panelError = params.error;
+  if (params.factura) {
+    try {
+      panel = await invoicePanel(db(), session.actor, params.factura);
+    } catch (error) {
+      if (!isAppError(error)) throw error;
+      panel = null;
+      panelError = error.message;
+    }
+  }
+  const nextParams = new URLSearchParams();
+  if (params.parte) nextParams.set("parte", params.parte);
+  if (params.factura) nextParams.set("factura", params.factura);
+  const next = `/por-pagar${nextParams.size ? `?${nextParams}` : ""}`;
   return (
-    <section className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Por pagar</h1>
+    <div className={panel ? "grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]" : ""}>
+      <section>
+        <p className="text-xs text-slate-500">{company?.name}</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Por pagar</h1>
         <p className="mt-1 text-sm text-slate-500">
-          No hay facturas por pagar y no se registró ningún pago. Este laboratorio no tiene un libro de cuentas por pagar.
-          Lo que sigue son gastos que ya salieron del banco.
+          Carpetas de proveedores con facturas de demostración. Vincular una factura anota el movimiento del banco; no paga.
         </p>
-      </div>
-      <StateView
-        variant="empty"
-        title="No hay saldos por pagar."
-        description="Sin facturas pendientes no hay nada que pagar desde aquí."
-      />
-      {analysis.rows.length === 0 ? null : (
-        <div className="overflow-hidden rounded-2xl border border-border bg-white">
-          <div className="border-b border-border px-4 py-3">
-            <h2 className="text-base font-semibold">Gastos ya debitados</h2>
-            <p className="text-xs text-slate-500">Total {formatUsd(analysis.totalCents)}. El detalle por categoría está en el análisis de gastos.</p>
+        {panelError && !panel ? <p className="mt-3 text-sm text-red-700" data-testid="server-error">{panelError}</p> : null}
+        {folder ? (
+          <div className="mt-4">
+            <Link href="/por-pagar" className="text-sm text-primary">Todas las carpetas</Link>
+            <h2 className="mt-2 text-lg font-semibold">{folder.name}</h2>
+            <div className="mt-3">
+              <InvoiceList invoices={folder.invoices} base="/por-pagar" partyId={folder.partyId} activeId={params.factura} />
+            </div>
           </div>
-          <table className="w-full text-left text-sm">
-            <thead className="text-xs text-slate-500">
-              <tr className="border-b border-border">
-                <th className="px-4 py-3 font-medium">Fecha</th>
-                <th className="px-4 py-3 font-medium">Movimiento</th>
-                <th className="px-4 py-3 font-medium">Categoría</th>
-                <th className="px-4 py-3 text-right font-medium">Importe</th>
-                <th className="px-4 py-3 font-medium" />
-              </tr>
-            </thead>
-            <tbody>
-              {analysis.rows.map((row) => (
-                <tr key={row.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3">{row.postedOn}</td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium">{row.merchant}</p>
-                    <p className="text-xs text-slate-500">{row.subcategory}</p>
-                  </td>
-                  <td className="px-4 py-3">{row.category}</td>
-                  <td className="px-4 py-3 text-right">{formatUsd(row.amountCents)}</td>
-                  <td className="px-4 py-3">
-                    <Link href={`/movimientos?movimiento=${row.id}`} className="text-sm font-medium text-primary">
-                      Ver
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="px-4 py-3 text-sm">
-            <Link href="/gastos" className="font-medium text-primary">Abrir el análisis de gastos</Link>
-          </p>
-        </div>
-      )}
-    </section>
+        ) : folders.length === 0 ? (
+          <div className="mt-4">
+            <StateView variant="empty" title="No hay facturas por pagar en esta empresa." />
+          </div>
+        ) : (
+          <div className="mt-4">
+            <InvoiceFolders folders={folders} base="/por-pagar" />
+          </div>
+        )}
+      </section>
+      {panel && panel.direction === "payable" && panel.companyId === session.companyId ? (
+        <InvoicePanel panel={panel} closeHref={folder ? `/por-pagar?parte=${folder.partyId}` : "/por-pagar"} next={next} error={panelError} />
+      ) : null}
+    </div>
   );
 }
