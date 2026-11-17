@@ -15,6 +15,7 @@ type Row = {
   amountCents: number;
   category: string | null;
   subcategory: string | null;
+  subcategoryId: string;
   documentState: string;
   reviewState: string;
   reconciliationState: string;
@@ -79,6 +80,8 @@ export function MovementsScreen({
   q,
   error,
   detail,
+  canReview,
+  categories,
 }: {
   companyName: string;
   balanceLabel: string;
@@ -88,6 +91,8 @@ export function MovementsScreen({
   q: string;
   error?: string;
   detail: Detail | null;
+  canReview: boolean;
+  categories: { name: string; children: { id: string; name: string }[] }[];
 }) {
   const countFor: Record<string, number> = {
     todos: counts.todos,
@@ -105,7 +110,7 @@ export function MovementsScreen({
             <h1 className="text-2xl font-semibold">Movimientos</h1>
             <p className="text-sm text-slate-500">{balanceLabel}</p>
           </div>
-          <p className="mt-1 text-sm text-slate-500">Clasifica y revisa las operaciones.</p>
+          <p className="mt-1 text-sm text-slate-500">En una fila abierta, elige la categoría y la subcategoría y guarda. Una fila sellada no se cambia.</p>
         </div>
         <div className="flex flex-wrap gap-2 px-4 py-3">
           {filters.map(([key, label]) => (
@@ -134,8 +139,7 @@ export function MovementsScreen({
                 <tr className="border-y border-border">
                   <th className="px-3 py-2 font-medium">Fecha</th>
                   <th className="px-3 py-2 font-medium">Movimiento</th>
-                  <th className="px-3 py-2 font-medium">Categoría</th>
-                  <th className="px-3 py-2 font-medium">Subcategoría</th>
+                  <th className="px-3 py-2 font-medium" colSpan={2}>Categoría y subcategoría</th>
                   <th className="px-3 py-2 font-medium">Ingresos</th>
                   <th className="px-3 py-2 font-medium">Gastos</th>
                   <th className="px-3 py-2 font-medium">Comprobante</th>
@@ -153,8 +157,14 @@ export function MovementsScreen({
                       <p className="font-medium">{row.merchant}</p>
                       <p className="text-xs text-slate-500">{row.description}</p>
                     </td>
-                    <td className="px-3 py-2">{row.category ?? "Sin categoría"}</td>
-                    <td className="px-3 py-2">{row.subcategory ?? "—"}</td>
+                    <td className="px-3 py-2" colSpan={2}>
+                      <CategoryEditor
+                        row={row}
+                        categories={categories}
+                        canReview={canReview}
+                        next={`/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}`}
+                      />
+                    </td>
                     <td className="px-3 py-2">{row.amountCents > 0 ? formatCentsPlain(row.amountCents) : ""}</td>
                     <td className="px-3 py-2">{row.amountCents < 0 ? formatCentsPlain(row.amountCents) : ""}</td>
                     <td className="px-3 py-2" data-testid="doc-state">{DOCUMENT_LABEL[row.documentState] ?? row.documentState}</td>
@@ -208,6 +218,15 @@ function Drawer({ detail, error, filter, q }: { detail: Detail; error?: string; 
         </div>
         <Link href={`/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}`} className="text-sm text-slate-500">Cerrar</Link>
       </div>
+      <CategoryForm
+        id={detail.id}
+        subcategoryId={detail.subcategoryId}
+        categories={pairsToGroups(detail.pairs)}
+        canReview={detail.canReview}
+        sealed={detail.sealed}
+        next={`/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}&movimiento=${detail.id}`}
+        testId="save-classification"
+      />
       {error ? <div className="mt-3"><StateView variant="error" title={error} testId="server-error" /></div> : null}
       <dl className="mt-4 grid grid-cols-2 gap-2 text-sm">
         <div><dt className="text-xs text-slate-500">Cuenta</dt><dd>{detail.institution} ····{detail.mask}</dd></div>
@@ -236,26 +255,6 @@ function Drawer({ detail, error, filter, q }: { detail: Detail; error?: string; 
         ) : (
           <p className="mt-1 text-slate-500">Faltante. No hay un comprobante vinculado.</p>
         )}
-      </section>
-      <section data-testid="drawer-classification" className="mt-4">
-        <h3 className="text-sm font-medium">Clasificación</h3>
-        <p className="mt-1 text-sm text-slate-600">{detail.categoryLabel}</p>
-        <form action={`/api/transactions/${detail.id}/classification`} method="post" className="mt-2 space-y-2">
-          {detail.sealed ? <input type="hidden" name="subcategoryId" value={detail.subcategoryId} /> : null}
-          <select
-            name={detail.sealed ? undefined : "subcategoryId"}
-            defaultValue={detail.subcategoryId}
-            disabled={detail.sealed}
-            className="h-10 w-full rounded-xl border border-border bg-white px-3 text-sm disabled:bg-slate-50"
-          >
-            <option value="">Sin categoría</option>
-            {detail.pairs.map((pair) => (
-              <option key={pair.subcategoryId} value={pair.subcategoryId}>{pair.label}</option>
-            ))}
-          </select>
-          {detail.canReview ? <Input name="justification" placeholder="Justificación de la corrección" /> : null}
-          <Button type="submit" variant="outline" data-testid="save-classification">Guardar categoría</Button>
-        </form>
       </section>
       <JournalBlock detail={detail} filter={filter} q={q} />
       <section data-testid="drawer-conversation" className="mt-4">
@@ -388,4 +387,102 @@ function JournalBlock({ detail, filter, q }: { detail: Detail; filter: string; q
       ) : null}
     </section>
   );
+}
+
+function CategoryEditor({
+  row,
+  categories,
+  canReview,
+  next,
+}: {
+  row: Row;
+  categories: { name: string; children: { id: string; name: string }[] }[];
+  canReview: boolean;
+  next: string;
+}) {
+  return (
+    <div data-testid={`category-label-${row.id}`}>
+      <p className="text-sm">{row.category ?? "Sin categoría"} <span className="text-slate-400">/</span> {row.subcategory ?? "—"}</p>
+      <CategoryForm
+        id={row.id}
+        subcategoryId={row.subcategoryId}
+        categories={categories}
+        canReview={canReview}
+        sealed={row.sealed}
+        next={next}
+        testId={`save-category-${row.id}`}
+        compact
+      />
+    </div>
+  );
+}
+
+function CategoryForm({
+  id,
+  subcategoryId,
+  categories,
+  canReview,
+  sealed,
+  next,
+  testId,
+  compact = false,
+}: {
+  id: string;
+  subcategoryId: string;
+  categories: { name: string; children: { id: string; name: string }[] }[];
+  canReview: boolean;
+  sealed: boolean;
+  next: string;
+  testId: string;
+  compact?: boolean;
+}) {
+  if (sealed) {
+    return <p className="mt-1 text-xs text-slate-500">Sellado. El servidor rechaza el cambio.</p>;
+  }
+  return (
+    <form action={`/api/transactions/${id}/classification`} method="post" className={compact ? "mt-1 space-y-1" : "mt-3 space-y-2 rounded-xl border border-border p-3"}>
+      <input type="hidden" name="next" value={next} />
+      {compact ? null : <h3 className="text-sm font-medium">Cambiar categoría y subcategoría</h3>}
+      <label className="block text-xs text-slate-500">
+        {compact ? null : "Categoría y subcategoría"}
+        <select
+          name="subcategoryId"
+          defaultValue={subcategoryId}
+          required
+          data-testid={compact ? `category-select-${id}` : `detail-category-select-${id}`}
+          aria-label={`Categoría y subcategoría de ${id}`}
+          className="mt-1 h-9 w-full min-w-[180px] rounded-xl border border-border bg-white px-2 text-sm"
+        >
+          <option value="">Elegir</option>
+          {categories.map((group) => (
+            <optgroup key={group.name} label={group.name}>
+              {group.children.map((child) => (
+                <option key={child.id} value={child.id}>{child.name}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+      {canReview ? (
+        <Input name="justification" required minLength={8} placeholder="Justificación del contador" aria-label="Justificación" />
+      ) : (
+        <p className="text-xs text-slate-500">{compact ? "Propuesta" : "Queda como propuesta. No sella ni crea el asiento."}</p>
+      )}
+      <button type="submit" data-testid={testId} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white">
+        Guardar categoría
+      </button>
+    </form>
+  );
+}
+
+function pairsToGroups(pairs: { subcategoryId: string; label: string }[]) {
+  const groups = new Map<string, { id: string; name: string }[]>();
+  for (const pair of pairs) {
+    const [category, ...rest] = pair.label.split(" / ");
+    const name = rest.join(" / ") || pair.label;
+    const list = groups.get(category) ?? [];
+    list.push({ id: pair.subcategoryId, name });
+    groups.set(category, list);
+  }
+  return [...groups.entries()].map(([name, children]) => ({ name, children }));
 }

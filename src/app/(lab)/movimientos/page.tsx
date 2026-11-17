@@ -2,9 +2,10 @@ import { MovementsScreen } from "@/components/movements-screen";
 import { StateView } from "@/components/state-view";
 import { isAppError } from "@/lib/errors";
 import { formatUsd } from "@/lib/money";
+import { canReview } from "@/lib/permissions";
 import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
-import { getHome, getMovement, listMovements, movementCounts } from "@/server/queries";
+import { getHome, getMovement, listCategoryTree, listMovements, movementCounts } from "@/server/queries";
 
 export default async function MovementsPage({
   searchParams,
@@ -17,10 +18,11 @@ export default async function MovementsPage({
   const filter = params.filtro || "todos";
   const q = params.q || "";
   try {
-    const [rows, counts, home] = await Promise.all([
+    const [rows, counts, home, tree] = await Promise.all([
       listMovements(db(), session.actor, session.companyId, filter, q),
       movementCounts(db(), session.actor, session.companyId),
       getHome(db(), session.actor, session.companyId),
+      listCategoryTree(db(), session.actor, session.companyId),
     ]);
     let detail = null;
     if (params.movimiento) {
@@ -36,6 +38,11 @@ export default async function MovementsPage({
         q={q}
         error={params.error}
         detail={detail}
+        canReview={canReview(session.actor, session.companyId)}
+        categories={tree.map((parent) => ({
+          name: parent.name,
+          children: parent.children.map((child) => ({ id: child.id, name: child.name })),
+        }))}
       />
     );
   } catch (error) {

@@ -663,6 +663,7 @@ export async function changeClassification(
   if (reviewer && (!justification || justification.length < 8)) {
     throw new AppError("La corrección del contador necesita una justificación.", 400, "JUSTIFICATION_REQUIRED");
   }
+  const classificationState = reviewer ? "Recorded" : "Proposed";
   if (transaction.classification) {
     await db.transactionClassification.update({
       where: { transactionId },
@@ -670,7 +671,7 @@ export async function changeClassification(
         categoryId: after.categoryId,
         subcategoryId: after.subcategoryId,
         source: reviewer ? "accountant" : "owner",
-        state: "Recorded",
+        state: classificationState,
       },
     });
   } else {
@@ -681,14 +682,14 @@ export async function changeClassification(
         categoryId: after.categoryId,
         subcategoryId: after.subcategoryId,
         source: reviewer ? "accountant" : "owner",
-        state: "Recorded",
+        state: classificationState,
       },
     });
   }
   await db.bankTransaction.update({
     where: { id: transactionId },
     data: {
-      accountingState: "Recorded",
+      accountingState: classificationState,
       reviewState: transaction.reviewState === "Approved" ? "NeedsReview" : transaction.reviewState,
     },
   });

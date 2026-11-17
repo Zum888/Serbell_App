@@ -228,3 +228,26 @@ it("guarda el asiento del contador y no deja editar un movimiento sellado", asyn
   expect(audit?.nextJson).toContain("20394");
   await expect(firmQueue(prisma, padrino, "revisar")).rejects.toMatchObject({ code: "FIRM_FORBIDDEN" });
 });
+
+it("el propietario propone la categoría y el sello bloquea el cambio", async () => {
+  const padrino = await loadActor(prisma, USER.padrino);
+  const carlos = await loadActor(prisma, USER.carlos);
+  if (!padrino || !carlos) throw new Error("faltan perfiles");
+  const before = await prisma.transactionClassification.findUnique({ where: { transactionId: TX.sunpass27 } });
+  await changeClassification(prisma, padrino, TX.sunpass27, { subcategoryId: CAT.qpl.mantenimiento });
+  const saved = await prisma.transactionClassification.findUnique({ where: { transactionId: TX.sunpass27 } });
+  expect(saved?.categoryId).toBe(CAT.qpl.operacion);
+  expect(saved?.subcategoryId).toBe(CAT.qpl.mantenimiento);
+  expect(saved?.source).toBe("owner");
+  expect(saved?.state).toBe("Proposed");
+  const audit = await prisma.auditEvent.findFirst({
+    where: { transactionId: TX.sunpass27, action: "classification_changed", actorId: USER.padrino },
+  });
+  expect(audit?.previousJson).toContain(before?.subcategoryId ?? "missing");
+  expect(audit?.nextJson).toContain(CAT.qpl.mantenimiento);
+  await expect(changeClassification(prisma, padrino, TX.fs15012, { subcategoryId: CAT.qpl.peajes })).rejects.toMatchObject({ code: "SEALED" });
+  await expect(
+    changeClassification(prisma, carlos, TX.fs15012, { subcategoryId: CAT.qpl.peajes, justification: "No debe pasar el sello." }),
+  ).rejects.toMatchObject({ code: "SEALED" });
+  await expect(sealTransaction(prisma, padrino, TX.sunpass27)).rejects.toMatchObject({ code: "SEAL_FORBIDDEN" });
+});

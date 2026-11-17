@@ -98,6 +98,7 @@ export async function listMovements(db: Db, actor: Actor, companyId: string, fil
       amountCents: row.amountCents,
       category: row.classification?.category?.name ?? null,
       subcategory: row.classification?.subcategory?.name ?? null,
+      subcategoryId: row.classification?.subcategoryId ?? "",
       documentState: row.documentState,
       reviewState: row.reviewState,
       reconciliationState: row.reconciliationState,
