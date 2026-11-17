@@ -1,3 +1,6 @@
+import { Building2, CheckCheck, Copy, FileWarning, MessageSquare, ClipboardList } from "lucide-react";
+import { Bars, Sparkline } from "@/components/charts";
+import { InsightStrip } from "@/components/insight-strip";
 import { greetingName } from "@/lib/labels";
 import { Input } from "@/components/ui/input";
 import { StateView } from "@/components/state-view";
@@ -32,31 +35,49 @@ export function FirmScreen({
 }) {
   const needle = q.trim().toLowerCase();
   const companies = summary.companies.filter((company) => !needle || company.name.toLowerCase().includes(needle) || company.industry.toLowerCase().includes(needle));
+  const busiest = [...summary.companies].sort((a, b) => b.awaitingReview - a.awaitingReview || a.name.localeCompare(b.name))[0];
+  const lines = [
+    `${summary.assigned} empresas asignadas. ${summary.awaitingReview} movimientos esperan revisión y ${summary.pendingReceipts} no tienen comprobante.`,
+    busiest ? `${busiest.name} concentra ${busiest.awaitingReview} movimientos por revisar.` : "No hay empresas asignadas.",
+    summary.duplicates === 0 ? "No hay comprobantes duplicados en las empresas asignadas." : `Hay ${summary.duplicates} comprobantes duplicados en las empresas asignadas.`,
+    summary.clarifications === 0 ? "No hay aclaraciones abiertas." : `Hay ${summary.clarifications} aclaraciones abiertas.`,
+  ];
   const cards = [
-    ["Empresas asignadas", summary.assigned],
-    ["Por revisar", summary.awaitingReview],
-    ["Comprobantes faltantes", summary.pendingReceipts],
-    ["Aclaraciones", summary.clarifications],
-    ["Listas para aprobar", summary.readyToApprove],
-    ["Duplicados", summary.duplicates],
+    ["Empresas asignadas", summary.assigned, <Building2 className="size-4" key="a" />],
+    ["Por revisar", summary.awaitingReview, <ClipboardList className="size-4" key="b" />],
+    ["Comprobantes faltantes", summary.pendingReceipts, <FileWarning className="size-4" key="c" />],
+    ["Aclaraciones", summary.clarifications, <MessageSquare className="size-4" key="d" />],
+    ["Listas para aprobar", summary.readyToApprove, <CheckCheck className="size-4" key="e" />],
+    ["Duplicados", summary.duplicates, <Copy className="size-4" key="f" />],
   ] as const;
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Buenos días, {greetingName(name)}.</h1>
-        <p className="mt-1 text-sm text-slate-500">Prioridades calculadas con los movimientos reales de las empresas asignadas.</p>
+        <p className="mt-1 text-sm text-slate-500">Prioridades contadas en los movimientos de las empresas asignadas.</p>
       </div>
+      <InsightStrip lines={lines} testId="firma-reading" />
+      <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {cards.map(([label, value, icon]) => (
+            <article key={label} className="rounded-2xl border border-border bg-white p-3">
+              <p className="flex items-center gap-2 text-xs text-slate-500">{icon}{label}</p>
+              <p className="mt-2 text-2xl font-semibold tracking-tight">{value}</p>
+            </article>
+          ))}
+        </div>
+        <article className="rounded-2xl border border-border bg-white p-4">
+          <h2 className="text-sm font-semibold">Por revisar</h2>
+          <Sparkline points={summary.companies.map((company) => company.awaitingReview)} color="#2563eb" />
+          <p className="text-xs text-slate-500">Una marca por empresa, en orden alfabético. No es una serie de tiempo.</p>
+          <div className="mt-3">
+            <Bars rows={summary.companies.map((company) => ({ label: company.name, value: company.awaitingReview, hint: String(company.awaitingReview) }))} />
+          </div>
+        </article>
+      </section>
       <form action="/firma">
         <Input name="q" defaultValue={q} placeholder="Buscar empresa" />
       </form>
-      <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {cards.map(([label, value]) => (
-          <article key={label} className="rounded-2xl border border-border bg-white p-3">
-            <p className="text-xs text-slate-500">{label}</p>
-            <p className="mt-1 text-2xl font-semibold">{value}</p>
-          </article>
-        ))}
-      </section>
       {companies.length === 0 ? <StateView variant="empty" title="Ninguna empresa coincide con la búsqueda." /> : (
         <div className="overflow-hidden rounded-2xl border border-border bg-white">
           <table className="w-full text-left text-sm">
@@ -97,3 +118,4 @@ export function FirmScreen({
     </div>
   );
 }
+

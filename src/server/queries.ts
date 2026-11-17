@@ -368,8 +368,8 @@ async function classifiedMovements(db: Db, actor: Actor, companyId: string, dire
     merchant: row.merchant,
     description: row.description,
     amountCents: row.amountCents,
-    category: row.classification?.category.name ?? "Sin categoría",
-    subcategory: row.classification?.subcategory.name ?? "Sin subcategoría",
+    category: row.classification?.category?.name ?? "Sin categoría",
+    subcategory: row.classification?.subcategory?.name ?? "Sin subcategoría",
   }));
 }
 
@@ -437,6 +437,9 @@ export async function accountBreakdowns(db: Db, actor: Actor, companyId: string)
         amountCents: row.amountCents,
         isDemonstration: row.isDemonstration,
       })),
+      series: [...rows]
+        .sort((a, b) => a.postedOn.getTime() - b.postedOn.getTime() || a.merchant.localeCompare(b.merchant))
+        .map((row) => row.amountCents),
     };
   });
 }
@@ -454,6 +457,195 @@ export async function bankSummary(db: Db, actor: Actor, companyId: string) {
     if (row.amountCents < 0) outflows += row.amountCents;
   }
   return { count: rows.length, inflows, outflows, net: inflows + outflows };
+}
+
+export type ReportPoint = { day: string; inflows: number; outflows: number; net: number };
+
+export type ReportPeriod = {
+  from: string;
+  to: string;
+  inflows: number;
+  outflows: number;
+  net: number;
+  count: number;
+};
+
+export async function companyReport(db: Db, actor: Actor, companyId: string) {
+  requireCompany(actor, companyId);
+  const [accounts, transactions, duplicateRows] = await Promise.all([
+    db.bankAccount.findMany({
+      where: { companyId },
+      orderBy: [{ institution: "asc" }, { mask: "asc" }],
+    }),
+    db.bankTransaction.findMany({
+      where: { companyId },
+      include: {
+        classification: { include: { category: true, subcategory: true } },
+        account: true,
+      },
+      orderBy: [{ postedOn: "asc" }, { merchant: "asc" }],
+    }),
+    db.document.findMany({
+      where: { companyId, duplicateOfId: { not: null } },
+      include: { extraction: true, duplicateOf: true },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+
+  let inflows = 0;
+  let outflows = 0;
+  let uncategorizedCount = 0;
+  let uncategorizedExpenseCents = 0;
+  const byDay = new Map<string, { inflows: number; outflows: number }>();
+  const byCategory = new Map<string, { category: string; totalCents: number; count: number }>();
+  const byGroup = new Map<string, { category: string; subcategory: string; totalCents: number; count: number }>();
+
+  for (const row of transactions) {
+    const day = dayKey(row.postedOn) ?? "";
+    const bucket = byDay.get(day) ?? { inflows: 0, outflows: 0 };
+    if (row.amountCents > 0) {
+      inflows += row.amountCents;
+      bucket.inflows += row.amountCents;
+    } else if (row.amountCents < 0) {
+      outflows += Math.abs(row.amountCents);
+      bucket.outflows += Math.abs(row.amountCents);
+    }
+    byDay.set(day, bucket);
+    const uncategorized = row.accountingState === "Uncategorized" || !row.classification;
+    if (uncategorized) {
+      uncategorizedCount += 1;
+      if (row.amountCents < 0) uncategorizedExpenseCents += Math.abs(row.amountCents);
+    }
+    if (row.amountCents < 0) {
+      const category = row.classification?.category?.name ?? "Sin categoría";
+      const subcategory = row.classification?.subcategory?.name ?? "Sin subcategoría";
+      const categoryRow = byCategory.get(category) ?? { category, totalCents: 0, count: 0 };
+      categoryRow.totalCents += Math.abs(row.amountCents);
+      categoryRow.count += 1;
+      byCategory.set(category, categoryRow);
+      const key = `${category}\n${subcategory}`;
+      const group = byGroup.get(key) ?? { category, subcategory, totalCents: 0, count: 0 };
+      group.totalCents += Math.abs(row.amountCents);
+      group.count += 1;
+      byGroup.set(key, group);
+    }
+  }
+
+  const days = [...byDay.keys()].filter(Boolean).sort();
+  const daily: ReportPoint[] = days.length
+    ? eachDay(days[0], days[days.length - 1]).map((day) => {
+        const bucket = byDay.get(day) ?? { inflows: 0, outflows: 0 };
+        return { day, inflows: bucket.inflows, outflows: bucket.outflows, net: bucket.inflows - bucket.outflows };
+      })
+    : [];
+
+  const span = days.length >= 2 ? splitSpan(days[0], days[days.length - 1]) : null;
+  const periodOf = (side: "early" | "late"): ReportPeriod | null => {
+    if (!span) return null;
+    const rows = transactions.filter((row) => {
+      const key = dayKey(row.postedOn);
+      if (!key) return false;
+      const ms = Date.parse(`${key}T12:00:00.000Z`);
+      return side === "early" ? ms < span.mid : ms >= span.mid;
+    });
+    if (rows.length === 0) return null;
+    const keys = rows.map((row) => dayKey(row.postedOn)).filter((key): key is string => Boolean(key)).sort();
+    let periodIn = 0;
+    let periodOut = 0;
+    for (const row of rows) {
+      if (row.amountCents > 0) periodIn += row.amountCents;
+      else if (row.amountCents < 0) periodOut += Math.abs(row.amountCents);
+    }
+    return {
+      from: keys[0],
+      to: keys[keys.length - 1],
+      inflows: periodIn,
+      outflows: periodOut,
+      net: periodIn - periodOut,
+      count: rows.length,
+    };
+  };
+
+  const largestExpenses = [...transactions]
+    .filter((row) => row.amountCents < 0)
+    .sort((a, b) => a.amountCents - b.amountCents || a.merchant.localeCompare(b.merchant))
+    .slice(0, 3)
+    .map((row) => ({
+      id: row.id,
+      merchant: row.merchant,
+      postedOn: formatDay(dayKey(row.postedOn)),
+      amountCents: row.amountCents,
+      category: row.classification?.category?.name ?? "Sin categoría",
+      institution: row.account.institution,
+      mask: row.account.mask,
+      isDemonstration: row.account.isDemonstration || row.isDemonstration,
+    }));
+
+  return {
+    count: transactions.length,
+    inflows,
+    outflows,
+    net: inflows - outflows,
+    firstDay: days[0] ?? null,
+    lastDay: days[days.length - 1] ?? null,
+    uncategorizedCount,
+    uncategorizedExpenseCents,
+    largestExpenses,
+    categories: [...byCategory.values()].sort((a, b) => b.totalCents - a.totalCents || a.category.localeCompare(b.category)),
+    groups: [...byGroup.values()].sort((a, b) => b.totalCents - a.totalCents || a.category.localeCompare(b.category)),
+    daily,
+    early: periodOf("early"),
+    late: periodOf("late"),
+    accounts: accounts.map((account) => {
+      const rows = transactions.filter((row) => row.accountId === account.id);
+      let accountIn = 0;
+      let accountOut = 0;
+      for (const row of rows) {
+        if (row.amountCents > 0) accountIn += row.amountCents;
+        else if (row.amountCents < 0) accountOut += Math.abs(row.amountCents);
+      }
+      return {
+        id: account.id,
+        institution: account.institution,
+        productName: account.productName,
+        mask: account.mask,
+        kind: account.kind,
+        isDemonstration: account.isDemonstration,
+        availableBalanceCents: account.availableBalanceCents,
+        inflows: accountIn,
+        outflows: accountOut,
+        net: accountIn - accountOut,
+        count: rows.length,
+        series: rows.map((row) => row.amountCents),
+      };
+    }),
+    storedBalanceCents: accounts.reduce((sum, account) => sum + account.availableBalanceCents, 0),
+    demonstrationAccountCount: accounts.filter((account) => account.isDemonstration).length,
+    duplicates: duplicateRows.map((row) => ({
+      id: row.id,
+      fileName: row.fileName,
+      merchant: row.extraction?.merchant ?? null,
+      amountCents: row.extraction?.amountCents ?? null,
+      originalName: row.duplicateOf?.fileName ?? null,
+    })),
+  };
+}
+
+function eachDay(from: string, to: string): string[] {
+  const days: string[] = [];
+  let cursor = Date.parse(`${from}T12:00:00.000Z`);
+  const end = Date.parse(`${to}T12:00:00.000Z`);
+  while (cursor <= end) {
+    days.push(new Date(cursor).toISOString().slice(0, 10));
+    cursor += 86_400_000;
+  }
+  return days;
+}
+
+function splitSpan(first: string, last: string) {
+  const start = Date.parse(`${first}T12:00:00.000Z`);
+  const end = Date.parse(`${last}T12:00:00.000Z`);
+  return { mid: start + Math.floor((end - start) / 2) };
 }
 
 export async function detectedDuplicates(db: Db, actor: Actor, companyId: string) {

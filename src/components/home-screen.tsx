@@ -1,5 +1,7 @@
 import { Clock, Layers, Paperclip, Sparkles, TrendingUp, Upload, Users, Wallet } from "lucide-react";
 import Link from "next/link";
+import { Sparkline } from "@/components/charts";
+import { InsightStrip } from "@/components/insight-strip";
 import { formatTodayLabel } from "@/lib/dates";
 import { greetingName } from "@/lib/labels";
 import { formatUsd } from "@/lib/money";
@@ -11,26 +13,6 @@ const DEMO = {
   payablesCents: 678000,
 };
 
-function Sparkline({ points, color }: { points: number[]; color: string }) {
-  const width = 128;
-  const height = 36;
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const span = max - min || 1;
-  const path = points
-    .map((point, index) => {
-      const x = (index / (points.length - 1)) * width;
-      const y = height - ((point - min) / span) * (height - 4) - 2;
-      return `${index === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`;
-    })
-    .join(" ");
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-9 w-full" aria-hidden>
-      <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 export function HomeScreen({
   name,
   companyId,
@@ -38,6 +20,8 @@ export function HomeScreen({
   accountCount,
   accounts,
   duplicates,
+  reading,
+  dailyNet,
 }: {
   name: string;
   companyId: string;
@@ -45,11 +29,14 @@ export function HomeScreen({
   accountCount: number;
   accounts: { institution: string; mask: string }[];
   duplicates: { id: string; fileName: string; merchant: string | null; amountCents: number | null; occurredOn: string; originalName: string | null }[];
+  reading: string[];
+  dailyNet: number[];
 }) {
   const accountLine = accounts.map((account) => `${account.institution} ····${account.mask}`).join(" · ");
   return (
     <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-4">
+        <InsightStrip lines={reading} testId="home-reading" />
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <article className="rounded-2xl border border-border bg-white p-4">
             <div className="flex items-center justify-between text-sm text-slate-500">
@@ -60,11 +47,11 @@ export function HomeScreen({
             <p data-testid="bank-balance" className="mt-3 text-2xl font-semibold tracking-tight">
               {formatUsd(balanceCents)}
             </p>
-            <Sparkline points={[8, 9, 8, 11, 10, 12, 13, 12]} color="#2563eb" />
+            <Sparkline points={dailyNet} color="#2563eb" />
             <p className="text-xs text-slate-500">
               {accountCount === 1 ? "1 cuenta conectada" : `${accountCount} cuentas conectadas`}
             </p>
-            <p className="text-xs text-slate-400">{accountLine}. El saldo sale de la base. La gráfica es ilustrativa.</p>
+            <p className="text-xs text-slate-400">{accountLine}. El saldo sale de la base. La línea es el neto diario de los movimientos, no el historial del saldo.</p>
           </article>
           <DemoCard title="Utilidad del mes" icon={<TrendingUp className="size-4" />} value={formatUsd(DEMO.profitCents)} detail="Margen ilustrativo 33.9%" color="#16a34a" points={[4, 6, 5, 8, 7, 9, 11]} />
           <DemoCard title="Por cobrar" icon={<Layers className="size-4" />} value={formatUsd(DEMO.receivablesCents)} detail="5 facturas abiertas, dato ilustrativo" color="#f97316" points={[6, 8, 7, 9, 8, 10, 9]} />

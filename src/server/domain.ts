@@ -489,7 +489,7 @@ export async function confirmLink(db: Db, actor: Actor, documentId: string, tran
     documentId,
     transactionId,
     role: "assistant",
-    body: `Vínculo confirmado con ${transaction.merchant} del ${dayKey(transaction.postedOn)}. El comprobante queda ligado. La conciliación bancaria sigue sin cerrar y la revisión del contador sigue pendiente.`,
+    body: `Vínculo confirmado con ${transaction.merchant} del ${dayKey(transaction.postedOn)}. El comprobante queda ligado. La revisión del contador sigue pendiente.`,
     intent: "confirm_link",
   });
   const classifiedByService = Boolean(!transaction.classification?.subcategoryId && extraction.subcategoryId && extraction.categoryId);

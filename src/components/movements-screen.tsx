@@ -103,7 +103,7 @@ export function MovementsScreen({
             <h1 className="text-2xl font-semibold">Movimientos</h1>
             <p className="text-sm text-slate-500">{balanceLabel}</p>
           </div>
-          <p className="mt-1 text-sm text-slate-500">Clasifica y revisa las operaciones. La conciliación bancaria de este laboratorio queda sin cerrar.</p>
+          <p className="mt-1 text-sm text-slate-500">Clasifica y revisa las operaciones.</p>
         </div>
         <div className="flex flex-wrap gap-2 px-4 py-3">
           {filters.map(([key, label]) => (

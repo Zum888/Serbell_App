@@ -1,28 +1,47 @@
+import { ArrowDownLeft } from "lucide-react";
 import Link from "next/link";
+import { Sparkline } from "@/components/charts";
+import { InsightStrip } from "@/components/insight-strip";
 import { StateView } from "@/components/state-view";
+import { inflowReading } from "@/lib/reading";
 import { formatUsd } from "@/lib/money";
 import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
-import { incomingMovements } from "@/server/queries";
+import { companyReport, incomingMovements } from "@/server/queries";
 
 export default async function ReceivablesPage() {
   const session = await pageContext();
   if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para ver sus cobros." />;
-  const incoming = await incomingMovements(db(), session.actor, session.companyId);
+  const [incoming, report] = await Promise.all([
+    incomingMovements(db(), session.actor, session.companyId),
+    companyReport(db(), session.actor, session.companyId),
+  ]);
+  const largest = [...incoming.rows].sort((a, b) => b.amountCents - a.amountCents)[0];
   return (
     <section className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold">Cobros</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          No hay facturas abiertas ni vencidas. Estas filas son ingresos que ya entraron al banco. No se registró ningún cobro nuevo.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">Cobros</h1>
+        <p className="mt-1 text-sm text-slate-500">Ingresos que ya entraron al banco. No hay facturas ni un registro de cobro nuevo.</p>
       </div>
+      <InsightStrip
+        lines={inflowReading({
+          inflows: incoming.totalCents,
+          count: report.count,
+          inflowCount: incoming.rows.length,
+          largestMerchant: largest?.merchant ?? null,
+          largestCents: largest?.amountCents ?? 0,
+        })}
+        testId="cobros-reading"
+      />
       <article className="rounded-2xl border border-border bg-white p-4">
-        <p className="text-sm text-slate-500">Ingresos en movimientos</p>
-        <p data-testid="cobros-total" className="mt-1 text-3xl font-semibold tracking-tight">
+        <div className="flex items-center gap-2 text-sm text-slate-500">
+          <ArrowDownLeft className="size-4" /> Ingresos en movimientos
+        </div>
+        <p data-testid="cobros-total" className="mt-2 text-3xl font-semibold tracking-tight">
           {formatUsd(incoming.totalCents)}
         </p>
-        <p className="mt-1 text-xs text-slate-500">{incoming.rows.length} movimientos de entrada.</p>
+        <Sparkline points={report.daily.map((point) => point.inflows)} color="#2563eb" />
+        <p className="text-xs text-slate-500">{incoming.rows.length} movimientos de entrada. La línea es el ingreso de cada día.</p>
       </article>
       {incoming.rows.length === 0 ? (
         <StateView variant="empty" title="No hay ingresos en los movimientos de esta empresa." />

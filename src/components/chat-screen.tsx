@@ -169,7 +169,7 @@ function DocumentPanel({ document }: { document: ChatDocument }) {
         </form>
       ) : null}
       {document.linkedTransactionId ? (
-        <StateView variant="success" testId="link-success" title="Vínculo confirmado." description="El comprobante quedó ligado al movimiento. La conciliación bancaria sigue sin cerrar." />
+        <StateView variant="success" testId="link-success" title="Vínculo confirmado." description="El comprobante quedó ligado al movimiento." />
       ) : null}
       {document.verified && !document.linkedTransactionId ? (
         <div data-testid="match-reasons" className="rounded-xl border border-border p-3 text-sm">

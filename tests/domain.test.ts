@@ -13,7 +13,7 @@ import {
   reconcileTransaction,
   sealTransaction,
 } from "@/server/domain";
-import { accountBreakdowns, getHome, getMovement, loadActor } from "@/server/queries";
+import { accountBreakdowns, companyReport, getHome, getMovement, loadActor } from "@/server/queries";
 import { seedDatabase } from "@/server/seed";
 
 const databaseUrl = "file:/tmp/serbell-vitest.db";
@@ -165,4 +165,24 @@ it("separa la conciliación manual de la marca del matcher", async () => {
   expect(accounts).toHaveLength(4);
   expect(accounts.some((account) => account.id === ACCOUNT.rivera)).toBe(false);
   expect(accounts.find((account) => account.id === ACCOUNT.qpl)?.availableBalanceCents).toBe(414049);
+});
+
+it("suma el reporte con los movimientos guardados de la empresa", async () => {
+  const padrino = await loadActor(prisma, USER.padrino);
+  const luis = await loadActor(prisma, USER.luis);
+  if (!padrino || !luis) throw new Error("faltan perfiles");
+  const report = await companyReport(prisma, padrino, COMPANY.qpl);
+  const rows = await prisma.bankTransaction.findMany({ where: { companyId: COMPANY.qpl } });
+  const inflows = rows.filter((row) => row.amountCents > 0).reduce((sum, row) => sum + row.amountCents, 0);
+  const outflows = rows.filter((row) => row.amountCents < 0).reduce((sum, row) => sum + Math.abs(row.amountCents), 0);
+  expect(report.inflows).toBe(inflows);
+  expect(report.outflows).toBe(outflows);
+  expect(report.net).toBe(inflows - outflows);
+  expect(report.count).toBe(rows.length);
+  expect(report.accounts.some((account) => account.id === ACCOUNT.rivera)).toBe(false);
+  expect(report.accounts.filter((account) => account.isDemonstration)).toHaveLength(3);
+  const most = rows.reduce((left, right) => (left.amountCents < right.amountCents ? left : right));
+  expect(report.largestExpenses[0]?.id).toBe(most.id);
+  expect(report.duplicates.length).toBeGreaterThan(0);
+  await expect(companyReport(prisma, luis, COMPANY.qpl)).rejects.toMatchObject({ code: "COMPANY_FORBIDDEN" });
 });

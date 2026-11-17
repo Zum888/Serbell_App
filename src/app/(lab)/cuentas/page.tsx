@@ -1,23 +1,38 @@
 import Link from "next/link";
+import { Sparkline } from "@/components/charts";
+import { InsightStrip } from "@/components/insight-strip";
 import { StateView } from "@/components/state-view";
+import { accountReading } from "@/lib/reading";
 import { formatUsd } from "@/lib/money";
 import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
-import { accountBreakdowns } from "@/server/queries";
+import { accountBreakdowns, companyReport } from "@/server/queries";
 
 export default async function AccountsPage() {
   const session = await pageContext();
   if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para ver sus cuentas." />;
-  const accounts = await accountBreakdowns(db(), session.actor, session.companyId);
+  const [accounts, report] = await Promise.all([
+    accountBreakdowns(db(), session.actor, session.companyId),
+    companyReport(db(), session.actor, session.companyId),
+  ]);
   if (accounts.length === 0) return <StateView variant="empty" title="Esta empresa no tiene cuentas bancarias." />;
   return (
     <section className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold">Cuentas bancarias</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Cuentas bancarias</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Cada cuenta y sus movimientos salen de la base. El saldo disponible es el guardado en la cuenta. Entradas, salidas y neto suman solo esos movimientos. No es un cierre ni una conciliación de extracto.
+          El saldo disponible es el guardado en cada cuenta. Entradas, salidas y neto suman solo sus movimientos.
         </p>
       </div>
+      <InsightStrip
+        lines={accountReading({
+          storedBalanceCents: report.storedBalanceCents,
+          net: report.net,
+          demonstrationAccountCount: report.demonstrationAccountCount,
+          accountCount: accounts.length,
+        })}
+        testId="cuentas-reading"
+      />
       {accounts.map((account) => (
         <article key={account.id} data-testid={`account-${account.id}`} className="overflow-hidden rounded-2xl border border-border bg-white">
           <div className="border-b border-border px-4 py-4">
@@ -29,6 +44,8 @@ export default async function AccountsPage() {
             <p className="text-sm text-slate-600">{account.kind === "card" ? "Tarjeta de crédito" : "Cuenta bancaria"} · ····{account.mask} · {account.currency}</p>
             <p className="mt-3 text-sm text-slate-500">Saldo disponible</p>
             <p data-testid="account-balance" className="text-2xl font-semibold tracking-tight">{formatUsd(account.availableBalanceCents)}</p>
+            <Sparkline points={account.series} color="#2563eb" />
+            <p className="text-xs text-slate-500">La línea sigue el importe de cada movimiento, del más antiguo al más reciente.</p>
           </div>
           <div className="grid gap-3 border-b border-border px-4 py-4 sm:grid-cols-3">
             <div>

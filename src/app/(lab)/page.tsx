@@ -4,7 +4,8 @@ import { StateView } from "@/components/state-view";
 import { formatUsd } from "@/lib/money";
 import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
-import { detectedDuplicates, getHome } from "@/server/queries";
+import { reportReading } from "@/lib/reading";
+import { companyReport, detectedDuplicates, getHome } from "@/server/queries";
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await pageContext();
@@ -13,10 +14,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     return <StateView variant="empty" title="Selecciona una empresa en la barra superior." />;
   }
   const { error } = await searchParams;
-  const [home, duplicates] = await Promise.all([
+  const [home, duplicates, report] = await Promise.all([
     getHome(db(), session.actor, session.companyId),
     detectedDuplicates(db(), session.actor, session.companyId),
+    companyReport(db(), session.actor, session.companyId),
   ]);
+  const reading = reportReading({ ...report, accountCount: report.accounts.length }).slice(0, 3);
   return (
     <div className="space-y-3">
       {error ? <StateView variant="error" title={error} testId="server-error" /> : null}
@@ -27,6 +30,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         accountCount={home.accountCount}
         accounts={home.accounts.map((account) => ({ institution: account.institution, mask: account.mask }))}
         duplicates={duplicates}
+        reading={reading}
+        dailyNet={report.daily.map((point) => point.net)}
       />
       <p className="sr-only">Saldo disponible {formatUsd(home.balanceCents)}</p>
     </div>
