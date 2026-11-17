@@ -18,6 +18,7 @@ type Row = {
   documentState: string;
   reviewState: string;
   reconciliationState: string;
+  serbellConciled: boolean;
   sealed: boolean;
   institution: string;
   mask: string;
@@ -36,6 +37,7 @@ type Detail = {
   reviewState: string;
   accountingState: string;
   reconciliationState: string;
+  serbellConciled: boolean;
   bankState: string;
   sealed: boolean;
   sealedAt: string | null;
@@ -155,7 +157,10 @@ export function MovementsScreen({
                     <td className="px-3 py-2">{row.amountCents < 0 ? formatCentsPlain(row.amountCents) : ""}</td>
                     <td className="px-3 py-2" data-testid="doc-state">{DOCUMENT_LABEL[row.documentState] ?? row.documentState}</td>
                     <td className="px-3 py-2" data-testid="review-state">{REVIEW_LABEL[row.reviewState] ?? row.reviewState}</td>
-                    <td className="px-3 py-2" data-testid="bank-recon">{RECONCILIATION_LABEL[row.reconciliationState] ?? "Sin conciliar"}</td>
+                    <td className="px-3 py-2" data-testid="bank-recon">
+                      <p>{RECONCILIATION_LABEL[row.reconciliationState] ?? "Sin conciliar"}</p>
+                      {row.serbellConciled ? <p data-testid="serbell-mark" className="text-xs font-medium text-primary">Serbell concilió</p> : null}
+                    </td>
                     <td className="px-3 py-2">
                       <span data-testid="seal-lock" data-locked={row.sealed ? "true" : "false"} className="inline-flex items-center gap-1 text-xs">
                         {row.sealed ? <Lock className="size-3.5" /> : <LockOpen className="size-3.5 text-slate-400" />}
@@ -163,9 +168,19 @@ export function MovementsScreen({
                       </span>
                     </td>
                     <td className="px-3 py-2">
-                      <Link className="font-medium text-primary" href={`/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}&movimiento=${row.id}`}>
-                        Ver
-                      </Link>
+                      <div className="flex items-center gap-3">
+                        <Link className="font-medium text-primary" href={`/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}&movimiento=${row.id}`}>
+                          Ver
+                        </Link>
+                        {row.reconciliationState === "Reconciled" ? null : (
+                          <form action={`/api/transactions/${row.id}/reconcile`} method="post">
+                            <input type="hidden" name="next" value={`/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}`} />
+                            <button type="submit" data-testid={`reconcile-${row.id}`} className="font-medium text-primary">
+                              Conciliar
+                            </button>
+                          </form>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -196,7 +211,13 @@ function Drawer({ detail, error, filter, q }: { detail: Detail; error?: string; 
         <div><dt className="text-xs text-slate-500">Cuenta</dt><dd>{detail.institution} ····{detail.mask}</dd></div>
         <div><dt className="text-xs text-slate-500">Producto</dt><dd>{detail.productName}</dd></div>
         <div><dt className="text-xs text-slate-500">Estado contable</dt><dd>{ACCOUNTING_LABEL[detail.accountingState] ?? detail.accountingState}</dd></div>
-        <div><dt className="text-xs text-slate-500">Conciliación</dt><dd>{RECONCILIATION_LABEL[detail.reconciliationState] ?? "Sin conciliar"}</dd></div>
+        <div>
+          <dt className="text-xs text-slate-500">Conciliación</dt>
+          <dd>
+            {RECONCILIATION_LABEL[detail.reconciliationState] ?? "Sin conciliar"}
+            {detail.serbellConciled ? <span data-testid="serbell-mark" className="mt-1 block text-xs font-medium text-primary">Serbell concilió</span> : null}
+          </dd>
+        </div>
       </dl>
       <section data-testid="drawer-document" className="mt-4 rounded-xl border border-border p-3 text-sm">
         <h3 className="font-medium">Comprobante</h3>
@@ -262,8 +283,14 @@ function Drawer({ detail, error, filter, q }: { detail: Detail; error?: string; 
         )}
       </section>
       <div className="mt-4 flex flex-wrap gap-2">
+        {detail.reconciliationState === "Reconciled" ? null : (
+          <form action={`/api/transactions/${detail.id}/reconcile`} method="post" className="mt-4">
+            <input type="hidden" name="next" value={`/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}&movimiento=${detail.id}`} />
+            <Button type="submit" variant="outline" data-testid={`reconcile-${detail.id}`}>Conciliar</Button>
+          </form>
+        )}
         {detail.canReview && !detail.sealed ? (
-          <form action={`/api/transactions/${detail.id}/seal`} method="post">
+          <form action={`/api/transactions/${detail.id}/seal`} method="post" className="mt-3">
             <Button type="submit" data-testid="approve-seal">Aprobar y sellar</Button>
           </form>
         ) : null}

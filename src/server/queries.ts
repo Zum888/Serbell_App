@@ -75,6 +75,7 @@ export async function listMovements(db: Db, actor: Actor, companyId: string, fil
     include: {
       classification: { include: { category: true, subcategory: true } },
       account: true,
+      audits: { where: { action: "serbell_matched" }, select: { id: true } },
     },
     orderBy: [{ postedOn: "desc" }, { merchant: "asc" }],
   });
@@ -100,6 +101,7 @@ export async function listMovements(db: Db, actor: Actor, companyId: string, fil
       documentState: row.documentState,
       reviewState: row.reviewState,
       reconciliationState: row.reconciliationState,
+      serbellConciled: row.audits.length > 0,
       sealed: Boolean(row.sealedAt),
       institution: row.account.institution,
       mask: row.account.mask,
@@ -178,6 +180,7 @@ export async function getMovement(db: Db, actor: Actor, transactionId: string) {
     reviewState: transaction.reviewState,
     accountingState: transaction.accountingState,
     reconciliationState: transaction.reconciliationState,
+    serbellConciled: transaction.audits.some((event) => event.action === "serbell_matched"),
     bankState: transaction.bankState,
     sealed: Boolean(transaction.sealedAt),
     sealedAt: transaction.sealedAt ? formatDateTime(transaction.sealedAt) : null,
@@ -397,7 +400,10 @@ export async function incomingMovements(db: Db, actor: Actor, companyId: string)
 
 export async function accountBreakdowns(db: Db, actor: Actor, companyId: string) {
   requireCompany(actor, companyId);
-  const accounts = await localProviders(db).bank.listAccounts(companyId);
+  const accounts = await db.bankAccount.findMany({
+    where: { companyId },
+    orderBy: [{ institution: "asc" }, { mask: "asc" }],
+  });
   const transactions = await db.bankTransaction.findMany({
     where: { companyId },
     orderBy: [{ postedOn: "desc" }, { merchant: "asc" }],
@@ -417,6 +423,8 @@ export async function accountBreakdowns(db: Db, actor: Actor, companyId: string)
       name: account.name,
       mask: account.mask,
       currency: account.currency,
+      kind: account.kind,
+      isDemonstration: account.isDemonstration,
       availableBalanceCents: account.availableBalanceCents,
       inflows,
       outflows,
@@ -427,6 +435,7 @@ export async function accountBreakdowns(db: Db, actor: Actor, companyId: string)
         merchant: row.merchant,
         description: row.description,
         amountCents: row.amountCents,
+        isDemonstration: row.isDemonstration,
       })),
     };
   });

@@ -4,7 +4,7 @@ import { CAT, TX } from "../src/lib/ids";
 test("Padrino vincula el ticket y Carlos lo sella", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Buenos días, Padrino/ })).toBeVisible();
-  await expect(page.getByTestId("bank-balance")).toContainText("4,140.49");
+  await expect(page.getByTestId("bank-balance")).toContainText("33,366.24");
 
   await page.getByTestId("nav-chat").click();
   await page.getByTestId("chat-file-input").setInputFiles("fixtures/FleetSmarts_ticket.jpg");

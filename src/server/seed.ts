@@ -3,6 +3,7 @@ import path from "node:path";
 import { ACCOUNT, CAT, COMPANY, FIRM_ID, TX, USER } from "@/lib/ids";
 import type { Db } from "@/server/db";
 import { sha256 } from "@/server/ids";
+import { stampReliableMatcherLinks } from "@/server/domain";
 
 const noon = (day: string) => new Date(`${day}T12:00:00.000Z`);
 
@@ -44,6 +45,89 @@ async function categories(
   ];
   for (const [id, parentId, name] of rows) {
     await db.accountingCategory.create({ data: { id, companyId, parentId, name } });
+  }
+}
+
+const DEMO = "Dato de demostración.";
+
+export const QPL_DEMO_ACCOUNTS = [
+  {
+    id: "acct_qpl_chase",
+    institution: "Chase",
+    productName: "Business Complete Checking",
+    mask: "7741",
+    name: "Business Complete Checking",
+    currency: "USD",
+    availableBalanceCents: 1_862_500,
+    kind: "bank",
+    isDemonstration: true,
+  },
+  {
+    id: "acct_qpl_wells",
+    institution: "Wells Fargo",
+    productName: "Navigate Business Checking",
+    mask: "2204",
+    name: "Navigate Business Checking",
+    currency: "USD",
+    availableBalanceCents: 640_075,
+    kind: "bank",
+    isDemonstration: true,
+  },
+  {
+    id: "acct_qpl_amex",
+    institution: "American Express",
+    productName: "Business Gold Card",
+    mask: "1005",
+    name: "Tarjeta de crédito Business Gold",
+    currency: "USD",
+    availableBalanceCents: 420_000,
+    kind: "card",
+    isDemonstration: true,
+  },
+] as const;
+
+export const QPL_DEMO_TRANSACTIONS = [
+  ["tx_qpl_demo_pilot", "acct_qpl_chase", "2026-10-06", "Pilot Flying J", -6420],
+  ["tx_qpl_demo_ruiz", "acct_qpl_chase", "2026-10-14", "Cliente Ruiz", 125_000],
+  ["tx_qpl_demo_sams", "acct_qpl_chase", "2026-10-26", "Sam's Club", -3890],
+  ["tx_qpl_demo_insurance", "acct_qpl_wells", "2026-10-04", "State Farm", -98_000],
+  ["tx_qpl_demo_deposit", "acct_qpl_wells", "2026-10-18", "Depósito de cliente", 45_000],
+  ["tx_qpl_demo_napa", "acct_qpl_wells", "2026-10-29", "NAPA Auto Parts", -2750],
+  ["tx_qpl_demo_shell", "acct_qpl_amex", "2026-10-09", "Shell", -5120],
+  ["tx_qpl_demo_amazon", "acct_qpl_amex", "2026-10-17", "Amazon", -2340],
+  ["tx_qpl_demo_payment", "acct_qpl_amex", "2026-10-23", "Pago a la tarjeta", 80_000],
+] as const;
+
+export async function insertQplDemonstrationAccounts(db: Db) {
+  for (const account of QPL_DEMO_ACCOUNTS) {
+    await db.bankAccount.upsert({
+      where: { id: account.id },
+      update: {},
+      create: { ...account, companyId: COMPANY.qpl },
+    });
+  }
+  for (const [id, accountId, day, merchant, amountCents] of QPL_DEMO_TRANSACTIONS) {
+    await db.bankTransaction.upsert({
+      where: { id },
+      update: {},
+      create: {
+        id,
+        companyId: COMPANY.qpl,
+        accountId,
+        postedOn: noon(day),
+        merchant,
+        description: DEMO,
+        amountCents,
+        currency: "USD",
+        bankState: "Posted",
+        reconciliationState: "Unreconciled",
+        documentState: "Missing",
+        accountingState: "Uncategorized",
+        reviewState: "NeedsReview",
+        externalId: id,
+        isDemonstration: true,
+      },
+    });
   }
 }
 
@@ -336,6 +420,8 @@ export async function seedDatabase(db: Db) {
       },
     ],
   });
+  await insertQplDemonstrationAccounts(db);
+  await stampReliableMatcherLinks(db);
   await db.accountingReview.create({
     data: {
       id: "rev_15012",

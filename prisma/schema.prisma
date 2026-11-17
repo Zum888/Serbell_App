@@ -83,6 +83,8 @@ model BankAccount {
   name                  String
   currency              String            @default("USD")
   availableBalanceCents Int
+  kind                  String            @default("bank")
+  isDemonstration       Boolean           @default(false)
   company               Company           @relation(fields: [companyId], references: [id])
   transactions          BankTransaction[]
   statements            BankStatement[]
@@ -103,6 +105,7 @@ model BankTransaction {
   accountingState     String
   reviewState         String
   externalId          String?
+  isDemonstration     Boolean                     @default(false)
   sealedAt            DateTime?
   sealedById          String?
   company             Company                     @relation(fields: [companyId], references: [id])

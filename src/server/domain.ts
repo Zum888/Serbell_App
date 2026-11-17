@@ -36,7 +36,7 @@ async function audit(
   db: Db,
   input: {
     companyId: string;
-    actorId: string;
+    actorId?: string | null;
     transactionId?: string | null;
     documentId?: string | null;
     action: string;
@@ -49,7 +49,7 @@ async function audit(
     data: {
       id: nid("aud"),
       companyId: input.companyId,
-      actorId: input.actorId,
+      actorId: input.actorId ?? null,
       transactionId: input.transactionId ?? null,
       documentId: input.documentId ?? null,
       action: input.action,
@@ -83,15 +83,12 @@ async function requireTransaction(db: Db, transactionId: string) {
   return transaction;
 }
 
-async function matchDocument(db: Db, documentId: string): Promise<MatchResult> {
+async function evaluateDocument(db: Db, documentId: string): Promise<MatchResult | null> {
   const document = await db.document.findUnique({
     where: { id: documentId },
     include: { extraction: true },
   });
-  if (!document?.extraction?.merchant || document.extraction.amountCents === null) {
-    throw new AppError("Completa comercio e importe antes de buscar coincidencias.", 400, "EXTRACTION_INCOMPLETE");
-  }
-  const providers = localProviders(db);
+  if (!document?.extraction?.merchant || document.extraction.amountCents === null) return null;
   const transactions = await db.bankTransaction.findMany({
     where: { companyId: document.companyId },
     include: { links: { where: { status: "confirmed" } } },
@@ -100,7 +97,7 @@ async function matchDocument(db: Db, documentId: string): Promise<MatchResult> {
     where: { companyId: document.companyId, id: { not: document.id } },
     include: { extraction: true },
   });
-  const result = providers.matching.evaluate({
+  return localProviders(db).matching.evaluate({
     document: {
       id: document.id,
       merchant: document.extraction.merchant,
@@ -125,6 +122,13 @@ async function matchDocument(db: Db, documentId: string): Promise<MatchResult> {
       fileHash: other.fileHash,
     })),
   });
+}
+
+async function matchDocument(db: Db, documentId: string): Promise<MatchResult> {
+  const result = await evaluateDocument(db, documentId);
+  if (!result) {
+    throw new AppError("Completa comercio e importe antes de buscar coincidencias.", 400, "EXTRACTION_INCOMPLETE");
+  }
 
   await db.matchCandidate.deleteMany({ where: { documentId } });
   for (const candidate of result.candidates) {
@@ -165,10 +169,12 @@ async function matchDocument(db: Db, documentId: string): Promise<MatchResult> {
       where: { documentId, kind: "no_match", status: "open" },
     });
     if (!existing) {
+      const owner = await db.document.findUnique({ where: { id: documentId }, select: { companyId: true } });
+      if (!owner) throw new AppError("No existe ese comprobante.", 404, "NOT_FOUND");
       await db.task.create({
         data: {
           id: nid("task"),
-          companyId: document.companyId,
+          companyId: owner.companyId,
           documentId,
           kind: "no_match",
           title: "Comprobante sin movimiento bancario",
@@ -486,6 +492,7 @@ export async function confirmLink(db: Db, actor: Actor, documentId: string, tran
     body: `Vínculo confirmado con ${transaction.merchant} del ${dayKey(transaction.postedOn)}. El comprobante queda ligado. La conciliación bancaria sigue sin cerrar y la revisión del contador sigue pendiente.`,
     intent: "confirm_link",
   });
+  const classifiedByService = Boolean(!transaction.classification?.subcategoryId && extraction.subcategoryId && extraction.categoryId);
   await audit(db, {
     companyId: document.companyId,
     actorId: actor.id,
@@ -501,6 +508,63 @@ export async function confirmLink(db: Db, actor: Actor, documentId: string, tran
       accountingState: subcategoryId ? "Proposed" : transaction.accountingState,
     },
   });
+  if (result.decision === "reliable" || classifiedByService) {
+    await audit(db, {
+      companyId: document.companyId,
+      transactionId,
+      documentId,
+      action: "serbell_matched",
+      next: {
+        decision: result.decision,
+        linked: true,
+        classified: classifiedByService,
+        categoryId,
+        subcategoryId,
+      },
+    });
+  }
+}
+
+export async function reconcileTransaction(db: Db, actor: Actor, transactionId: string) {
+  const transaction = await requireTransaction(db, transactionId);
+  assertCompanyAccess(actor, transaction.companyId);
+  if (transaction.reconciliationState === "Reconciled") return;
+  await db.bankTransaction.update({
+    where: { id: transactionId },
+    data: { reconciliationState: "Reconciled" },
+  });
+  await audit(db, {
+    companyId: transaction.companyId,
+    actorId: actor.id,
+    transactionId,
+    action: "manual_reconcile",
+    previous: { reconciliationState: transaction.reconciliationState },
+    next: { reconciliationState: "Reconciled" },
+  });
+}
+
+export async function stampReliableMatcherLinks(db: Db) {
+  const links = await db.transactionDocumentLink.findMany({
+    where: { status: "confirmed" },
+    select: { transactionId: true, documentId: true },
+  });
+  for (const link of links) {
+    const already = await db.auditEvent.findFirst({
+      where: { transactionId: link.transactionId, action: "serbell_matched" },
+    });
+    if (already) continue;
+    const result = await evaluateDocument(db, link.documentId);
+    if (!result || result.decision !== "reliable" || result.proposedTransactionId !== link.transactionId) continue;
+    const transaction = await db.bankTransaction.findUnique({ where: { id: link.transactionId } });
+    if (!transaction) continue;
+    await audit(db, {
+      companyId: transaction.companyId,
+      transactionId: link.transactionId,
+      documentId: link.documentId,
+      action: "serbell_matched",
+      next: { decision: "reliable", linked: true },
+    });
+  }
 }
 
 export async function postponeLink(db: Db, actor: Actor, documentId: string) {

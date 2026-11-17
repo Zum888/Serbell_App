@@ -26,11 +26,10 @@ export default async function MovementsPage({
     if (params.movimiento) {
       detail = await getMovement(db(), session.actor, params.movimiento);
     }
-    const account = home.accounts[0];
     return (
       <MovementsScreen
         companyName={home.company.name}
-        balanceLabel={account ? `${account.institution} ····${account.mask} · ${formatUsd(home.balanceCents)}` : formatUsd(home.balanceCents)}
+        balanceLabel={`Disponible en las ${home.accountCount} cuentas · ${formatUsd(home.balanceCents)}`}
         rows={rows}
         counts={counts}
         filter={filter}

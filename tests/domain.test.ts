@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { CAT, COMPANY, TX, USER } from "@/lib/ids";
+import { ACCOUNT, CAT, COMPANY, TX, USER } from "@/lib/ids";
 import { AppError } from "@/lib/errors";
 import {
   changeClassification,
@@ -10,9 +10,10 @@ import {
   confirmLink,
   postChat,
   saveUploadedDocument,
+  reconcileTransaction,
   sealTransaction,
 } from "@/server/domain";
-import { getHome, getMovement, loadActor } from "@/server/queries";
+import { accountBreakdowns, getHome, getMovement, loadActor } from "@/server/queries";
 import { seedDatabase } from "@/server/seed";
 
 const databaseUrl = "file:/tmp/serbell-vitest.db";
@@ -93,11 +94,14 @@ it("vincula el comprobante, el contador sella y el propietario no puede editar",
   await expect(getHome(prisma, luis, COMPANY.qpl)).rejects.toMatchObject({ code: "COMPANY_FORBIDDEN" });
 
   const home = await getHome(prisma, padrino, COMPANY.qpl);
-  expect(home.balanceCents).toBe(414049);
-  await prisma.bankAccount.update({ where: { id: home.accounts[0].id }, data: { availableBalanceCents: 100 } });
+  const boa = home.accounts.find((account) => account.id === ACCOUNT.qpl);
+  expect(boa?.availableBalanceCents).toBe(414049);
+  expect(home.accounts).toHaveLength(4);
+  expect(home.balanceCents).toBe(3_336_624);
+  await prisma.bankAccount.update({ where: { id: ACCOUNT.qpl }, data: { availableBalanceCents: 100 } });
   const changed = await getHome(prisma, padrino, COMPANY.qpl);
-  expect(changed.balanceCents).toBe(100);
-  await prisma.bankAccount.update({ where: { id: home.accounts[0].id }, data: { availableBalanceCents: 414049 } });
+  expect(changed.balanceCents).toBe(3_336_624 - 414049 + 100);
+  await prisma.bankAccount.update({ where: { id: ACCOUNT.qpl }, data: { availableBalanceCents: 414049 } });
 });
 
 it("guarda la corrección del contador sin aplicarla a otro movimiento", async () => {
@@ -140,4 +144,25 @@ it("detecta un archivo duplicado y no finge una acción no implementada", async 
   const status = await postChat(prisma, padrino, COMPANY.qpl, "estado de operaciones");
   expect(status.reply).toContain("Quick Pick Logistics");
   expect(status.reply).toContain("movimientos");
+});
+
+it("separa la conciliación manual de la marca del matcher", async () => {
+  const padrino = await loadActor(prisma, USER.padrino);
+  if (!padrino) throw new Error("falta Padrino");
+  expect(await prisma.auditEvent.findFirst({ where: { transactionId: TX.fs15012, action: "serbell_matched" } })).not.toBeNull();
+  expect(await prisma.auditEvent.findFirst({ where: { transactionId: TX.fs21148, action: "serbell_matched" } })).toBeNull();
+  expect(await prisma.auditEvent.findFirst({ where: { transactionId: "tx_qpl_demo_pilot", action: "serbell_matched" } })).toBeNull();
+
+  await reconcileTransaction(prisma, padrino, TX.brian);
+  const brian = await prisma.bankTransaction.findUnique({ where: { id: TX.brian } });
+  expect(brian?.reconciliationState).toBe("Reconciled");
+  expect(brian?.sealedAt).toBeNull();
+  const manual = await prisma.auditEvent.findFirst({ where: { transactionId: TX.brian, action: "manual_reconcile" } });
+  expect(manual?.actorId).toBe(USER.padrino);
+  expect(await prisma.auditEvent.findFirst({ where: { transactionId: TX.brian, action: "serbell_matched" } })).toBeNull();
+
+  const accounts = await accountBreakdowns(prisma, padrino, COMPANY.qpl);
+  expect(accounts).toHaveLength(4);
+  expect(accounts.some((account) => account.id === ACCOUNT.rivera)).toBe(false);
+  expect(accounts.find((account) => account.id === ACCOUNT.qpl)?.availableBalanceCents).toBe(414049);
 });

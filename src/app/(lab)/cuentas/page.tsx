@@ -21,9 +21,12 @@ export default async function AccountsPage() {
       {accounts.map((account) => (
         <article key={account.id} data-testid={`account-${account.id}`} className="overflow-hidden rounded-2xl border border-border bg-white">
           <div className="border-b border-border px-4 py-4">
-            <p className="text-sm text-slate-500">{account.institution}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-slate-500">{account.institution}</p>
+              {account.isDemonstration ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">Demostración</span> : null}
+            </div>
             <h2 className="text-lg font-semibold">{account.productName}</h2>
-            <p className="text-sm text-slate-600">····{account.mask} · {account.currency}</p>
+            <p className="text-sm text-slate-600">{account.kind === "card" ? "Tarjeta de crédito" : "Cuenta bancaria"} · ····{account.mask} · {account.currency}</p>
             <p className="mt-3 text-sm text-slate-500">Saldo disponible</p>
             <p data-testid="account-balance" className="text-2xl font-semibold tracking-tight">{formatUsd(account.availableBalanceCents)}</p>
           </div>
