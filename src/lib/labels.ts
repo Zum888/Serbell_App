@@ -46,6 +46,7 @@ export const AUDIT_LABEL: Record<string, string> = {
   seeded_seal: "Sello de demostración inicial",
   seeded_approval: "Aprobación de demostración inicial",
   manual_reconcile: "Conciliación manual",
+  document_replaced: "Comprobante reemplazado",
   serbell_matched: "Serbell concilió",
   asiento_saved: "Asiento registrado",
 };

@@ -5,6 +5,19 @@ import { canReview, companyRole, type Actor, type MembershipRole } from "@/lib/p
 import { localProviders } from "@/providers/local";
 import type { Db } from "@/server/db";
 
+export function documentChangeNote(action: string, previousJson: string | null, nextJson: string | null): string | null {
+  if (action !== "document_replaced") return null;
+  try {
+    const previous = previousJson ? (JSON.parse(previousJson) as { fileName?: string | null }) : null;
+    const next = nextJson ? (JSON.parse(nextJson) as { fileName?: string | null }) : null;
+    const before = previous?.fileName || "Sin comprobante";
+    const after = next?.fileName || "—";
+    return `Antes: ${before}. Ahora: ${after}.`;
+  } catch {
+    return null;
+  }
+}
+
 const roleOf = (value: string): MembershipRole => {
   if (value === "BUSINESS_OWNER" || value === "ACCOUNTANT" || value === "FIRM_ADMIN") return value;
   return "BUSINESS_OWNER";
@@ -76,6 +89,10 @@ export async function listMovements(db: Db, actor: Actor, companyId: string, fil
       classification: { include: { category: true, subcategory: true } },
       account: true,
       audits: { where: { action: "serbell_matched" }, select: { id: true } },
+      links: {
+        where: { status: "confirmed" },
+        include: { document: { select: { id: true, fileName: true } } },
+      },
     },
     orderBy: [{ postedOn: "desc" }, { merchant: "asc" }],
   });
@@ -106,6 +123,8 @@ export async function listMovements(db: Db, actor: Actor, companyId: string, fil
       sealed: Boolean(row.sealedAt),
       institution: row.account.institution,
       mask: row.account.mask,
+      documentId: row.links[0]?.document.id ?? null,
+      documentName: row.links[0]?.document.fileName ?? null,
     }));
 }
 
@@ -231,9 +250,42 @@ export async function getMovement(db: Db, actor: Actor, transactionId: string) {
       actor: event.actor?.name ?? "Sistema",
       at: formatDateTime(event.createdAt),
       justification: event.justification,
-      previousJson: event.previousJson,
-      nextJson: event.nextJson,
+      note: documentChangeNote(event.action, event.previousJson, event.nextJson),
     })),
+  };
+}
+
+export async function getReceiptContext(db: Db, actor: Actor, transactionId: string) {
+  const transaction = await db.bankTransaction.findUnique({
+    where: { id: transactionId },
+    include: {
+      links: { where: { status: "confirmed" }, include: { document: true } },
+      audits: { where: { action: "document_replaced" }, orderBy: { createdAt: "desc" }, take: 1 },
+    },
+  });
+  if (!transaction) throw new AppError("No existe ese movimiento.", 404, "NOT_FOUND");
+  if (!companyRole(actor, transaction.companyId)) {
+    throw new AppError("El servidor rechazó la solicitud: no tienes acceso a esta empresa.", 403, "COMPANY_FORBIDDEN");
+  }
+  const documents = await db.document.findMany({
+    where: { companyId: transaction.companyId },
+    include: { links: { where: { status: "confirmed" }, select: { transactionId: true } } },
+    orderBy: { fileName: "asc" },
+  });
+  const link = transaction.links[0] ?? null;
+  const audit = transaction.audits[0] ?? null;
+  return {
+    transactionId: transaction.id,
+    merchant: transaction.merchant,
+    sealed: Boolean(transaction.sealedAt),
+    document: link
+      ? { id: link.document.id, fileName: link.document.fileName, mimeType: link.document.mimeType }
+      : null,
+    choices: documents
+      .filter((document) => document.id !== link?.documentId)
+      .filter((document) => !document.links.some((item) => item.transactionId !== transaction.id))
+      .map((document) => ({ id: document.id, fileName: document.fileName })),
+    auditNote: audit ? documentChangeNote(audit.action, audit.previousJson, audit.nextJson) : null,
   };
 }
 

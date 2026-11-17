@@ -11,6 +11,8 @@ import {
   postChat,
   saveUploadedDocument,
   reconcileTransaction,
+  reconcileTransactions,
+  replaceTransactionDocument,
   reopenTransaction,
   saveJournalEntry,
   sealTransaction,
@@ -250,4 +252,64 @@ it("el propietario propone la categoría y el sello bloquea el cambio", async ()
     changeClassification(prisma, carlos, TX.fs15012, { subcategoryId: CAT.qpl.peajes, justification: "No debe pasar el sello." }),
   ).rejects.toMatchObject({ code: "SEALED" });
   await expect(sealTransaction(prisma, padrino, TX.sunpass27)).rejects.toMatchObject({ code: "SEAL_FORBIDDEN" });
+});
+
+it("no concilia un movimiento sellado y concilia varios sin la marca de Serbell", async () => {
+  const padrino = await loadActor(prisma, USER.padrino);
+  if (!padrino) throw new Error("falta Padrino");
+  const sealedBefore = await prisma.auditEvent.count({ where: { transactionId: TX.fs15012, action: "manual_reconcile" } });
+  await expect(reconcileTransaction(prisma, padrino, TX.fs15012)).rejects.toMatchObject({ code: "SEALED" });
+  expect(await prisma.auditEvent.count({ where: { transactionId: TX.fs15012, action: "manual_reconcile" } })).toBe(sealedBefore);
+  const incomeBefore = await prisma.bankTransaction.findUnique({ where: { id: TX.income200 } });
+  await expect(reconcileTransactions(prisma, padrino, [TX.income200, TX.fs15012])).rejects.toMatchObject({ code: "SEALED" });
+  const incomeAfter = await prisma.bankTransaction.findUnique({ where: { id: TX.income200 } });
+  expect(incomeAfter?.reconciliationState).toBe(incomeBefore?.reconciliationState);
+
+  await reconcileTransactions(prisma, padrino, [TX.sunpass03, TX.income200]);
+  for (const id of [TX.sunpass03, TX.income200]) {
+    const row = await prisma.bankTransaction.findUnique({ where: { id } });
+    expect(row?.reconciliationState).toBe("Reconciled");
+    expect(row?.sealedAt).toBeNull();
+    const manual = await prisma.auditEvent.findFirst({ where: { transactionId: id, action: "manual_reconcile", actorId: USER.padrino } });
+    expect(manual?.nextJson).toContain("Reconciled");
+    expect(await prisma.auditEvent.findFirst({ where: { transactionId: id, action: "serbell_matched" } })).toBeNull();
+  }
+  const audits = await prisma.auditEvent.count({ where: { transactionId: TX.sunpass03, action: "manual_reconcile" } });
+  await reconcileTransactions(prisma, padrino, [TX.sunpass03]);
+  expect(await prisma.auditEvent.count({ where: { transactionId: TX.sunpass03, action: "manual_reconcile" } })).toBe(audits);
+});
+
+it("reemplaza el comprobante y deja el anterior y el nuevo en la auditoría", async () => {
+  const padrino = await loadActor(prisma, USER.padrino);
+  if (!padrino) throw new Error("falta Padrino");
+  const sealedLink = await prisma.transactionDocumentLink.findFirst({
+    where: { transactionId: TX.fs15012, status: "confirmed" },
+  });
+  await expect(replaceTransactionDocument(prisma, padrino, TX.fs15012, "doc_qpl_sunpass")).rejects.toMatchObject({ code: "SEALED" });
+  const sealedStill = await prisma.transactionDocumentLink.findFirst({
+    where: { transactionId: TX.fs15012, status: "confirmed" },
+  });
+  expect(sealedStill?.documentId).toBe(sealedLink?.documentId);
+  await expect(replaceTransactionDocument(prisma, padrino, TX.fs21148, "doc_qpl_fs_15012")).rejects.toMatchObject({ code: "ALREADY_LINKED" });
+
+  const uploaded = await saveUploadedDocument(prisma, padrino, {
+    companyId: COMPANY.qpl,
+    fileName: "ticket-reemplazo.jpg",
+    mimeType: "image/jpeg",
+    bytes: Buffer.from("reemplazo-unico-comprobante-21148"),
+  });
+  await replaceTransactionDocument(prisma, padrino, TX.fs21148, uploaded.id);
+  const link = await prisma.transactionDocumentLink.findFirst({ where: { transactionId: TX.fs21148, status: "confirmed" } });
+  expect(link?.documentId).toBe(uploaded.id);
+  const movement = await prisma.bankTransaction.findUnique({ where: { id: TX.fs21148 } });
+  expect(movement?.documentState).toBe("Linked");
+  const audit = await prisma.auditEvent.findFirst({ where: { transactionId: TX.fs21148, action: "document_replaced", actorId: USER.padrino } });
+  expect(audit?.previousJson).toContain("doc_qpl_fs_21148");
+  expect(audit?.previousJson).toContain("FleetSmarts_21148.jpg");
+  expect(audit?.nextJson).toContain(uploaded.id);
+  expect(audit?.nextJson).toContain("ticket-reemplazo.jpg");
+  expect(await prisma.auditEvent.findFirst({ where: { transactionId: TX.fs21148, action: "serbell_matched" } })).toBeNull();
+  const count = await prisma.auditEvent.count({ where: { transactionId: TX.fs21148, action: "document_replaced" } });
+  await replaceTransactionDocument(prisma, padrino, TX.fs21148, uploaded.id);
+  expect(await prisma.auditEvent.count({ where: { transactionId: TX.fs21148, action: "document_replaced" } })).toBe(count);
 });

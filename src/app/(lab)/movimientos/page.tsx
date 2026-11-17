@@ -5,12 +5,12 @@ import { formatUsd } from "@/lib/money";
 import { canReview } from "@/lib/permissions";
 import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
-import { getHome, getMovement, listCategoryTree, listMovements, movementCounts } from "@/server/queries";
+import { getHome, getMovement, getReceiptContext, listCategoryTree, listMovements, movementCounts } from "@/server/queries";
 
 export default async function MovementsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filtro?: string; q?: string; movimiento?: string; error?: string }>;
+  searchParams: Promise<{ filtro?: string; q?: string; movimiento?: string; error?: string; fila?: string; recibo?: string }>;
 }) {
   const session = await pageContext();
   const params = await searchParams;
@@ -25,7 +25,10 @@ export default async function MovementsPage({
       listCategoryTree(db(), session.actor, session.companyId),
     ]);
     let detail = null;
-    if (params.movimiento) {
+    let receipt = null;
+    if (params.fila) {
+      receipt = await getReceiptContext(db(), session.actor, params.fila);
+    } else if (params.movimiento) {
       detail = await getMovement(db(), session.actor, params.movimiento);
     }
     return (
@@ -38,6 +41,7 @@ export default async function MovementsPage({
         q={q}
         error={params.error}
         detail={detail}
+        receipt={receipt}
         canReview={canReview(session.actor, session.companyId)}
         categories={tree.map((parent) => ({
           name: parent.name,

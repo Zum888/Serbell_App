@@ -1,8 +1,9 @@
-import { Lock, LockOpen } from "lucide-react";
 import Link from "next/link";
-import { formatDay } from "@/lib/dates";
-import { ACCOUNTING_LABEL, DOCUMENT_LABEL, RECONCILIATION_LABEL, REVIEW_LABEL } from "@/lib/labels";
-import { formatCentsPlain, formatUsd } from "@/lib/money";
+import { CategoryForm, pairsToGroups } from "@/components/category-form";
+import { MovementsTable } from "@/components/movements-table";
+import { ReceiptPanel } from "@/components/receipt-panel";
+import { ACCOUNTING_LABEL, RECONCILIATION_LABEL } from "@/lib/labels";
+import { formatUsd } from "@/lib/money";
 import { StateView } from "@/components/state-view";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,17 @@ type Row = {
   sealed: boolean;
   institution: string;
   mask: string;
+  documentId: string | null;
+  documentName: string | null;
+};
+
+type Receipt = {
+  transactionId: string;
+  merchant: string;
+  sealed: boolean;
+  document: { id: string; fileName: string; mimeType: string } | null;
+  choices: { id: string; fileName: string }[];
+  auditNote: string | null;
 };
 
 type Detail = {
@@ -60,7 +72,7 @@ type Detail = {
     isDemonstration: boolean;
   } | null;
   messages: { id: string; role: string; body: string; author: string; at: string }[];
-  history: { id: string; action: string; actor: string; at: string; justification: string | null }[];
+  history: { id: string; action: string; actor: string; at: string; justification: string | null; note: string | null }[];
 };
 
 const filters = [
@@ -80,6 +92,7 @@ export function MovementsScreen({
   q,
   error,
   detail,
+  receipt,
   canReview,
   categories,
 }: {
@@ -91,6 +104,7 @@ export function MovementsScreen({
   q: string;
   error?: string;
   detail: Detail | null;
+  receipt: Receipt | null;
   canReview: boolean;
   categories: { name: string; children: { id: string; name: string }[] }[];
 }) {
@@ -101,8 +115,9 @@ export function MovementsScreen({
     "por-revisar": counts.porRevisar,
     aprobados: counts.aprobados,
   };
+  const side = receipt || detail;
   return (
-    <div className={detail ? "grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]" : ""}>
+    <div className={side ? "grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_400px]" : ""}>
       <section className="min-w-0 rounded-2xl border border-border bg-white">
         <div className="border-b border-border px-4 py-4">
           <p className="text-xs text-slate-500">{companyName}</p>
@@ -110,7 +125,7 @@ export function MovementsScreen({
             <h1 className="text-2xl font-semibold">Movimientos</h1>
             <p className="text-sm text-slate-500">{balanceLabel}</p>
           </div>
-          <p className="mt-1 text-sm text-slate-500">En una fila abierta, elige la categoría y la subcategoría y guarda. Una fila sellada no se cambia.</p>
+          <p className="mt-1 text-sm text-slate-500">Un clic en Conciliar deja la fila conciliada. Marca varias filas abiertas y concílialas juntas. El comprobante se abre a la derecha.</p>
         </div>
         <div className="flex flex-wrap gap-2 px-4 py-3">
           {filters.map(([key, label]) => (
@@ -127,82 +142,17 @@ export function MovementsScreen({
           <input type="hidden" name="filtro" value={filter} />
           <Input name="q" defaultValue={q} placeholder="Buscar movimiento, comercio o importe..." />
         </form>
-        {error && !detail ? <div className="px-4 pb-3"><StateView variant="error" title={error} testId="server-error" /></div> : null}
+        {error && !detail && !receipt ? <div className="px-4 pb-3"><StateView variant="error" title={error} testId="server-error" /></div> : null}
         {rows.length === 0 ? (
           <div className="px-4 pb-4">
             <StateView variant="empty" title="No hay movimientos con este filtro." />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-left text-sm">
-              <thead className="text-xs text-slate-500">
-                <tr className="border-y border-border">
-                  <th className="px-3 py-2 font-medium">Fecha</th>
-                  <th className="px-3 py-2 font-medium">Movimiento</th>
-                  <th className="px-3 py-2 font-medium" colSpan={2}>Categoría y subcategoría</th>
-                  <th className="px-3 py-2 font-medium">Ingresos</th>
-                  <th className="px-3 py-2 font-medium">Gastos</th>
-                  <th className="px-3 py-2 font-medium">Comprobante</th>
-                  <th className="px-3 py-2 font-medium">Revisión</th>
-                  <th className="px-3 py-2 font-medium">Conciliación bancaria</th>
-                  <th className="px-3 py-2 font-medium">Sello</th>
-                  <th className="px-3 py-2 font-medium">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id} data-testid={`movement-row-${row.id}`} className="border-b border-border align-top">
-                    <td className="px-3 py-2 whitespace-nowrap">{formatDay(row.postedOn)}</td>
-                    <td className="px-3 py-2">
-                      <p className="font-medium">{row.merchant}</p>
-                      <p className="text-xs text-slate-500">{row.description}</p>
-                    </td>
-                    <td className="px-3 py-2" colSpan={2}>
-                      <CategoryEditor
-                        row={row}
-                        categories={categories}
-                        canReview={canReview}
-                        next={`/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}`}
-                      />
-                    </td>
-                    <td className="px-3 py-2">{row.amountCents > 0 ? formatCentsPlain(row.amountCents) : ""}</td>
-                    <td className="px-3 py-2">{row.amountCents < 0 ? formatCentsPlain(row.amountCents) : ""}</td>
-                    <td className="px-3 py-2" data-testid="doc-state">{DOCUMENT_LABEL[row.documentState] ?? row.documentState}</td>
-                    <td className="px-3 py-2" data-testid="review-state">{REVIEW_LABEL[row.reviewState] ?? row.reviewState}</td>
-                    <td className="px-3 py-2" data-testid="bank-recon">
-                      <p>{RECONCILIATION_LABEL[row.reconciliationState] ?? "Sin conciliar"}</p>
-                      {row.serbellConciled ? <p data-testid="serbell-mark" className="text-xs font-medium text-primary">Serbell concilió</p> : null}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span data-testid="seal-lock" data-locked={row.sealed ? "true" : "false"} className="inline-flex items-center gap-1 text-xs">
-                        {row.sealed ? <Lock className="size-3.5" /> : <LockOpen className="size-3.5 text-slate-400" />}
-                        {row.sealed ? <span data-testid="sealed-label">Autorizado y bloqueado</span> : "Abierto"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-3">
-                        <Link className="font-medium text-primary" href={`/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}&movimiento=${row.id}`}>
-                          Ver
-                        </Link>
-                        {row.reconciliationState === "Reconciled" ? null : (
-                          <form action={`/api/transactions/${row.id}/reconcile`} method="post">
-                            <input type="hidden" name="next" value={`/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}`} />
-                            <button type="submit" data-testid={`reconcile-${row.id}`} className="font-medium text-primary">
-                              Conciliar
-                            </button>
-                          </form>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <MovementsTable rows={rows} categories={categories} canReview={canReview} filter={filter} q={q} />
         )}
         <p className="px-4 py-3 text-xs text-slate-500">{rows.length} movimientos en esta vista</p>
       </section>
-      {detail ? <Drawer detail={detail} error={error} filter={filter} q={q} /> : null}
+      {receipt ? <ReceiptPanel receipt={receipt} filter={filter} q={q} error={error} /> : detail ? <Drawer detail={detail} error={error} filter={filter} q={q} /> : null}
     </div>
   );
 }
@@ -278,6 +228,7 @@ function Drawer({ detail, error, filter, q }: { detail: Detail; error?: string; 
               <li key={event.id} className="text-sm">
                 <p className="font-medium">{event.action}</p>
                 <p className="text-xs text-slate-500">{event.actor} · {event.at}</p>
+                {event.note ? <p className="text-slate-600">{event.note}</p> : null}
                 {event.justification ? <p className="text-slate-600">{event.justification}</p> : null}
               </li>
             ))}
@@ -389,100 +340,3 @@ function JournalBlock({ detail, filter, q }: { detail: Detail; filter: string; q
   );
 }
 
-function CategoryEditor({
-  row,
-  categories,
-  canReview,
-  next,
-}: {
-  row: Row;
-  categories: { name: string; children: { id: string; name: string }[] }[];
-  canReview: boolean;
-  next: string;
-}) {
-  return (
-    <div data-testid={`category-label-${row.id}`}>
-      <p className="text-sm">{row.category ?? "Sin categoría"} <span className="text-slate-400">/</span> {row.subcategory ?? "—"}</p>
-      <CategoryForm
-        id={row.id}
-        subcategoryId={row.subcategoryId}
-        categories={categories}
-        canReview={canReview}
-        sealed={row.sealed}
-        next={next}
-        testId={`save-category-${row.id}`}
-        compact
-      />
-    </div>
-  );
-}
-
-function CategoryForm({
-  id,
-  subcategoryId,
-  categories,
-  canReview,
-  sealed,
-  next,
-  testId,
-  compact = false,
-}: {
-  id: string;
-  subcategoryId: string;
-  categories: { name: string; children: { id: string; name: string }[] }[];
-  canReview: boolean;
-  sealed: boolean;
-  next: string;
-  testId: string;
-  compact?: boolean;
-}) {
-  if (sealed) {
-    return <p className="mt-1 text-xs text-slate-500">Sellado. El servidor rechaza el cambio.</p>;
-  }
-  return (
-    <form action={`/api/transactions/${id}/classification`} method="post" className={compact ? "mt-1 space-y-1" : "mt-3 space-y-2 rounded-xl border border-border p-3"}>
-      <input type="hidden" name="next" value={next} />
-      {compact ? null : <h3 className="text-sm font-medium">Cambiar categoría y subcategoría</h3>}
-      <label className="block text-xs text-slate-500">
-        {compact ? null : "Categoría y subcategoría"}
-        <select
-          name="subcategoryId"
-          defaultValue={subcategoryId}
-          required
-          data-testid={compact ? `category-select-${id}` : `detail-category-select-${id}`}
-          aria-label={`Categoría y subcategoría de ${id}`}
-          className="mt-1 h-9 w-full min-w-[180px] rounded-xl border border-border bg-white px-2 text-sm"
-        >
-          <option value="">Elegir</option>
-          {categories.map((group) => (
-            <optgroup key={group.name} label={group.name}>
-              {group.children.map((child) => (
-                <option key={child.id} value={child.id}>{child.name}</option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-      </label>
-      {canReview ? (
-        <Input name="justification" required minLength={8} placeholder="Justificación del contador" aria-label="Justificación" />
-      ) : (
-        <p className="text-xs text-slate-500">{compact ? "Propuesta" : "Queda como propuesta. No sella ni crea el asiento."}</p>
-      )}
-      <button type="submit" data-testid={testId} className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white">
-        Guardar categoría
-      </button>
-    </form>
-  );
-}
-
-function pairsToGroups(pairs: { subcategoryId: string; label: string }[]) {
-  const groups = new Map<string, { id: string; name: string }[]>();
-  for (const pair of pairs) {
-    const [category, ...rest] = pair.label.split(" / ");
-    const name = rest.join(" / ") || pair.label;
-    const list = groups.get(category) ?? [];
-    list.push({ id: pair.subcategoryId, name });
-    groups.set(category, list);
-  }
-  return [...groups.entries()].map(([name, children]) => ({ name, children }));
-}

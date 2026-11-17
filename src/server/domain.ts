@@ -525,22 +525,113 @@ export async function confirmLink(db: Db, actor: Actor, documentId: string, tran
   }
 }
 
+export async function reconcileTransactions(db: Db, actor: Actor, ids: string[]) {
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+  if (!unique.length) throw new AppError("Selecciona un movimiento.", 400, "NONE");
+  const transactions = [];
+  for (const id of unique) {
+    const transaction = await requireTransaction(db, id);
+    assertCanMutate(actor, transaction.companyId, transaction.sealedAt);
+    transactions.push(transaction);
+  }
+  const reconciled: string[] = [];
+  for (const transaction of transactions) {
+    if (transaction.reconciliationState === "Reconciled") continue;
+    await db.bankTransaction.update({
+      where: { id: transaction.id },
+      data: { reconciliationState: "Reconciled" },
+    });
+    await audit(db, {
+      companyId: transaction.companyId,
+      actorId: actor.id,
+      transactionId: transaction.id,
+      action: "manual_reconcile",
+      previous: { reconciliationState: transaction.reconciliationState },
+      next: { reconciliationState: "Reconciled" },
+    });
+    reconciled.push(transaction.id);
+  }
+  return reconciled;
+}
+
 export async function reconcileTransaction(db: Db, actor: Actor, transactionId: string) {
+  await reconcileTransactions(db, actor, [transactionId]);
+}
+
+export async function replaceTransactionDocument(db: Db, actor: Actor, transactionId: string, documentId: string) {
   const transaction = await requireTransaction(db, transactionId);
-  assertCompanyAccess(actor, transaction.companyId);
-  if (transaction.reconciliationState === "Reconciled") return;
+  assertCanMutate(actor, transaction.companyId, transaction.sealedAt);
+  const document = await requireDocument(db, actor, documentId);
+  if (document.companyId !== transaction.companyId) {
+    throw new AppError("El comprobante y el movimiento son de empresas distintas.", 403, "COMPANY_FORBIDDEN");
+  }
+  const previousLink = await db.transactionDocumentLink.findFirst({
+    where: { transactionId, status: "confirmed" },
+    include: { document: true },
+  });
+  if (previousLink?.documentId === documentId) return documentId;
+  const taken = await db.transactionDocumentLink.findFirst({
+    where: { documentId, status: "confirmed", NOT: { transactionId } },
+  });
+  if (taken) {
+    throw new AppError("Ese comprobante ya está vinculado a otro movimiento.", 409, "ALREADY_LINKED");
+  }
+  if (previousLink) {
+    await db.transactionDocumentLink.delete({ where: { id: previousLink.id } });
+    const remaining = await db.transactionDocumentLink.count({
+      where: { documentId: previousLink.documentId, status: "confirmed" },
+    });
+    if (!remaining && previousLink.document.status === "linked") {
+      await db.document.update({
+        where: { id: previousLink.documentId },
+        data: { status: "received" },
+      });
+    }
+  }
+  await db.transactionDocumentLink.create({
+    data: {
+      id: nid("link"),
+      transactionId,
+      documentId,
+      status: "confirmed",
+      confirmedById: actor.id,
+      confirmedAt: new Date(),
+    },
+  });
   await db.bankTransaction.update({
     where: { id: transactionId },
-    data: { reconciliationState: "Reconciled" },
+    data: { documentState: "Linked" },
   });
+  await db.document.update({ where: { id: documentId }, data: { status: "linked" } });
   await audit(db, {
     companyId: transaction.companyId,
     actorId: actor.id,
     transactionId,
-    action: "manual_reconcile",
-    previous: { reconciliationState: transaction.reconciliationState },
-    next: { reconciliationState: "Reconciled" },
+    documentId,
+    action: "document_replaced",
+    previous: previousLink
+      ? { documentId: previousLink.documentId, fileName: previousLink.document.fileName }
+      : { documentId: null, fileName: null },
+    next: { documentId, fileName: document.fileName },
   });
+  return documentId;
+}
+
+export async function uploadReplacementDocument(
+  db: Db,
+  actor: Actor,
+  transactionId: string,
+  file: { fileName: string; mimeType: string; bytes: Buffer },
+) {
+  const transaction = await requireTransaction(db, transactionId);
+  assertCanMutate(actor, transaction.companyId, transaction.sealedAt);
+  const saved = await saveUploadedDocument(db, actor, {
+    companyId: transaction.companyId,
+    fileName: file.fileName,
+    mimeType: file.mimeType,
+    bytes: file.bytes,
+  });
+  return replaceTransactionDocument(db, actor, transactionId, saved.id);
 }
 
 export async function stampReliableMatcherLinks(db: Db) {
