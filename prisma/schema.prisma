@@ -119,6 +119,7 @@ model BankTransaction {
   messages            Message[]
   tasks               Task[]
   reconciliationItems ReconciliationItem[]
+  journalEntry        JournalEntry?
 
   @@index([companyId])
 }
@@ -314,14 +315,15 @@ model ClassificationRule {
   @@index([companyId])
 }
 
-/// Prepared for a later ledger. This laboratory does not post journal entries.
 model JournalEntry {
-  id        String        @id
-  companyId String
-  memo      String?
-  createdAt DateTime      @default(now())
-  company   Company       @relation(fields: [companyId], references: [id])
-  lines     JournalLine[]
+  id            String          @id
+  companyId     String
+  transactionId String?         @unique
+  memo          String?
+  createdAt     DateTime        @default(now())
+  company       Company         @relation(fields: [companyId], references: [id])
+  transaction   BankTransaction? @relation(fields: [transactionId], references: [id])
+  lines         JournalLine[]
 }
 
 model JournalLine {

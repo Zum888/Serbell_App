@@ -47,6 +47,7 @@ export const AUDIT_LABEL: Record<string, string> = {
   seeded_approval: "Aprobación de demostración inicial",
   manual_reconcile: "Conciliación manual",
   serbell_matched: "Serbell concilió",
+  asiento_saved: "Asiento registrado",
 };
 
 export function greetingName(name: string): string {

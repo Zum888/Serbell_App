@@ -1,5 +1,6 @@
 import { Building2, CheckCheck, Copy, FileWarning, MessageSquare, ClipboardList } from "lucide-react";
-import { Bars, Sparkline } from "@/components/charts";
+import Link from "next/link";
+import { Sparkline } from "@/components/charts";
 import { InsightStrip } from "@/components/insight-strip";
 import { greetingName } from "@/lib/labels";
 import { Input } from "@/components/ui/input";
@@ -43,12 +44,12 @@ export function FirmScreen({
     summary.clarifications === 0 ? "No hay aclaraciones abiertas." : `Hay ${summary.clarifications} aclaraciones abiertas.`,
   ];
   const cards = [
-    ["Empresas asignadas", summary.assigned, <Building2 className="size-4" key="a" />],
-    ["Por revisar", summary.awaitingReview, <ClipboardList className="size-4" key="b" />],
-    ["Comprobantes faltantes", summary.pendingReceipts, <FileWarning className="size-4" key="c" />],
-    ["Aclaraciones", summary.clarifications, <MessageSquare className="size-4" key="d" />],
-    ["Listas para aprobar", summary.readyToApprove, <CheckCheck className="size-4" key="e" />],
-    ["Duplicados", summary.duplicates, <Copy className="size-4" key="f" />],
+    ["Empresas asignadas", summary.assigned, <Building2 className="size-4" key="a" />, "/firma/lista?tipo=empresas", "firm-empresas"],
+    ["Por revisar", summary.awaitingReview, <ClipboardList className="size-4" key="b" />, "/firma/lista?tipo=revisar", "firm-revisar"],
+    ["Comprobantes faltantes", summary.pendingReceipts, <FileWarning className="size-4" key="c" />, "/firma/lista?tipo=comprobantes", "firm-comprobantes"],
+    ["Aclaraciones", summary.clarifications, <MessageSquare className="size-4" key="d" />, "/firma/lista?tipo=aclaraciones", "firm-aclaraciones"],
+    ["Listas para aprobar", summary.readyToApprove, <CheckCheck className="size-4" key="e" />, "/firma/lista?tipo=aprobar", "firm-aprobar"],
+    ["Duplicados", summary.duplicates, <Copy className="size-4" key="f" />, "/firma/lista?tipo=duplicados", "firm-duplicados"],
   ] as const;
   return (
     <div className="space-y-4">
@@ -59,20 +60,27 @@ export function FirmScreen({
       <InsightStrip lines={lines} testId="firma-reading" />
       <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {cards.map(([label, value, icon]) => (
-            <article key={label} className="rounded-2xl border border-border bg-white p-3">
+          {cards.map(([label, value, icon, href, testId]) => (
+            <Link key={label} href={href} data-testid={testId} className="block rounded-2xl border border-border bg-white p-3 hover:border-primary">
               <p className="flex items-center gap-2 text-xs text-slate-500">{icon}{label}</p>
               <p className="mt-2 text-2xl font-semibold tracking-tight">{value}</p>
-            </article>
+            </Link>
           ))}
         </div>
         <article className="rounded-2xl border border-border bg-white p-4">
           <h2 className="text-sm font-semibold">Por revisar</h2>
           <Sparkline points={summary.companies.map((company) => company.awaitingReview)} color="#2563eb" />
           <p className="text-xs text-slate-500">Una marca por empresa, en orden alfabético. No es una serie de tiempo.</p>
-          <div className="mt-3">
-            <Bars rows={summary.companies.map((company) => ({ label: company.name, value: company.awaitingReview, hint: String(company.awaitingReview) }))} />
-          </div>
+          <ul className="mt-3 space-y-2">
+            {summary.companies.map((company) => (
+              <li key={company.id}>
+                <a className="flex items-baseline justify-between gap-3 text-sm font-medium text-primary" href={`/api/session/company?companyId=${company.id}&next=${encodeURIComponent("/movimientos")}`}>
+                  <span>{company.name}</span>
+                  <span className="text-slate-600">{company.awaitingReview}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
         </article>
       </section>
       <form action="/firma">
@@ -96,7 +104,9 @@ export function FirmScreen({
               {companies.map((company) => (
                 <tr key={company.id} className="border-b border-border last:border-0">
                   <td className="px-4 py-3">
-                    <p className="font-medium">{company.name}</p>
+                    <a data-testid={`company-link-${company.id}`} className="font-medium text-primary" href={`/api/session/company?companyId=${company.id}&next=${encodeURIComponent("/movimientos")}`}>
+                      {company.name}
+                    </a>
                     <p className="text-xs text-slate-500">{company.industry}</p>
                   </td>
                   <td className="px-4 py-3">{company.awaitingReview}</td>

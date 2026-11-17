@@ -134,6 +134,7 @@ export async function getMovement(db: Db, actor: Actor, transactionId: string) {
       classification: { include: { category: true, subcategory: true } },
       links: { where: { status: "confirmed" }, include: { document: { include: { extraction: true } } } },
       candidates: { include: { document: true } },
+      journalEntry: { include: { lines: true } },
       audits: { include: { actor: true }, orderBy: { createdAt: "desc" } },
       messages: { include: { author: true }, orderBy: { createdAt: "asc" } },
     },
@@ -189,6 +190,19 @@ export async function getMovement(db: Db, actor: Actor, transactionId: string) {
       ? `${transaction.classification.category.name} / ${transaction.classification.subcategory.name}`
       : "Sin categoría",
     pairs,
+    catalog: [...new Set(categories.map((category) => category.name))].sort((a, b) => a.localeCompare(b, "es")),
+    journal: transaction.journalEntry
+      ? {
+          lines: [...transaction.journalEntry.lines]
+            .sort((a, b) => b.debitCents - a.debitCents || a.accountName.localeCompare(b.accountName))
+            .map((line) => ({
+              id: line.id,
+              accountName: line.accountName,
+              debitCents: line.debitCents,
+              creditCents: line.creditCents,
+            })),
+        }
+      : null,
     canReview: canReview(actor, transaction.companyId),
     canReopen: actor.firmRole === "FIRM_ADMIN",
     document: link
@@ -333,6 +347,82 @@ export async function getFirm(db: Db, actor: Actor) {
     duplicates: rows.reduce((sum, row) => sum + row.duplicates, 0),
     companies: rows,
   };
+}
+
+export async function firmQueue(db: Db, actor: Actor, tipo: string) {
+  if (!actor.firmRole) {
+    throw new AppError("Esta pantalla es del despacho.", 403, "FIRM_FORBIDDEN");
+  }
+  const companyIds = actor.memberships.map((membership) => membership.companyId);
+  const companies = await db.company.findMany({
+    where: { id: { in: companyIds } },
+    orderBy: { name: "asc" },
+  });
+  const companyName = new Map(companies.map((company) => [company.id, company.name]));
+  if (tipo === "empresas") {
+    return companies.map((company) => ({
+      id: company.id,
+      companyId: company.id,
+      companyName: company.name,
+      title: company.name,
+      detail: company.industry,
+      href: `/api/session/company?companyId=${company.id}&next=${encodeURIComponent("/movimientos")}`,
+    }));
+  }
+  if (tipo === "aclaraciones") {
+    const tasks = await db.task.findMany({
+      where: { companyId: { in: companyIds }, kind: "clarification", status: "open" },
+      orderBy: [{ company: { name: "asc" } }, { createdAt: "asc" }],
+    });
+    return tasks.map((task) => ({
+      id: task.id,
+      companyId: task.companyId,
+      companyName: companyName.get(task.companyId) ?? "",
+      title: task.title,
+      detail: "Aclaración abierta",
+      href: task.transactionId
+        ? `/api/session/company?companyId=${task.companyId}&next=${encodeURIComponent(`/movimientos?movimiento=${task.transactionId}`)}`
+        : `/api/session/company?companyId=${task.companyId}&next=${encodeURIComponent("/movimientos")}`,
+    }));
+  }
+  if (tipo === "duplicados") {
+    const documents = await db.document.findMany({
+      where: {
+        companyId: { in: companyIds },
+        OR: [{ duplicateOfId: { not: null } }, { status: "duplicate" }],
+      },
+      include: { extraction: true, duplicateOf: true },
+      orderBy: [{ company: { name: "asc" } }, { fileName: "asc" }],
+    });
+    return documents.map((document) => ({
+      id: document.id,
+      companyId: document.companyId,
+      companyName: companyName.get(document.companyId) ?? "",
+      title: document.fileName,
+      detail: document.duplicateOf?.fileName
+        ? `Copia de ${document.duplicateOf.fileName}${document.extraction?.merchant ? ` · ${document.extraction.merchant}` : ""}`
+        : document.extraction?.merchant ?? "Comprobante duplicado",
+      href: `/api/session/company?companyId=${document.companyId}&next=${encodeURIComponent(`/comprobantes?foco=${document.id}`)}`,
+    }));
+  }
+  const where =
+    tipo === "comprobantes"
+      ? { documentState: "Missing" }
+      : tipo === "aprobar"
+        ? { reviewState: "NeedsReview", documentState: "Linked", sealedAt: null }
+        : { reviewState: "NeedsReview" };
+  const transactions = await db.bankTransaction.findMany({
+    where: { companyId: { in: companyIds }, ...where },
+    orderBy: [{ company: { name: "asc" } }, { postedOn: "desc" }, { merchant: "asc" }],
+  });
+  return transactions.map((transaction) => ({
+    id: transaction.id,
+    companyId: transaction.companyId,
+    companyName: companyName.get(transaction.companyId) ?? "",
+    title: transaction.merchant,
+    detail: `${formatDay(dayKey(transaction.postedOn))} · ${transaction.amountCents < 0 ? "−" : ""}${(Math.abs(transaction.amountCents) / 100).toFixed(2)}`,
+    href: `/api/session/company?companyId=${transaction.companyId}&next=${encodeURIComponent(`/movimientos?movimiento=${transaction.id}`)}`,
+  }));
 }
 
 function requireCompany(actor: Actor, companyId: string) {

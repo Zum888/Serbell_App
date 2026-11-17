@@ -44,6 +44,8 @@ type Detail = {
   subcategoryId: string;
   categoryLabel: string;
   pairs: { subcategoryId: string; label: string }[];
+  catalog: string[];
+  journal: { lines: { id: string; accountName: string; debitCents: number; creditCents: number }[] } | null;
   canReview: boolean;
   canReopen: boolean;
   document: {
@@ -255,6 +257,7 @@ function Drawer({ detail, error, filter, q }: { detail: Detail; error?: string; 
           <Button type="submit" variant="outline" data-testid="save-classification">Guardar categoría</Button>
         </form>
       </section>
+      <JournalBlock detail={detail} filter={filter} q={q} />
       <section data-testid="drawer-conversation" className="mt-4">
         <h3 className="text-sm font-medium">Conversación</h3>
         {detail.messages.length === 0 ? <p className="mt-1 text-sm text-slate-500">Todavía no hay mensajes sobre este movimiento.</p> : (
@@ -309,5 +312,80 @@ function Drawer({ detail, error, filter, q }: { detail: Detail; error?: string; 
         </form>
       ) : null}
     </aside>
+  );
+}
+
+function JournalBlock({ detail, filter, q }: { detail: Detail; filter: string; q: string }) {
+  const debit = detail.journal?.lines.reduce((sum, line) => sum + line.debitCents, 0) ?? 0;
+  const credit = detail.journal?.lines.reduce((sum, line) => sum + line.creditCents, 0) ?? 0;
+  return (
+    <section data-testid="drawer-asiento" className="mt-4 rounded-xl border border-border p-3">
+      <h3 className="text-sm font-medium">Asiento</h3>
+      {detail.journal ? (
+        <table className="mt-2 w-full text-left text-sm">
+          <thead className="text-xs text-slate-500">
+            <tr>
+              <th className="py-1 font-medium">Cuenta</th>
+              <th className="py-1 text-right font-medium">Débito</th>
+              <th className="py-1 text-right font-medium">Crédito</th>
+            </tr>
+          </thead>
+          <tbody>
+            {detail.journal.lines.map((line) => (
+              <tr key={line.id} data-testid="journal-line">
+                <td className="py-1">{line.accountName}</td>
+                <td className="py-1 text-right">{line.debitCents ? formatUsd(line.debitCents) : ""}</td>
+                <td className="py-1 text-right">{line.creditCents ? formatUsd(line.creditCents) : ""}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t border-border text-xs text-slate-500">
+              <td className="py-1">Cuadra</td>
+              <td className="py-1 text-right">{formatUsd(debit)}</td>
+              <td className="py-1 text-right">{formatUsd(credit)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      ) : (
+        <p className="mt-1 text-sm text-slate-500">Este movimiento todavía no tiene asiento.</p>
+      )}
+      {detail.sealed ? (
+        <p className="mt-2 text-xs text-slate-500">Está sellado. Ana tiene que reabrirlo con una justificación antes de editarlo.</p>
+      ) : null}
+      {detail.canReview && !detail.sealed ? (
+        <form action={`/api/transactions/${detail.id}/asiento`} method="post" className="mt-3 space-y-2">
+          <input type="hidden" name="next" value={`/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}&movimiento=${detail.id}`} />
+          <label className="block text-xs text-slate-500">
+            Categoría y subcategoría
+            <select name="subcategoryId" defaultValue={detail.subcategoryId} required className="mt-1 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm">
+              <option value="">Elegir</option>
+              {detail.pairs.map((pair) => (
+                <option key={pair.subcategoryId} value={pair.subcategoryId}>{pair.label}</option>
+              ))}
+            </select>
+          </label>
+          <div className="grid grid-cols-[minmax(0,1fr)_88px_88px] gap-2 text-xs text-slate-500">
+            <span>Cuenta del catálogo</span>
+            <span>Débito, centavos</span>
+            <span>Crédito, centavos</span>
+          </div>
+          {[0, 1, 2, 3].map((index) => (
+            <div key={index} className="grid grid-cols-[minmax(0,1fr)_88px_88px] gap-2">
+              <select name="accountName" defaultValue={index === 0 ? "Combustible" : index === 1 ? "Servicios" : ""} className="h-10 rounded-xl border border-border bg-white px-2 text-sm">
+                <option value="">—</option>
+                {detail.catalog.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+              <Input name="debitCents" inputMode="numeric" placeholder="0" defaultValue={index === 0 ? String(Math.abs(detail.amountCents)) : ""} aria-label={`Débito ${index + 1}`} />
+              <Input name="creditCents" inputMode="numeric" placeholder="0" defaultValue={index === 1 ? String(Math.abs(detail.amountCents)) : ""} aria-label={`Crédito ${index + 1}`} />
+            </div>
+          ))}
+          <Input name="justification" placeholder="Justificación del asiento" required />
+          <Button type="submit" data-testid="save-asiento">Guardar asiento</Button>
+        </form>
+      ) : null}
+    </section>
   );
 }

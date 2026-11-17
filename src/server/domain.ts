@@ -724,6 +724,167 @@ export async function changeClassification(
   });
 }
 
+export async function saveJournalEntry(
+  db: Db,
+  actor: Actor,
+  transactionId: string,
+  input: {
+    subcategoryId: string;
+    justification?: string;
+    lines: { accountName: string; debitCents: number; creditCents: number }[];
+  },
+) {
+  const transaction = await requireTransaction(db, transactionId);
+  assertCanMutate(actor, transaction.companyId, transaction.sealedAt);
+  if (!canReview(actor, transaction.companyId)) {
+    throw new AppError("El servidor rechazó el asiento: solo el contador puede registrarlo.", 403, "ASIENTO_FORBIDDEN");
+  }
+  const justification = input.justification?.trim() ?? "";
+  if (justification.length < 8) {
+    throw new AppError("El asiento necesita una justificación.", 400, "JUSTIFICATION_REQUIRED");
+  }
+  const subcategory = await db.accountingCategory.findUnique({
+    where: { id: input.subcategoryId },
+    include: { parent: true },
+  });
+  if (!subcategory || !subcategory.parentId || subcategory.companyId !== transaction.companyId || !subcategory.parent) {
+    throw new AppError("La subcategoría no pertenece a esta empresa o no depende de una categoría.", 400, "CATEGORY_INVALID");
+  }
+  const catalog = await db.accountingCategory.findMany({
+    where: { companyId: transaction.companyId },
+    select: { name: true },
+  });
+  const names = new Set(catalog.map((row) => row.name));
+  const lines = input.lines
+    .map((line) => ({
+      accountName: line.accountName.trim(),
+      debitCents: line.debitCents,
+      creditCents: line.creditCents,
+    }))
+    .filter((line) => line.accountName || line.debitCents || line.creditCents);
+  if (!lines.some((line) => line.debitCents > 0) || !lines.some((line) => line.creditCents > 0)) {
+    throw new AppError("El asiento necesita al menos un débito y un crédito.", 400, "ASIENTO_INCOMPLETE");
+  }
+  let debit = 0;
+  let credit = 0;
+  for (const line of lines) {
+    if (!names.has(line.accountName)) {
+      throw new AppError(`La cuenta «${line.accountName}» no está en el catálogo de esta empresa.`, 400, "ACCOUNT_UNKNOWN");
+    }
+    if (!Number.isInteger(line.debitCents) || !Number.isInteger(line.creditCents) || line.debitCents < 0 || line.creditCents < 0) {
+      throw new AppError("Los importes del asiento tienen que ser centavos enteros.", 400, "AMOUNT_INVALID");
+    }
+    if (line.debitCents > 0 && line.creditCents > 0) {
+      throw new AppError("Una línea no puede tener débito y crédito a la vez.", 400, "LINE_BOTH");
+    }
+    if (line.debitCents === 0 && line.creditCents === 0) {
+      throw new AppError("Cada línea del asiento necesita un importe en centavos.", 400, "LINE_EMPTY");
+    }
+    debit += line.debitCents;
+    credit += line.creditCents;
+  }
+  if (debit !== credit) {
+    throw new AppError("El asiento no cuadra: los débitos y los créditos tienen que ser iguales.", 400, "ASIENTO_UNBALANCED");
+  }
+  const existing = await db.journalEntry.findUnique({
+    where: { transactionId },
+    include: { lines: { orderBy: { id: "asc" } } },
+  });
+  const previous = {
+    categoryId: transaction.classification?.categoryId ?? null,
+    subcategoryId: transaction.classification?.subcategoryId ?? null,
+    categoryName: transaction.classification?.category?.name ?? null,
+    subcategoryName: transaction.classification?.subcategory?.name ?? null,
+    lines: (existing?.lines ?? []).map((line) => ({
+      accountName: line.accountName,
+      debitCents: line.debitCents,
+      creditCents: line.creditCents,
+    })),
+  };
+  const next = {
+    categoryId: subcategory.parentId,
+    subcategoryId: subcategory.id,
+    categoryName: subcategory.parent.name,
+    subcategoryName: subcategory.name,
+    lines: lines.map((line) => ({
+      accountName: line.accountName,
+      debitCents: line.debitCents,
+      creditCents: line.creditCents,
+    })),
+  };
+  const entryId = existing?.id ?? nid("je");
+  await db.$transaction(async (tx) => {
+    if (transaction.classification) {
+      await tx.transactionClassification.update({
+        where: { transactionId },
+        data: {
+          categoryId: next.categoryId,
+          subcategoryId: next.subcategoryId,
+          source: "accountant",
+          state: "Recorded",
+        },
+      });
+    } else {
+      await tx.transactionClassification.create({
+        data: {
+          id: nid("class"),
+          transactionId,
+          categoryId: next.categoryId,
+          subcategoryId: next.subcategoryId,
+          source: "accountant",
+          state: "Recorded",
+        },
+      });
+    }
+    await tx.bankTransaction.update({
+      where: { id: transactionId },
+      data: {
+        accountingState: transaction.accountingState === "Approved" ? "Approved" : "Recorded",
+        reviewState: transaction.reviewState === "Approved" ? "NeedsReview" : transaction.reviewState,
+      },
+    });
+    if (existing) {
+      await tx.journalLine.deleteMany({ where: { entryId: existing.id } });
+    } else {
+      await tx.journalEntry.create({
+        data: { id: entryId, companyId: transaction.companyId, transactionId, memo: transaction.merchant },
+      });
+    }
+    await tx.journalLine.createMany({
+      data: lines.map((line) => ({
+        id: nid("jl"),
+        entryId,
+        accountName: line.accountName,
+        debitCents: line.debitCents,
+        creditCents: line.creditCents,
+      })),
+    });
+    await tx.accountingReview.create({
+      data: {
+        id: nid("rev"),
+        transactionId,
+        actorId: actor.id,
+        action: "asiento",
+        previousJson: JSON.stringify(previous),
+        nextJson: JSON.stringify(next),
+        justification,
+      },
+    });
+    await tx.auditEvent.create({
+      data: {
+        id: nid("aud"),
+        companyId: transaction.companyId,
+        actorId: actor.id,
+        transactionId,
+        action: "asiento_saved",
+        previousJson: JSON.stringify(previous),
+        nextJson: JSON.stringify(next),
+        justification,
+      },
+    });
+  });
+}
+
 export async function sealTransaction(db: Db, actor: Actor, transactionId: string) {
   const transaction = await requireTransaction(db, transactionId);
   assertCanSeal(actor, transaction.companyId);

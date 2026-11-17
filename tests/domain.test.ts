@@ -11,9 +11,11 @@ import {
   postChat,
   saveUploadedDocument,
   reconcileTransaction,
+  reopenTransaction,
+  saveJournalEntry,
   sealTransaction,
 } from "@/server/domain";
-import { accountBreakdowns, companyReport, getHome, getMovement, loadActor } from "@/server/queries";
+import { accountBreakdowns, companyReport, firmQueue, getFirm, getHome, getMovement, loadActor } from "@/server/queries";
 import { seedDatabase } from "@/server/seed";
 
 const databaseUrl = "file:/tmp/serbell-vitest.db";
@@ -185,4 +187,44 @@ it("suma el reporte con los movimientos guardados de la empresa", async () => {
   expect(report.largestExpenses[0]?.id).toBe(most.id);
   expect(report.duplicates.length).toBeGreaterThan(0);
   await expect(companyReport(prisma, luis, COMPANY.qpl)).rejects.toMatchObject({ code: "COMPANY_FORBIDDEN" });
+});
+
+it("guarda el asiento del contador y no deja editar un movimiento sellado", async () => {
+  const carlos = await loadActor(prisma, USER.carlos);
+  const padrino = await loadActor(prisma, USER.padrino);
+  const ana = await loadActor(prisma, USER.ana);
+  if (!carlos || !padrino || !ana) throw new Error("faltan perfiles");
+  const lines = [
+    { accountName: "Combustible", debitCents: 20394, creditCents: 0 },
+    { accountName: "Servicios", debitCents: 0, creditCents: 20394 },
+  ];
+  const input = { subcategoryId: CAT.qpl.combustible, justification: "Asiento del combustible FleetSmarts.", lines };
+  await expect(saveJournalEntry(prisma, carlos, TX.fs20394, input)).rejects.toMatchObject({ code: "SEALED" });
+  await expect(saveJournalEntry(prisma, padrino, TX.fs20394, input)).rejects.toMatchObject({ code: "SEALED" });
+  await expect(saveJournalEntry(prisma, padrino, TX.sunpass03, input)).rejects.toMatchObject({ code: "ASIENTO_FORBIDDEN" });
+  await expect(
+    saveJournalEntry(prisma, carlos, TX.sunpass03, { ...input, lines: [{ accountName: "Combustible", debitCents: 1000, creditCents: 0 }, { accountName: "Servicios", debitCents: 0, creditCents: 500 }] }),
+  ).rejects.toMatchObject({ code: "ASIENTO_UNBALANCED" });
+  await expect(
+    saveJournalEntry(prisma, carlos, TX.sunpass03, { ...input, lines: [{ accountName: "Banco inventado", debitCents: 1000, creditCents: 0 }, { accountName: "Servicios", debitCents: 0, creditCents: 1000 }] }),
+  ).rejects.toMatchObject({ code: "ACCOUNT_UNKNOWN" });
+
+  const summary = await getFirm(prisma, carlos);
+  const revisar = await firmQueue(prisma, carlos, "revisar");
+  expect(revisar).toHaveLength(summary.awaitingReview);
+  expect(revisar.some((row) => row.companyId === COMPANY.rivera)).toBe(true);
+
+  await reopenTransaction(prisma, ana, TX.fs20394, "Reabro el sello para registrar el asiento.");
+  await saveJournalEntry(prisma, carlos, TX.fs20394, input);
+  const entry = await prisma.journalEntry.findUnique({ where: { transactionId: TX.fs20394 }, include: { lines: true } });
+  expect(entry?.lines).toHaveLength(2);
+  const debit = entry?.lines.reduce((sum, line) => sum + line.debitCents, 0);
+  const credit = entry?.lines.reduce((sum, line) => sum + line.creditCents, 0);
+  expect(debit).toBe(credit);
+  const audit = await prisma.auditEvent.findFirst({ where: { transactionId: TX.fs20394, action: "asiento_saved" } });
+  expect(audit?.actorId).toBe(USER.carlos);
+  expect(audit?.previousJson).toContain("Combustible");
+  expect(audit?.nextJson).toContain("Servicios");
+  expect(audit?.nextJson).toContain("20394");
+  await expect(firmQueue(prisma, padrino, "revisar")).rejects.toMatchObject({ code: "FIRM_FORBIDDEN" });
 });
