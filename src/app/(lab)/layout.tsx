@@ -4,9 +4,10 @@ import { Shell } from "@/components/shell";
 import { StateView } from "@/components/state-view";
 import { db } from "@/server/db";
 import { getShell, loadActor } from "@/server/queries";
-import { COMPANY_COOKIE, USER_COOKIE } from "@/server/session";
+import { COMPANY_COOKIE, requirePageViewer, USER_COOKIE } from "@/server/session";
 
 export default async function LabLayout({ children }: { children: React.ReactNode }) {
+  await requirePageViewer();
   const jar = await cookies();
   const userId = jar.get(USER_COOKIE)?.value;
   if (!userId) redirect("/api/session/enter?next=/");

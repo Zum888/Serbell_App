@@ -1,4 +1,6 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { unauthorized } from "next/navigation";
+import { requireIdentity } from "../../cursor/identity";
 import { PROFILE_COMPANY, PROFILES } from "@/lib/ids";
 import { AppError } from "@/lib/errors";
 import type { Actor } from "@/lib/permissions";
@@ -32,7 +34,24 @@ export async function readActor(): Promise<{ actor: Actor; companyId: string | n
   return { actor, companyId };
 }
 
+/** Cursor sign-in. The demo profile cookie is not authentication. */
+export async function requireViewer() {
+  const identity = await requireIdentity(await headers());
+  if (identity instanceof Response) {
+    throw new AppError("Inicia sesión en Cursor para usar el laboratorio.", 401, "NO_VIEWER");
+  }
+  return identity;
+}
+
+/** Pages answer 401 when Cursor has not signed the viewer in. */
+export async function requirePageViewer() {
+  const identity = await requireIdentity(await headers());
+  if (identity instanceof Response) unauthorized();
+  return identity;
+}
+
 export async function requireActor(): Promise<{ actor: Actor; companyId: string | null }> {
+  await requireViewer();
   const session = await readActor();
   if (!session) throw new AppError("No hay una sesión de laboratorio.", 401, "NO_SESSION");
   return session;

@@ -76,7 +76,7 @@ export function Shell({
                 <ChevronDown className="size-4 text-slate-400" />
               </summary>
               <div className="absolute right-0 z-20 mt-2 w-72 rounded-xl border border-border bg-white p-1 shadow-sm">
-                <p className="px-3 py-2 text-xs text-muted">Perfil de laboratorio. No pide contraseña.</p>
+                <p className="px-3 py-2 text-xs text-muted">Perfil de demostración, después de entrar con Cursor.</p>
                 {PROFILES.map((item) => (
                   <a
                     key={item.id}

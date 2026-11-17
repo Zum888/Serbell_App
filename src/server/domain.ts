@@ -17,9 +17,7 @@ import { safeFileName } from "@/lib/utils";
 import { localProviders } from "@/providers/local";
 import type { Db } from "@/server/db";
 import { nid, sha256 } from "@/server/ids";
-
-const MAX_BYTES = 8_000_000;
-const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
+import { ALLOWED_UPLOAD_TYPES, MAX_UPLOAD_BYTES } from "@/server/upload";
 
 async function conversationFor(db: Db, companyId: string) {
   const existing = await db.conversation.findFirst({
@@ -210,8 +208,8 @@ export async function saveUploadedDocument(
 ) {
   assertCompanyAccess(actor, input.companyId);
   if (!input.bytes.byteLength) throw new AppError("El archivo está vacío.", 400, "EMPTY_FILE");
-  if (input.bytes.byteLength > MAX_BYTES) throw new AppError("El archivo supera 8 MB.", 400, "FILE_TOO_LARGE");
-  if (!ALLOWED_TYPES.has(input.mimeType)) {
+  if (input.bytes.byteLength > MAX_UPLOAD_BYTES) throw new AppError("El archivo supera 8 MB.", 400, "FILE_TOO_LARGE");
+  if (!ALLOWED_UPLOAD_TYPES.has(input.mimeType)) {
     throw new AppError("Solo se aceptan JPG, PNG, WEBP o PDF.", 400, "FILE_TYPE");
   }
   const providers = localProviders(db);

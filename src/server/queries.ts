@@ -1028,14 +1028,20 @@ export async function getBoardReceipt(
     transaction = loaded.links[0]?.transaction ?? transaction;
   }
   if (!document && !transaction) throw new AppError("No existe ese comprobante.", 404, "NOT_FOUND");
-  const companyId = document?.companyId ?? transaction?.companyId ?? "";
+  if (transaction && document && transaction.companyId !== document.companyId) {
+    throw new AppError("El servidor rechazó la solicitud: no tienes acceso a esta empresa.", 403, "COMPANY_FORBIDDEN");
+  }
+  if (transaction && !companyRole(actor, transaction.companyId)) {
+    throw new AppError("El servidor rechazó la solicitud: no tienes acceso a esta empresa.", 403, "COMPANY_FORBIDDEN");
+  }
+  const companyId = transaction?.companyId ?? document?.companyId ?? "";
   if (!companyRole(actor, companyId)) {
     throw new AppError("El servidor rechazó la solicitud: no tienes acceso a esta empresa.", 403, "COMPANY_FORBIDDEN");
   }
   const candidates = document && !transaction
     ? await Promise.all(document.candidates.filter((candidate) => !candidate.blocked && candidate.decision !== "conflict").map(async (candidate) => {
         const match = await db.bankTransaction.findUnique({ where: { id: candidate.transactionId } });
-        if (!match || match.sealedAt) return null;
+        if (!match || match.sealedAt || match.companyId !== companyId) return null;
         return {
           transactionId: match.id,
           merchant: match.merchant,

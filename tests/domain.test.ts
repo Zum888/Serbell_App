@@ -19,7 +19,7 @@ import {
   saveJournalEntry,
   sealTransaction,
 } from "@/server/domain";
-import { accountBreakdowns, companyReport, documentBoard, firmQueue, getFirm, getHome, getMovement, loadActor, reviewBoard } from "@/server/queries";
+import { accountBreakdowns, companyReport, documentBoard, firmQueue, getBoardReceipt, getFirm, getHome, getMovement, loadActor, reviewBoard } from "@/server/queries";
 import { applyMerchantCategory, confirmFocus, focusQueue, skipFocus } from "@/server/focus";
 import { invoiceDesk, invoicePanel, linkInvoice, markInvoiceFollowUp } from "@/server/invoices";
 import { seedInvoices } from "@/server/invoice-seed";
@@ -493,4 +493,28 @@ it("una cuenta manual no cruza de empresa y conciliar solo toca el banco", async
   const sealed = await prisma.bankTransaction.findUnique({ where: { id: TX.fs15012 } });
   expect(sealed?.reconciliationState).toBe("Unreconciled");
   expect(sealed?.sealedAt).toBeTruthy();
+});
+
+it("no abre un movimiento de otra empresa desde un comprobante", async () => {
+  const padrino = await loadActor(prisma, USER.padrino);
+  const carlos = await loadActor(prisma, USER.carlos);
+  if (!padrino || !carlos) throw new Error("faltan actores");
+  await prisma.document.create({
+    data: {
+      id: "doc_cross_qpl",
+      companyId: COMPANY.qpl,
+      uploadedById: USER.padrino,
+      fileName: "cross.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 4,
+      storagePath: "storage/uploads/co_qpl/cross.pdf",
+      fileHash: "cross-hash-qpl",
+      status: "received",
+    },
+  });
+  await expect(getBoardReceipt(prisma, carlos, { documentId: "doc_cross_qpl", transactionId: TX.homeDepot })).rejects.toMatchObject({ code: "COMPANY_FORBIDDEN" });
+  await expect(getBoardReceipt(prisma, padrino, { documentId: "doc_cross_qpl", transactionId: TX.homeDepot })).rejects.toMatchObject({ code: "COMPANY_FORBIDDEN" });
+  const own = await getBoardReceipt(prisma, padrino, { documentId: "doc_cross_qpl" });
+  expect(own.movement).toBeNull();
+  expect(own.document?.id).toBe("doc_cross_qpl");
 });

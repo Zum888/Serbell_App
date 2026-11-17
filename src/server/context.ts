@@ -2,9 +2,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/server/db";
 import { getShell, loadActor } from "@/server/queries";
-import { COMPANY_COOKIE, USER_COOKIE } from "@/server/session";
+import { COMPANY_COOKIE, requirePageViewer, USER_COOKIE } from "@/server/session";
 
 export async function pageContext() {
+  await requirePageViewer();
   const jar = await cookies();
   const userId = jar.get(USER_COOKIE)?.value;
   if (!userId) redirect("/api/session/enter?next=/");
