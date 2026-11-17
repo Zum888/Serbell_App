@@ -395,6 +395,43 @@ export async function incomingMovements(db: Db, actor: Actor, companyId: string)
   return { rows, totalCents, openTasks: tasks.map((task) => ({ id: task.id, title: task.title, kind: task.kind })) };
 }
 
+export async function accountBreakdowns(db: Db, actor: Actor, companyId: string) {
+  requireCompany(actor, companyId);
+  const accounts = await localProviders(db).bank.listAccounts(companyId);
+  const transactions = await db.bankTransaction.findMany({
+    where: { companyId },
+    orderBy: [{ postedOn: "desc" }, { merchant: "asc" }],
+  });
+  return accounts.map((account) => {
+    const rows = transactions.filter((row) => row.accountId === account.id);
+    let inflows = 0;
+    let outflows = 0;
+    for (const row of rows) {
+      if (row.amountCents > 0) inflows += row.amountCents;
+      else if (row.amountCents < 0) outflows += row.amountCents;
+    }
+    return {
+      id: account.id,
+      institution: account.institution,
+      productName: account.productName,
+      name: account.name,
+      mask: account.mask,
+      currency: account.currency,
+      availableBalanceCents: account.availableBalanceCents,
+      inflows,
+      outflows,
+      net: inflows + outflows,
+      movements: rows.map((row) => ({
+        id: row.id,
+        postedOn: formatDay(dayKey(row.postedOn)),
+        merchant: row.merchant,
+        description: row.description,
+        amountCents: row.amountCents,
+      })),
+    };
+  });
+}
+
 export async function bankSummary(db: Db, actor: Actor, companyId: string) {
   requireCompany(actor, companyId);
   const rows = await db.bankTransaction.findMany({

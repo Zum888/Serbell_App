@@ -1,24 +1,79 @@
+import Link from "next/link";
 import { StateView } from "@/components/state-view";
 import { formatUsd } from "@/lib/money";
 import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
-import { getHome } from "@/server/queries";
+import { accountBreakdowns } from "@/server/queries";
 
 export default async function AccountsPage() {
   const session = await pageContext();
   if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para ver sus cuentas." />;
-  const home = await getHome(db(), session.actor, session.companyId);
-  if (home.accounts.length === 0) return <StateView variant="empty" title="Esta empresa no tiene cuentas bancarias." />;
+  const accounts = await accountBreakdowns(db(), session.actor, session.companyId);
+  if (accounts.length === 0) return <StateView variant="empty" title="Esta empresa no tiene cuentas bancarias." />;
   return (
-    <section className="space-y-3">
-      <h1 className="text-2xl font-semibold">Cuentas bancarias</h1>
-      {home.accounts.map((account) => (
-        <article key={account.id} className="rounded-2xl border border-border bg-white p-4">
-          <p className="text-sm text-slate-500">{account.institution}</p>
-          <h2 className="text-lg font-semibold">{account.productName}</h2>
-          <p className="text-sm">····{account.mask} · {account.currency}</p>
-          <p className="mt-2 text-2xl font-semibold">{formatUsd(account.availableBalanceCents)}</p>
-          <p className="text-xs text-slate-500">Saldo disponible leído de la base de datos.</p>
+    <section className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-semibold">Cuentas bancarias</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Cada cuenta y sus movimientos salen de la base. El saldo disponible es el guardado en la cuenta. Entradas, salidas y neto suman solo esos movimientos. No es un cierre ni una conciliación de extracto.
+        </p>
+      </div>
+      {accounts.map((account) => (
+        <article key={account.id} data-testid={`account-${account.id}`} className="overflow-hidden rounded-2xl border border-border bg-white">
+          <div className="border-b border-border px-4 py-4">
+            <p className="text-sm text-slate-500">{account.institution}</p>
+            <h2 className="text-lg font-semibold">{account.productName}</h2>
+            <p className="text-sm text-slate-600">····{account.mask} · {account.currency}</p>
+            <p className="mt-3 text-sm text-slate-500">Saldo disponible</p>
+            <p data-testid="account-balance" className="text-2xl font-semibold tracking-tight">{formatUsd(account.availableBalanceCents)}</p>
+          </div>
+          <div className="grid gap-3 border-b border-border px-4 py-4 sm:grid-cols-3">
+            <div>
+              <p className="text-xs text-slate-500">Entradas</p>
+              <p data-testid="account-inflows" className="text-lg font-semibold">{formatUsd(account.inflows)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">Salidas</p>
+              <p data-testid="account-outflows" className="text-lg font-semibold">{formatUsd(account.outflows)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">Neto de movimientos</p>
+              <p data-testid="account-net" className="text-lg font-semibold">{formatUsd(account.net)}</p>
+            </div>
+          </div>
+          {account.movements.length === 0 ? (
+            <div className="p-4">
+              <StateView variant="empty" title="Esta cuenta no tiene movimientos." />
+            </div>
+          ) : (
+            <table className="w-full text-left text-sm">
+              <thead className="text-xs text-slate-500">
+                <tr className="border-b border-border">
+                  <th className="px-4 py-3 font-medium">Fecha</th>
+                  <th className="px-4 py-3 font-medium">Movimiento</th>
+                  <th className="px-4 py-3 text-right font-medium">Importe</th>
+                  <th className="px-4 py-3 font-medium" />
+                </tr>
+              </thead>
+              <tbody>
+                {account.movements.map((movement) => (
+                  <tr key={movement.id} data-testid="account-movement" className="border-b border-border last:border-0">
+                    <td className="px-4 py-3">{movement.postedOn}</td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium">{movement.merchant}</p>
+                      <p className="text-xs text-slate-500">{movement.description}</p>
+                    </td>
+                    <td className="px-4 py-3 text-right">{formatUsd(movement.amountCents)}</td>
+                    <td className="px-4 py-3">
+                      <Link href={`/movimientos?movimiento=${movement.id}`} className="text-sm font-medium text-primary">
+                        Ver
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </article>
       ))}
     </section>
