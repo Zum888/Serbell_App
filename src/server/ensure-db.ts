@@ -1,13 +1,15 @@
 import { execFileSync } from "node:child_process";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
+import { AppError } from "@/lib/errors";
 import { gateEnforced } from "@/server/access";
 import { dataRoot } from "@/server/paths";
 import { seedDatabase } from "@/server/seed";
 
 const copying = new Map<string, Promise<string>>();
 let templateJob: Promise<string> | null = null;
+const MAX_VISITOR_DATABASES = 80;
 
 /**
  * The SQLite file for local design work. Production does not use this: each
@@ -90,10 +92,15 @@ export function visitorDatabaseFile(key: string): Promise<string> {
   const existing = copying.get(key);
   if (existing) return existing;
   const job = (async () => {
-    const file = path.join(dataRoot(), "visitors", `${key}.db`);
+    const directory = path.join(dataRoot(), "visitors");
+    const file = path.join(directory, `${key}.db`);
     if (!existsSync(/*turbopackIgnore: true*/ file)) {
+      mkdirSync(directory, { recursive: true });
+      const taken = readdirSync(directory).filter((name) => name.endsWith(".db")).length;
+      if (taken >= MAX_VISITOR_DATABASES) {
+        throw new AppError("El laboratorio está lleno. Intenta más tarde.", 429, "LAB_FULL");
+      }
       const template = await ensureTemplate();
-      mkdirSync(path.dirname(file), { recursive: true });
       copyFileSync(template, file);
       chmodSync(file, 0o600);
     }
