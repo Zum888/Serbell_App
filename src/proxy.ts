@@ -1,22 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { requireIdentity } from "../cursor/identity";
-import { isDemoOwner } from "@/server/owner";
 
-export async function proxy(request: NextRequest) {
-  const identity = await requireIdentity(request);
-  if (identity instanceof Response) {
-    return new NextResponse(null, {
-      status: 401,
-      headers: { "cache-control": "private, no-store" },
-    });
-  }
-  if (!isDemoOwner(identity)) {
-    return new NextResponse(null, {
-      status: 403,
-      headers: { "cache-control": "private, no-store" },
-    });
-  }
+/**
+ * The lab is a self-contained demo: it manages its own per-viewer session and
+ * admits every visitor (on a Private or Team deployment, Cursor's platform has
+ * already restricted who can reach the app). We only mark responses as private
+ * and uncacheable so a shared cache never serves one viewer's data to another.
+ */
+export function proxy(_request: NextRequest) {
   const response = NextResponse.next();
   response.headers.set("cache-control", "private, no-store");
   return response;
