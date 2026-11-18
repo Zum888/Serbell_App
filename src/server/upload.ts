@@ -1,6 +1,7 @@
 import { AppError } from "@/lib/errors";
 
 export const MAX_UPLOAD_BYTES = 8_000_000;
+export const MAX_UPLOADS_PER_COMPANY = 40;
 const FORM_OVERHEAD = 256_000;
 
 export const ALLOWED_UPLOAD_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);

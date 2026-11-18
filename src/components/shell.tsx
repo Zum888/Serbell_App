@@ -3,16 +3,19 @@ import Link from "next/link";
 import { PROFILES } from "@/lib/ids";
 import type { Actor } from "@/lib/permissions";
 import { SideNav } from "@/components/nav";
+import { PostLink } from "@/components/post-link";
 
 export function Shell({
   actor,
   companies,
   companyId,
+  canSwitchProfiles,
   children,
 }: {
   actor: Actor;
   companies: { id: string; name: string; industry: string }[];
   companyId: string | null;
+  canSwitchProfiles: boolean;
   children: React.ReactNode;
 }) {
   const profile = PROFILES.find((item) => item.id === actor.id);
@@ -37,14 +40,15 @@ export function Shell({
                 </summary>
                 <div className="absolute z-20 mt-2 w-72 rounded-xl border border-border bg-white p-1 shadow-sm">
                   {companies.map((item) => (
-                    <a
+                    <PostLink
                       key={item.id}
-                      href={`/api/session/company?companyId=${item.id}&next=/movimientos`}
-                      className="block rounded-lg px-3 py-2 text-sm hover:bg-slate-50"
+                      action="/api/session/company"
+                      fields={{ companyId: item.id, next: "/movimientos" }}
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50"
                     >
                       <span className="font-medium">{item.name}</span>
                       <span className="block text-xs text-muted">{item.industry}</span>
-                    </a>
+                    </PostLink>
                   ))}
                 </div>
               </details>
@@ -76,20 +80,30 @@ export function Shell({
                 <ChevronDown className="size-4 text-slate-400" />
               </summary>
               <div className="absolute right-0 z-20 mt-2 w-72 rounded-xl border border-border bg-white p-1 shadow-sm">
-                <p className="px-3 py-2 text-xs text-muted">Perfil de demostración, después de entrar con Cursor.</p>
-                {PROFILES.map((item) => (
-                  <a
-                    key={item.id}
-                    data-testid={`profile-option-${item.id}`}
-                    href={`/api/session/enter?user=${item.id}&next=${encodeURIComponent(item.home)}`}
-                    className="block rounded-lg px-3 py-2 text-sm hover:bg-slate-50"
-                  >
-                    <span className="font-medium">{item.name}</span>
-                    <span className="block text-xs text-muted">
-                      {item.role} · {item.company}
-                    </span>
-                  </a>
-                ))}
+                <p className="px-3 py-2 text-xs text-muted">
+                  {canSwitchProfiles ? "Perfil de demostración, con tu sesión de Cursor." : "Enlace público: perfil de propietario."}
+                </p>
+                {(canSwitchProfiles ? PROFILES : PROFILES.filter((item) => item.id === actor.id)).map((item) =>
+                  canSwitchProfiles ? (
+                    <PostLink
+                      key={item.id}
+                      action="/api/session/enter"
+                      fields={{ user: item.id, next: item.home }}
+                      testId={`profile-option-${item.id}`}
+                      className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50"
+                    >
+                      <span className="font-medium">{item.name}</span>
+                      <span className="block text-xs text-muted">
+                        {item.role} · {item.company}
+                      </span>
+                    </PostLink>
+                  ) : (
+                    <p key={item.id} className="px-3 py-2 text-sm">
+                      <span className="font-medium">{item.name}</span>
+                      <span className="block text-xs text-muted">{item.role} · {item.company}</span>
+                    </p>
+                  ),
+                )}
               </div>
             </details>
           </div>

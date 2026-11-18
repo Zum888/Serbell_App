@@ -17,7 +17,8 @@ import { safeFileName } from "@/lib/utils";
 import { localProviders } from "@/providers/local";
 import type { Db } from "@/server/db";
 import { nid, sha256 } from "@/server/ids";
-import { ALLOWED_UPLOAD_TYPES, MAX_UPLOAD_BYTES } from "@/server/upload";
+import { dataRoot } from "@/server/paths";
+import { ALLOWED_UPLOAD_TYPES, MAX_UPLOAD_BYTES, MAX_UPLOADS_PER_COMPANY } from "@/server/upload";
 
 async function conversationFor(db: Db, companyId: string) {
   const existing = await db.conversation.findFirst({
@@ -212,6 +213,14 @@ export async function saveUploadedDocument(
   if (!ALLOWED_UPLOAD_TYPES.has(input.mimeType)) {
     throw new AppError("Solo se aceptan JPG, PNG, WEBP o PDF.", 400, "FILE_TYPE");
   }
+  const stored = await db.document.findMany({
+    where: { companyId: input.companyId },
+    select: { storagePath: true },
+  });
+  const uploaded = stored.filter((row) => /\/doc_[0-9a-f]{12}-/.test(row.storagePath)).length;
+  if (uploaded >= MAX_UPLOADS_PER_COMPANY) {
+    throw new AppError(`Llegaste al límite de ${MAX_UPLOADS_PER_COMPANY} comprobantes subidos.`, 429, "UPLOAD_LIMIT");
+  }
   const providers = localProviders(db);
   const draft = providers.extraction.extract(input.fileName);
   const hash = sha256(input.bytes);
@@ -221,7 +230,7 @@ export async function saveUploadedDocument(
   const id = nid("doc");
   const fileName = safeFileName(input.fileName);
   const storagePath = path.join("storage", "uploads", input.companyId, `${id}-${fileName}`);
-  const absolute = path.join(process.cwd(), storagePath);
+  const absolute = path.join(dataRoot(), storagePath);
   await mkdir(path.dirname(absolute), { recursive: true });
   await writeFile(absolute, input.bytes);
 

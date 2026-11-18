@@ -7,7 +7,13 @@ import { pageSession } from "@/server/session";
 export default async function LabLayout({ children }: { children: React.ReactNode }) {
   if (!(await hasAccess())) redirect("/acceso?next=/");
   const session = await pageSession();
-  if (!session) redirect("/api/session/enter?next=/");
+  if (!session) {
+    return (
+      <main className="mx-auto max-w-lg p-8">
+        <StateView variant="error" title="No hay una sesión de laboratorio." />
+      </main>
+    );
+  }
   if (!session.actor) {
     return (
       <main className="mx-auto max-w-lg p-8">
@@ -20,7 +26,7 @@ export default async function LabLayout({ children }: { children: React.ReactNod
     );
   }
   return (
-    <Shell actor={session.actor} companies={session.companies} companyId={session.companyId}>
+    <Shell actor={session.actor} companies={session.companies} companyId={session.companyId} canSwitchProfiles={session.canSwitchProfiles}>
       {children}
     </Shell>
   );

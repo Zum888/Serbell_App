@@ -34,12 +34,10 @@ yarn-error.log*
 .env*
 !.env.example
 
-# local data
+# local data. The demo database is created at runtime in a writable directory,
+# never committed, so the host cannot serve it as a public file.
 /prisma/*.db
 /prisma/*.db-journal
-# ...but ship the pre-seeded demo database so the hosted app never has to
-# build or seed one at runtime (a read-only app dir would make that fail).
-!/prisma/demo.db
 /storage/uploads/**
 !/storage/uploads/.gitkeep
 

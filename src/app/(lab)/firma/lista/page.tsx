@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BoardViewer } from "@/components/board-viewer";
 import { ReviewBoard } from "@/components/review-board";
+import { SessionLink } from "@/components/post-link";
 import { StateView } from "@/components/state-view";
 import { isAppError } from "@/lib/errors";
 import { db } from "@/server/db";
@@ -81,7 +82,7 @@ export default async function FirmListPage({
                       <p className="text-xs text-slate-500">{row.detail}</p>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <a className="font-medium text-primary" href={row.href}>Abrir</a>
+                      <SessionLink href={row.href} className="font-medium text-primary">Abrir</SessionLink>
                     </td>
                   </tr>
                 ))}

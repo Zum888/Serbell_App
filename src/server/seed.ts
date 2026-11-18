@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { dataRoot } from "@/server/paths";
 import { ACCOUNT, CAT, COMPANY, FIRM_ID, TX, USER } from "@/lib/ids";
 import type { Db } from "@/server/db";
 import { sha256 } from "@/server/ids";
@@ -11,7 +12,7 @@ const noon = (day: string) => new Date(`${day}T12:00:00.000Z`);
 
 async function store(companyId: string, name: string, bytes: Buffer) {
   const storagePath = path.join("storage", "uploads", companyId, name);
-  const absolute = path.join(process.cwd(), storagePath);
+  const absolute = path.join(dataRoot(), storagePath);
   await mkdir(path.dirname(absolute), { recursive: true });
   await writeFile(absolute, bytes);
   return { storagePath, fileHash: sha256(bytes), sizeBytes: bytes.byteLength };

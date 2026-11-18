@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { getIdentity } from "../../cursor/identity";
-import { PROFILE_COMPANY, PROFILES } from "@/lib/ids";
+import { PROFILE_COMPANY, PROFILES, USER } from "@/lib/ids";
 import { AppError } from "@/lib/errors";
 import type { Actor } from "@/lib/permissions";
 import { hasAccess } from "@/server/access";
@@ -12,14 +12,23 @@ export const USER_COOKIE = "serbell_user";
 export const COMPANY_COOKIE = "serbell_company";
 
 /**
- * Shared sandbox key for anonymous visitors of a public app. When the app is
- * published Private or Team, Cursor signs the viewer in and we use their own
- * stable `sub` instead, so each signed-in person keeps a separate profile. A
- * forged value cannot reach here: an identity is only trusted when Cursor
- * signed it, and everyone else simply shares this one demo sandbox, which has
- * nothing privileged to escalate into.
+ * Anonymous visitors of the public app share one sandbox, and it is pinned to
+ * the business-owner profile. They cannot switch into the accountant or the
+ * firm admin. Those profiles exist only for a viewer Cursor has signed in.
  */
 const PUBLIC_VIEWER_SUB = "public-demo";
+const PUBLIC_PROFILE = USER.padrino;
+const PRIVILEGED_PROFILES = new Set<string>([USER.carlos, USER.ana]);
+
+export function assertProfileAllowed(viewerSub: string, profileId: string, signedIn: boolean) {
+  if (!profileById(profileId)) throw new AppError("Ese perfil no existe.", 400, "UNKNOWN_PROFILE");
+  if (viewerSub === PUBLIC_VIEWER_SUB && profileId !== PUBLIC_PROFILE) {
+    throw new AppError("En el enlace público solo se usa el perfil de propietario.", 403, "PROFILE_FORBIDDEN");
+  }
+  if (PRIVILEGED_PROFILES.has(profileId) && !signedIn) {
+    throw new AppError("Ese perfil solo está disponible con sesión de Cursor.", 403, "PROFILE_FORBIDDEN");
+  }
+}
 
 export function profileById(userId: string) {
   return PROFILES.find((profile) => profile.id === userId) ?? null;
@@ -56,8 +65,13 @@ async function actorFromBinding(viewerSub: string) {
   return { actor, companyId, viewerSub };
 }
 
+export async function privateIdentityPresent(): Promise<boolean> {
+  const identity = await getIdentity(await headers());
+  return identity.verified && identity.kind === "person";
+}
+
 export async function saveDemoBinding(viewerSub: string, profileId: string) {
-  if (!profileById(profileId)) throw new AppError("Ese perfil no existe.", 400, "UNKNOWN_PROFILE");
+  assertProfileAllowed(viewerSub, profileId, await privateIdentityPresent());
   const companyId = PROFILE_COMPANY[profileId] ?? "";
   await db().demoBinding.upsert({
     where: { viewerSub },
@@ -75,9 +89,10 @@ export async function setDemoCompany(viewerSub: string, actor: Actor, companyId:
 
 /** Resolve (and, on first visit, create) the demo profile stored for this viewer. */
 async function resolveSession(viewerSub: string) {
+  const pinned = viewerSub === PUBLIC_VIEWER_SUB ? PUBLIC_PROFILE : null;
   const existing = await actorFromBinding(viewerSub);
-  if (existing) return existing;
-  await saveDemoBinding(viewerSub, PROFILES[0].id);
+  if (existing && (!pinned || existing.actor.id === pinned)) return existing;
+  await saveDemoBinding(viewerSub, pinned ?? PROFILES[0].id);
   return actorFromBinding(viewerSub);
 }
 
@@ -94,7 +109,7 @@ export async function pageSession() {
   const session = await resolveSession(viewerSub);
   if (!session) return null;
   const shell = await getShell(db(), session.actor);
-  return { ...session, companies: shell.companies };
+  return { ...session, companies: shell.companies, canSwitchProfiles: await privateIdentityPresent() };
 }
 
 export function defaultCompany(userId: string): string {

@@ -1,6 +1,7 @@
 import { Building2, CheckCheck, Copy, FileWarning, MessageSquare, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { Sparkline } from "@/components/charts";
+import { PostLink } from "@/components/post-link";
 import { InsightStrip } from "@/components/insight-strip";
 import { greetingName } from "@/lib/labels";
 import { Input } from "@/components/ui/input";
@@ -74,10 +75,14 @@ export function FirmScreen({
           <ul className="mt-3 space-y-2">
             {summary.companies.map((company) => (
               <li key={company.id}>
-                <a className="flex items-baseline justify-between gap-3 text-sm font-medium text-primary" href={`/api/session/company?companyId=${company.id}&next=${encodeURIComponent("/movimientos")}`}>
+                <PostLink
+                  action="/api/session/company"
+                  fields={{ companyId: company.id, next: "/movimientos" }}
+                  className="flex w-full items-baseline justify-between gap-3 text-sm font-medium text-primary"
+                >
                   <span>{company.name}</span>
                   <span className="text-slate-600">{company.awaitingReview}</span>
-                </a>
+                </PostLink>
               </li>
             ))}
           </ul>
@@ -104,9 +109,14 @@ export function FirmScreen({
               {companies.map((company) => (
                 <tr key={company.id} className="border-b border-border last:border-0">
                   <td className="px-4 py-3">
-                    <a data-testid={`company-link-${company.id}`} className="font-medium text-primary" href={`/api/session/company?companyId=${company.id}&next=${encodeURIComponent("/movimientos")}`}>
+                    <PostLink
+                      action="/api/session/company"
+                      fields={{ companyId: company.id, next: "/movimientos" }}
+                      testId={`company-link-${company.id}`}
+                      className="font-medium text-primary"
+                    >
                       {company.name}
-                    </a>
+                    </PostLink>
                     <p className="text-xs text-slate-500">{company.industry}</p>
                   </td>
                   <td className="px-4 py-3">{company.awaitingReview}</td>
@@ -115,9 +125,14 @@ export function FirmScreen({
                   <td className="px-4 py-3">{company.readyToApprove}</td>
                   <td className="px-4 py-3">{company.duplicates}</td>
                   <td className="px-4 py-3 text-right">
-                    <a data-testid={`company-open-${company.id}`} className="font-medium text-primary" href={`/api/session/company?companyId=${company.id}&next=/movimientos`}>
+                    <PostLink
+                      action="/api/session/company"
+                      fields={{ companyId: company.id, next: "/movimientos" }}
+                      testId={`company-open-${company.id}`}
+                      className="font-medium text-primary"
+                    >
                       Abrir
-                    </a>
+                    </PostLink>
                   </td>
                 </tr>
               ))}

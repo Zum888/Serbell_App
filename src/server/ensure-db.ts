@@ -1,12 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
-import os from "node:os";
+import { chmodSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
+import { dataRoot } from "@/server/paths";
 import { seedDatabase } from "@/server/seed";
-
-/** The pre-seeded demo database that ships with the repository. */
-const TEMPLATE_FILE = path.join(process.cwd(), "prisma", "demo.db");
 
 /**
  * Resolve the SQLite file the app should use and make sure DATABASE_URL points
@@ -28,7 +25,7 @@ function resolveRuntimeFile(): string | null {
     }
   }
 
-  const file = path.join(os.tmpdir(), "serbell", "demo.db");
+  const file = path.join(dataRoot(), "demo.db");
   process.env.DATABASE_URL = `file:${file}`;
   return file;
 }
@@ -49,16 +46,8 @@ export async function ensureDemoDatabase() {
     if (existsSync(/*turbopackIgnore: true*/ file)) return;
 
     mkdirSync(path.dirname(file), { recursive: true });
-
-    if (existsSync(/*turbopackIgnore: true*/ TEMPLATE_FILE)) {
-      copyFileSync(TEMPLATE_FILE, file);
-      // SQLite must be able to write to the copy (and its journal); the source
-      // may be read-only when it ships inside a read-only app image.
-      chmodSync(file, 0o644);
-      return;
-    }
-
     await buildAndSeed(file);
+    chmodSync(file, 0o644);
   } catch (error) {
     console.error("ensureDemoDatabase failed:", error);
   }

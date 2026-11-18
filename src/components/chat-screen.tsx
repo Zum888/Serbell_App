@@ -77,12 +77,15 @@ export function ChatScreen({
               Adjuntar comprobante
             </label>
             <input id="comprobante" data-testid="chat-file-input" name="file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required className="mt-2 block w-full text-sm" />
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3">
               <Button type="submit" data-testid="upload-submit">Adjuntar</Button>
-              <a data-testid="demo-ticket" href={`/api/documents/use-demo?companyId=${companyId}`} className="inline-flex h-10 items-center rounded-full border border-border bg-white px-4 text-sm">
-                Adjuntar ticket de demostración FleetSmarts
-              </a>
             </div>
+          </form>
+          <form action="/api/documents/use-demo" method="post">
+            <input type="hidden" name="companyId" value={companyId} />
+            <button type="submit" data-testid="demo-ticket" className="inline-flex h-10 items-center rounded-full border border-border bg-white px-4 text-sm">
+              Adjuntar ticket de demostración FleetSmarts
+            </button>
           </form>
         </div>
         <form action="/api/chat" method="post" className="flex gap-2 border-t border-border p-3">
