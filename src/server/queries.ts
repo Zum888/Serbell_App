@@ -905,7 +905,9 @@ export async function documentBoard(db: Db, actor: Actor, companyId: string) {
     fileName: string;
     merchant: string;
     amountLabel: string;
+    amountCents: number | null;
     dateLabel: string;
+    day: string | null;
     duplicate: boolean;
     conflict: boolean;
     movement: { id: string; label: string } | null;
@@ -927,13 +929,16 @@ export async function documentBoard(db: Db, actor: Actor, companyId: string) {
     });
     const merchant = transaction?.merchant || row.extraction?.merchant || row.fileName;
     const amountCents = transaction?.amountCents ?? row.extraction?.amountCents ?? null;
-    const dateLabel = formatDay(dayKey(transaction?.postedOn) ?? dayKey(row.extraction?.occurredOn));
+    const day = dayKey(transaction?.postedOn) ?? dayKey(row.extraction?.occurredOn);
+    const dateLabel = formatDay(day);
     groups[column].push({
       id: row.id,
       fileName: row.fileName,
       merchant,
       amountLabel: moneyLabel(amountCents),
+      amountCents: amountCents === null ? null : Math.abs(amountCents),
       dateLabel,
+      day,
       duplicate,
       conflict,
       movement: transaction

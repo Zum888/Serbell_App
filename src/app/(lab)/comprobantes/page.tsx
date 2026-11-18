@@ -30,7 +30,9 @@ export default async function DocumentsPage({
         fileName: card.fileName,
         merchant: card.merchant,
         amountLabel: card.amountLabel,
+        amountCents: card.amountCents,
         dateLabel: card.dateLabel,
+        day: card.day,
         duplicate: card.duplicate,
         conflict: card.conflict,
         status: column,
@@ -50,7 +52,7 @@ export default async function DocumentsPage({
         <section>
           <p className="text-xs text-slate-500">{company?.name}</p>
           <h1 className="text-2xl font-semibold">Comprobantes</h1>
-          <p className="mt-1 text-sm text-slate-500">Busca, filtra y marca varios comprobantes a la vez. La vista previa se abre al lado sin recargar.</p>
+          <p className="mt-1 text-sm text-slate-500">Como en Finder: cambia entre íconos, lista o carpetas. Barra espaciadora para la vista rápida, flechas para moverte y ⌘ o Shift + clic para elegir varios.</p>
           <div className="mt-4">
             <DocumentGallery cards={cards} />
           </div>

@@ -32,3 +32,11 @@ summary {
 summary::-webkit-details-marker {
   display: none;
 }
+
+html[data-money="color"] .money-in {
+  color: #059669;
+}
+
+html[data-money="color"] .money-out {
+  color: #e11d48;
+}

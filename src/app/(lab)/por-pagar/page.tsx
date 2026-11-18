@@ -1,4 +1,7 @@
+import { FixedChecklist } from "@/components/fixed-checklist";
 import { DeskTotals, InvoiceFolders, InvoiceList, InvoicePanel } from "@/components/invoice-desk";
+import { monthName } from "@/lib/fixed";
+import { fixedChecklist } from "@/server/planning";
 import { StateView } from "@/components/state-view";
 import { isAppError } from "@/lib/errors";
 import { db } from "@/server/db";
@@ -15,7 +18,10 @@ export default async function PayablesPage({
   const params = await searchParams;
   if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para ver sus facturas." />;
   const company = session.companies.find((item) => item.id === session.companyId);
-  const { folders, summary } = await invoiceDesk(db(), session.actor, session.companyId, "payable");
+  const [{ folders, summary }, fixed] = await Promise.all([
+    invoiceDesk(db(), session.actor, session.companyId, "payable"),
+    fixedChecklist(db(), session.actor, session.companyId),
+  ]);
   const folder = folders.find((item) => item.partyId === params.parte) ?? null;
   let panel = null;
   let panelError = params.error;
@@ -38,9 +44,20 @@ export default async function PayablesPage({
         <p className="text-xs text-slate-500">{company?.name}</p>
         <h1 className="text-2xl font-semibold tracking-tight">Por pagar</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Carpetas de proveedores con facturas de demostración. Vincular una factura anota el movimiento del banco; no paga.
+          Tus gastos fijos del mes y las carpetas de proveedores con facturas de demostración. Vincular una factura anota el movimiento del banco; no paga.
         </p>
-        <div className="mt-4"><DeskTotals summary={summary} label="Total por pagar" /></div>
+        {!folder ? (
+          <div className="mt-4">
+            <FixedChecklist
+              monthLabel={monthName(fixed.period)}
+              referenceDay={fixed.referenceDay}
+              rows={fixed.rows}
+              accounts={fixed.accounts}
+              categories={fixed.categories}
+            />
+          </div>
+        ) : null}
+        <div className="mt-4"><DeskTotals summary={summary} label="Facturas por pagar" /></div>
         {panelError && !panel ? <p className="mt-3 text-sm text-red-700" data-testid="server-error">{panelError}</p> : null}
         {folder ? (
           <div className="mt-4">

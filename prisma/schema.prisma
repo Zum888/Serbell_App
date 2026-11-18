@@ -16,18 +16,18 @@ model AccountingFirm {
 }
 
 model User {
-  id                 String                @id
+  id                 String               @id
   name               String
-  email              String                @unique
-  createdAt          DateTime              @default(now())
+  email              String               @unique
+  createdAt          DateTime             @default(now())
   memberships        CompanyMembership[]
   firmMemberships    FirmMembership[]
   messages           Message[]
   auditEvents        AuditEvent[]
   reviews            AccountingReview[]
   rules              ClassificationRule[]
-  sealedTransactions BankTransaction[]     @relation("SealedBy")
-  uploadedDocuments  Document[]            @relation("UploadedBy")
+  sealedTransactions BankTransaction[]    @relation("SealedBy")
+  uploadedDocuments  Document[]           @relation("UploadedBy")
 }
 
 model FirmMembership {
@@ -42,27 +42,27 @@ model FirmMembership {
 }
 
 model Company {
-  id                     String                  @id
-  firmId                 String
-  name                   String
-  industry               String
-  createdAt              DateTime                @default(now())
-  firm                   AccountingFirm          @relation(fields: [firmId], references: [id])
-  memberships            CompanyMembership[]
-  accounts               BankAccount[]
-  transactions           BankTransaction[]
-  categories             AccountingCategory[]
-  documents              Document[]
-  conversations          Conversation[]
-  tasks                  Task[]
-  audits                 AuditEvent[]
-  rules                  ClassificationRule[]
-  journalEntries         JournalEntry[]
-  reconciliationPeriods  ReconciliationPeriod[]
-  periodCloses           PeriodClose[]
-  approvalPolicies       ApprovalPolicy[]
-  parties                Party[]
-  invoices               Invoice[]
+  id                    String                 @id
+  firmId                String
+  name                  String
+  industry              String
+  createdAt             DateTime               @default(now())
+  firm                  AccountingFirm         @relation(fields: [firmId], references: [id])
+  memberships           CompanyMembership[]
+  accounts              BankAccount[]
+  transactions          BankTransaction[]
+  categories            AccountingCategory[]
+  documents             Document[]
+  conversations         Conversation[]
+  tasks                 Task[]
+  audits                AuditEvent[]
+  rules                 ClassificationRule[]
+  journalEntries        JournalEntry[]
+  reconciliationPeriods ReconciliationPeriod[]
+  periodCloses          PeriodClose[]
+  approvalPolicies      ApprovalPolicy[]
+  parties               Party[]
+  invoices              Invoice[]
 }
 
 model CompanyMembership {
@@ -94,26 +94,26 @@ model BankAccount {
 }
 
 model BankTransaction {
-  id                  String                      @id
+  id                  String                     @id
   companyId           String
   accountId           String
   postedOn            DateTime
   merchant            String
   description         String
   amountCents         Int
-  currency            String                      @default("USD")
+  currency            String                     @default("USD")
   bankState           String
-  reconciliationState String                      @default("Unreconciled")
+  reconciliationState String                     @default("Unreconciled")
   documentState       String
   accountingState     String
   reviewState         String
   externalId          String?
-  isDemonstration     Boolean                     @default(false)
+  isDemonstration     Boolean                    @default(false)
   sealedAt            DateTime?
   sealedById          String?
-  company             Company                     @relation(fields: [companyId], references: [id])
-  account             BankAccount                 @relation(fields: [accountId], references: [id])
-  sealedBy            User?                       @relation("SealedBy", fields: [sealedById], references: [id])
+  company             Company                    @relation(fields: [companyId], references: [id])
+  account             BankAccount                @relation(fields: [accountId], references: [id])
+  sealedBy            User?                      @relation("SealedBy", fields: [sealedById], references: [id])
   links               TransactionDocumentLink[]
   candidates          MatchCandidate[]
   classification      TransactionClassification?
@@ -129,7 +129,7 @@ model BankTransaction {
 }
 
 model Document {
-  id            String                   @id
+  id            String                    @id
   companyId     String
   uploadedById  String
   fileName      String
@@ -139,11 +139,11 @@ model Document {
   fileHash      String?
   status        String
   duplicateOfId String?
-  createdAt     DateTime                 @default(now())
-  company       Company                  @relation(fields: [companyId], references: [id])
-  uploadedBy    User                     @relation("UploadedBy", fields: [uploadedById], references: [id])
-  duplicateOf   Document?                @relation("DocumentDuplicate", fields: [duplicateOfId], references: [id])
-  duplicates    Document[]               @relation("DocumentDuplicate")
+  createdAt     DateTime                  @default(now())
+  company       Company                   @relation(fields: [companyId], references: [id])
+  uploadedBy    User                      @relation("UploadedBy", fields: [uploadedById], references: [id])
+  duplicateOf   Document?                 @relation("DocumentDuplicate", fields: [duplicateOfId], references: [id])
+  duplicates    Document[]                @relation("DocumentDuplicate")
   extraction    DocumentExtraction?
   links         TransactionDocumentLink[]
   candidates    MatchCandidate[]
@@ -320,12 +320,12 @@ model ClassificationRule {
 }
 
 model JournalEntry {
-  id            String          @id
+  id            String           @id
   companyId     String
-  transactionId String?         @unique
+  transactionId String?          @unique
   memo          String?
-  createdAt     DateTime        @default(now())
-  company       Company         @relation(fields: [companyId], references: [id])
+  createdAt     DateTime         @default(now())
+  company       Company          @relation(fields: [companyId], references: [id])
   transaction   BankTransaction? @relation(fields: [transactionId], references: [id])
   lines         JournalLine[]
 }
@@ -434,4 +434,47 @@ model DemoBinding {
   profileId String
   companyId String
   updatedAt DateTime @updatedAt
+}
+
+model FixedExpense {
+  id              String                @id
+  companyId       String
+  name            String
+  vendor          String
+  matchHint       String
+  amountCents     Int
+  dueDay          Int
+  frequency       String                @default("monthly")
+  accountId       String?
+  subcategoryId   String?
+  isDemonstration Boolean               @default(true)
+  createdAt       DateTime              @default(now())
+  payments        FixedExpensePayment[]
+
+  @@index([companyId])
+}
+
+model FixedExpensePayment {
+  id             String       @id
+  fixedExpenseId String
+  period         String
+  actorId        String?
+  paidAt         DateTime     @default(now())
+  fixedExpense   FixedExpense @relation(fields: [fixedExpenseId], references: [id], onDelete: Cascade)
+
+  @@unique([fixedExpenseId, period])
+}
+
+/// Totals of months before the stored movements. Demonstration history for month-over-month comparisons.
+model MonthSnapshot {
+  id                  String  @id
+  companyId           String
+  month               String
+  inflowsCents        Int
+  outflowsCents       Int
+  closingBalanceCents Int
+  categoriesJson      String
+  isDemonstration     Boolean @default(true)
+
+  @@unique([companyId, month])
 }

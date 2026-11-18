@@ -1,10 +1,9 @@
-import { CreditCard, Landmark } from "lucide-react";
+import { CreditCard, Landmark, LayoutGrid, Plus } from "lucide-react";
 import Link from "next/link";
 import { BankStep } from "@/components/bank-step";
 import { InsightStrip } from "@/components/insight-strip";
+import { MoneyToggle } from "@/components/money-toggle";
 import { StateView } from "@/components/state-view";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { accountInitials, movementRunningCents } from "@/lib/accounts";
 import { RECONCILIATION_LABEL } from "@/lib/labels";
 import { accountReading } from "@/lib/reading";
@@ -81,9 +80,35 @@ export default async function AccountsPage({
   if (selected) {
     return (
       <section className="space-y-4">
+        <nav aria-label="Cambiar de cuenta" data-testid="account-switcher" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          <Link href="/cuentas" className="flex shrink-0 items-center gap-1.5 rounded-xl border border-border bg-white px-3 py-2 text-sm text-slate-600 hover:border-slate-300">
+            <LayoutGrid className="size-4" /> Todas
+          </Link>
+          {accounts.map((account) => {
+            const active = account.id === selected.id;
+            return (
+              <Link
+                key={account.id}
+                href={`/cuentas?cuenta=${account.id}`}
+                aria-current={active ? "page" : undefined}
+                className={`flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-left transition ${active ? "border-slate-900 bg-slate-900 text-white" : "border-border bg-white hover:border-slate-300"}`}
+              >
+                <span className={`grid size-7 place-items-center rounded-lg text-[10px] font-semibold ${active ? "bg-white/15" : "bg-slate-100 text-slate-700"}`}>
+                  {accountInitials(account.institution)}
+                </span>
+                <span>
+                  <span className="block text-xs font-medium leading-tight">{account.institution} ····{account.mask}</span>
+                  <span className={`block text-[11px] tabular-nums leading-tight ${active ? "text-white/70" : "text-slate-500"}`}>{formatUsd(account.availableBalanceCents)}</span>
+                </span>
+              </Link>
+            );
+          })}
+          <Link href="/cuentas/conectar" className="flex shrink-0 items-center gap-1.5 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500 hover:border-slate-400">
+            <Plus className="size-4" /> Agregar
+          </Link>
+        </nav>
         <div>
-          <Link href="/cuentas" className="text-sm text-primary">Todas las cuentas</Link>
-          <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-xs text-slate-500">{selected.institution}</p>
               <h1 className="text-2xl font-semibold tracking-tight">{selected.productName}</h1>
@@ -95,7 +120,9 @@ export default async function AccountsPage({
               </Link>
             ) : null}
           </div>
-          {selected.origin === "manual" ? (
+          {selected.origin === "plaid_demo" ? (
+            <p className="mt-2 text-sm text-emerald-700">Conectada con Plaid (demostración). Todavía no trae movimientos.</p>
+          ) : selected.origin === "manual" ? (
             <p className="mt-2 text-sm text-amber-700">Cuenta manual. No está conectada a un banco.</p>
           ) : selected.isDemonstration ? (
             <p className="mt-2 text-sm text-amber-700">Demostración. El saldo es el guardado en esta cuenta.</p>
@@ -111,17 +138,18 @@ export default async function AccountsPage({
           </article>
           <article className="rounded-2xl border border-border bg-white p-4">
             <p className="text-xs text-slate-500">Entradas</p>
-            <p className="mt-1 text-lg font-semibold">{formatUsd(selected.inflows)}</p>
+            <p className="money-in mt-1 text-lg font-semibold">{formatUsd(selected.inflows)}</p>
           </article>
           <article className="rounded-2xl border border-border bg-white p-4">
             <p className="text-xs text-slate-500">Salidas</p>
-            <p className="mt-1 text-lg font-semibold">{formatUsd(selected.outflows)}</p>
+            <p className="money-out mt-1 text-lg font-semibold">{formatUsd(selected.outflows)}</p>
           </article>
           <article className="rounded-2xl border border-border bg-white p-4">
             <p className="text-xs text-slate-500">Conciliados</p>
             <p className="mt-1 text-lg font-semibold" data-testid="account-reconciled">{selected.reconciledCount} de {selected.movements.length}</p>
           </article>
         </div>
+        <div className="flex justify-end"><MoneyToggle /></div>
         {selected.movements.length === 0 ? (
           <StateView variant="empty" title="Esta cuenta no tiene movimientos." description="El saldo inicial quedó guardado. No se inventaron movimientos." />
         ) : (
@@ -144,7 +172,7 @@ export default async function AccountsPage({
                       <p className="font-medium">{movement.merchant}</p>
                       <p className="text-xs text-slate-500">{movement.description}</p>
                     </td>
-                    <td className="px-4 py-3 text-right">{formatUsd(movement.amountCents)}</td>
+                    <td className={`px-4 py-3 text-right font-medium tabular-nums ${movement.amountCents < 0 ? "money-out" : "money-in"}`}>{formatUsd(movement.amountCents)}</td>
                     <td className="px-4 py-3" data-testid="bank-recon">{RECONCILIATION_LABEL[movement.reconciliationState] ?? movement.reconciliationState}</td>
                     <td className="px-4 py-3">
                       {movement.reconciliationState === "Reconciled" && !movement.sealed ? (
@@ -172,9 +200,14 @@ export default async function AccountsPage({
   }
   return (
     <section className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Cuentas bancarias</h1>
-        <p className="mt-1 text-sm text-slate-500">Elige una cuenta para ver su saldo y sus movimientos. El saldo es el guardado en la base.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Cuentas bancarias</h1>
+          <p className="mt-1 text-sm text-slate-500">Elige una cuenta para ver su saldo y sus movimientos. El saldo es el guardado en la base.</p>
+        </div>
+        <Link href="/cuentas/conectar" data-testid="add-account" className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+          <Plus className="size-4" /> Agregar cuenta
+        </Link>
       </div>
       <InsightStrip
         lines={accountReading({
@@ -208,7 +241,9 @@ export default async function AccountsPage({
               <p className="mt-3 text-sm text-slate-600">{kindLabel(account.kind)} · ····{account.mask}</p>
               <p data-testid="account-balance" className="mt-2 text-2xl font-semibold tracking-tight">{formatUsd(account.availableBalanceCents)}</p>
               <p className="mt-1 text-xs text-slate-500">{account.reconciledCount} de {account.movements.length} conciliados con el banco</p>
-              {account.origin === "manual" ? (
+              {account.origin === "plaid_demo" ? (
+                <p className="mt-2 text-xs text-emerald-700">Conectada con Plaid (demostración)</p>
+              ) : account.origin === "manual" ? (
                 <p className="mt-2 text-xs text-amber-700">Manual. No está conectada a un banco.</p>
               ) : account.isDemonstration ? (
                 <p className="mt-2 text-xs text-amber-700">Demostración</p>
@@ -217,36 +252,6 @@ export default async function AccountsPage({
           ))}
         </div>
       )}
-      <form action="/api/accounts" method="post" className="max-w-xl space-y-3 rounded-2xl border border-border bg-white p-4" data-testid="add-account">
-        <h2 className="text-base font-semibold">Agregar cuenta</h2>
-        <p className="text-sm text-slate-500">Se guarda como cuenta manual de esta empresa. No abre una conexión con el banco.</p>
-        <label className="block text-xs text-slate-500">
-          Institución
-          <Input name="institution" required minLength={2} placeholder="Nombre del banco" className="mt-1" />
-        </label>
-        <label className="block text-xs text-slate-500">
-          Nombre de la cuenta
-          <Input name="name" required minLength={2} placeholder="Operativa" className="mt-1" />
-        </label>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-xs text-slate-500">
-            Últimos 4
-            <Input name="mask" required pattern="\d{4}" maxLength={4} placeholder="4410" className="mt-1" />
-          </label>
-          <label className="block text-xs text-slate-500">
-            Tipo
-            <select name="kind" required className="mt-1 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm" defaultValue="bank">
-              <option value="bank">Corriente</option>
-              <option value="card">Crédito</option>
-            </select>
-          </label>
-        </div>
-        <label className="block text-xs text-slate-500">
-          Saldo inicial (USD)
-          <Input name="balance" required placeholder="250.00" className="mt-1" />
-        </label>
-        <Button type="submit" data-testid="save-account">Guardar cuenta manual</Button>
-      </form>
     </section>
   );
 }

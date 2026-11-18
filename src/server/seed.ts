@@ -5,6 +5,7 @@ import type { Db } from "@/server/db";
 import { sha256 } from "@/server/ids";
 import { stampReliableMatcherLinks } from "@/server/domain";
 import { seedInvoices } from "@/server/invoice-seed";
+import { seedPlanning } from "@/server/planning-seed";
 
 const noon = (day: string) => new Date(`${day}T12:00:00.000Z`);
 
@@ -554,4 +555,5 @@ export async function seedDatabase(db: Db) {
     },
   });
   await seedInvoices(db);
+  await seedPlanning(db);
 }

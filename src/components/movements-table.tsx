@@ -1,11 +1,20 @@
 "use client";
 
-import { Lock, LockOpen, Plus } from "lucide-react";
+import { Check, Lock, LockOpen, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { CategoryMenu, pathOf, type CategoryNode } from "@/components/category-menu";
+import { MoneyToggle } from "@/components/money-toggle";
 import { formatDay } from "@/lib/dates";
 import { DOCUMENT_LABEL, RECONCILIATION_LABEL, REVIEW_LABEL } from "@/lib/labels";
 import { formatCentsPlain } from "@/lib/money";
+
+const REVIEW_TONE: Record<string, string> = {
+  NeedsReview: "bg-blue-50 text-blue-700",
+  NeedsClient: "bg-amber-50 text-amber-800",
+  Approved: "bg-emerald-50 text-emerald-700",
+  Reopened: "bg-violet-50 text-violet-700",
+};
 
 type Row = {
   id: string;
@@ -50,7 +59,7 @@ export function MovementsTable({
   const [error, setError] = useState<string | null>(null);
   const [tree, setTree] = useState<Group[]>(categories);
   const [labels, setLabels] = useState<Record<string, string>>({});
-  const [reviews, setReviews] = useState<Record<string, string>>({});
+  const [reviews, setReviews] = useState<Record<string, { label: string; state: string }>>({});
   const next = `/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}`;
 
   function reconciled(row: Row) {
@@ -61,6 +70,11 @@ export function MovementsTable({
     return !row.sealed && !reconciled(row);
   }
 
+  function needsCategory(row: Row) {
+    return !row.sealed && !labels[row.id] && !row.category;
+  }
+
+  const missing = rows.filter(needsCategory).length;
   const openRows = rows.filter(selectable);
   const selectedIds = openRows.filter((row) => selected[row.id]).map((row) => row.id);
   const allSelected = openRows.length > 0 && selectedIds.length === openRows.length;
@@ -105,8 +119,24 @@ export function MovementsTable({
 
   return (
     <div>
+      {missing > 0 ? (
+        <div data-testid="category-guide" className="mx-4 mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm text-amber-900">
+          <Sparkles className="mt-0.5 size-4 shrink-0 text-amber-600" />
+          <p>
+            <span className="font-semibold">{missing === 1 ? "1 movimiento necesita" : `${missing} movimientos necesitan`} tu atención.</span>{" "}
+            Están marcados en ámbar: toca <span className="font-medium">Elegir categoría</span> y se guarda al seleccionar.
+          </p>
+        </div>
+      ) : (
+        <div className="mx-4 mb-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-800">
+          <Check className="size-4" /> Todos los movimientos de esta vista tienen categoría.
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-3">
-        <p className="text-xs text-slate-500">{selectedIds.length} seleccionados</p>
+        <div className="flex items-center gap-3">
+          <p className="text-xs text-slate-500">{selectedIds.length} seleccionados</p>
+          <MoneyToggle />
+        </div>
         <button
           type="button"
           data-testid="reconcile-selection"
@@ -153,20 +183,24 @@ export function MovementsTable({
             {rows.map((row) => {
               const isReconciled = reconciled(row);
               const label = labels[row.id] ?? (row.category ? `${row.category} / ${row.subcategory ?? "—"}` : "Sin categoría");
-              const reviewLabel = reviews[row.id] ?? (REVIEW_LABEL[row.reviewState] ?? row.reviewState);
+              const reviewState = reviews[row.id]?.state || row.reviewState;
+              const reviewLabel = reviews[row.id]?.label || (REVIEW_LABEL[row.reviewState] ?? row.reviewState);
+              const attention = needsCategory(row);
+              const marker = attention ? "shadow-[inset_3px_0_0_0_#f59e0b]" : reviewState === "NeedsReview" && !row.sealed ? "shadow-[inset_3px_0_0_0_#93c5fd]" : "";
               return (
                 <tr
                   key={row.id}
                   data-testid={`movement-row-${row.id}`}
-                  className="border-b border-border align-top"
+                  data-attention={attention ? "true" : "false"}
+                  className={`border-b border-border align-top ${attention ? "bg-amber-50/30" : ""}`}
                   onClick={(event) => {
                     const target = event.target as HTMLElement;
-                    if (target.closest("a, button, input, select, textarea, label, form")) return;
+                    if (target.closest("a, button, input, select, textarea, label, form, [role=menu]")) return;
                     if (!selectable(row)) return;
                     void reconcile([row.id]);
                   }}
                 >
-                  <td className="px-3 py-3">
+                  <td className={`px-3 py-3 ${marker}`}>
                     {selectable(row) ? (
                       <input
                         type="checkbox"
@@ -189,32 +223,40 @@ export function MovementsTable({
                     <p className="font-medium">{row.merchant}</p>
                     <p className="text-xs text-slate-500">{row.description}</p>
                   </td>
-                  <td className="px-3 py-3 min-w-[260px]">
-                    <p data-testid={`category-label-${row.id}`} className="mb-1 text-xs text-slate-500">{label}</p>
+                  <td className="px-3 py-3 min-w-[240px]">
+                    {attention ? (
+                      <span className="mb-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Necesita categoría</span>
+                    ) : null}
+                    <p data-testid={`category-label-${row.id}`} className="sr-only">{label}</p>
                     <ClassifyInline
                       id={row.id}
                       companyId={companyId}
                       subcategoryId={row.subcategoryId}
                       sealed={row.sealed}
                       canReview={canReview}
+                      attention={attention}
                       next={next}
                       tree={tree}
                       onTree={setTree}
-                      onSaved={(categoryLabel, reviewText) => {
+                      onSaved={(categoryLabel, reviewText, state) => {
                         setLabels((current) => ({ ...current, [row.id]: categoryLabel }));
-                        if (reviewText) setReviews((current) => ({ ...current, [row.id]: reviewText }));
+                        if (reviewText) setReviews((current) => ({ ...current, [row.id]: { label: reviewText, state } }));
                       }}
                     />
                   </td>
-                  <td className="px-3 py-3">{row.amountCents > 0 ? formatCentsPlain(row.amountCents) : ""}</td>
-                  <td className="px-3 py-3">{row.amountCents < 0 ? formatCentsPlain(row.amountCents) : ""}</td>
+                  <td className="money-in px-3 py-3 whitespace-nowrap font-medium tabular-nums">{row.amountCents > 0 ? formatCentsPlain(row.amountCents) : ""}</td>
+                  <td className="money-out px-3 py-3 whitespace-nowrap font-medium tabular-nums">{row.amountCents < 0 ? formatCentsPlain(row.amountCents) : ""}</td>
                   <td className="px-3 py-3" data-testid="doc-state">
                     <Link href={receiptHref(row)} data-testid={`receipt-${row.id}`} className="font-medium text-primary">
                       {row.documentName ?? "Sin comprobante"}
                     </Link>
                     <p className="text-xs text-slate-500">{DOCUMENT_LABEL[row.documentState] ?? row.documentState}</p>
                   </td>
-                  <td className="px-3 py-3" data-testid="review-state">{reviewLabel}</td>
+                  <td className="px-3 py-3" data-testid="review-state">
+                    <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${REVIEW_TONE[reviewState] ?? "bg-slate-100 text-slate-600"}`}>
+                      {reviewLabel}
+                    </span>
+                  </td>
                   <td className="px-3 py-3" data-testid="bank-recon">
                     <p className="text-xs text-slate-500">{row.institution} ····{row.mask}</p>
                     {isReconciled ? (
@@ -260,6 +302,7 @@ function ClassifyInline({
   subcategoryId,
   sealed,
   canReview,
+  attention,
   next,
   tree,
   onTree,
@@ -270,84 +313,66 @@ function ClassifyInline({
   subcategoryId: string;
   sealed: boolean;
   canReview: boolean;
+  attention: boolean;
   next: string;
   tree: Group[];
   onTree: (updater: (current: Group[]) => Group[]) => void;
-  onSaved: (categoryLabel: string, reviewLabel: string) => void;
+  onSaved: (categoryLabel: string, reviewLabel: string, reviewState: string) => void;
 }) {
-  const initialCategory = useMemo(
-    () => tree.find((group) => group.children.some((child) => child.id === subcategoryId))?.id ?? "",
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-  const [categoryId, setCategoryId] = useState(initialCategory);
-  const [subId, setSubId] = useState(subcategoryId);
+  const [saved, setSaved] = useState(subcategoryId);
+  const [pending, setPending] = useState<string | null>(null);
+  const [done, setDone] = useState<{ undo: string | null } | null>(null);
   const [justification, setJustification] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [adding, setAdding] = useState<null | "category" | "subcategory">(null);
-  const [newName, setNewName] = useState("");
 
-  const group = tree.find((item) => item.id === categoryId) ?? null;
+  useEffect(() => {
+    if (!done) return;
+    const timer = window.setTimeout(() => setDone(null), 12000);
+    return () => window.clearTimeout(timer);
+  }, [done]);
 
   if (sealed) {
     return <p className="text-xs text-slate-500">Sellado. El servidor rechaza el cambio.</p>;
   }
 
-  async function addCategory(parentId: string | null) {
-    const name = newName.trim();
-    if (name.length < 2) {
-      setError("El nombre es demasiado corto.");
-      return;
+  async function addCategory(parentId: string | null, name: string): Promise<CategoryNode | null> {
+    const form = new FormData();
+    form.set("companyId", companyId);
+    if (parentId) form.set("parentId", parentId);
+    form.set("name", name);
+    const response = await fetch("/api/categories", { method: "POST", headers: { accept: "application/json" }, body: form });
+    const body = (await response.json()) as { id?: string; name?: string; error?: string };
+    if (!response.ok || !body.id || !body.name) throw new Error(body.error || "No se pudo agregar.");
+    const node = { id: body.id, name: body.name };
+    if (parentId) {
+      onTree((current) => current.map((item) => (item.id === parentId ? { ...item, children: [...item.children, node] } : item)));
+    } else {
+      onTree((current) => [...current, { ...node, children: [] }]);
     }
-    setBusy(true);
-    setError(null);
-    try {
-      const form = new FormData();
-      form.set("companyId", companyId);
-      if (parentId) form.set("parentId", parentId);
-      form.set("name", name);
-      const response = await fetch("/api/categories", { method: "POST", headers: { accept: "application/json" }, body: form });
-      const body = (await response.json()) as { id?: string; name?: string; parentId?: string | null; error?: string };
-      if (!response.ok || !body.id) throw new Error(body.error || "No se pudo agregar.");
-      if (parentId) {
-        onTree((current) => current.map((item) => (item.id === parentId ? { ...item, children: [...item.children, { id: body.id!, name: body.name! }] } : item)));
-        setSubId(body.id);
-      } else {
-        onTree((current) => [...current, { id: body.id!, name: body.name!, children: [] }]);
-        setCategoryId(body.id);
-        setSubId("");
-      }
-      setNewName("");
-      setAdding(null);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "No se pudo agregar.");
-    } finally {
-      setBusy(false);
-    }
+    return node;
   }
 
-  async function save() {
-    if (!subId) {
-      setError("Elige una subcategoría.");
-      return;
-    }
+  async function save(target: string, note: string, previous: string | null) {
     setBusy(true);
     setError(null);
     try {
       const form = new FormData();
-      form.set("subcategoryId", subId);
+      form.set("subcategoryId", target);
       form.set("next", next);
-      if (canReview) form.set("justification", justification);
+      if (canReview) form.set("justification", note);
       const response = await fetch(`/api/transactions/${id}/classification`, {
         method: "POST",
         headers: { accept: "application/json" },
         body: form,
       });
-      const body = (await response.json()) as { categoryLabel?: string; reviewLabel?: string; error?: string };
+      const body = (await response.json()) as { categoryLabel?: string; reviewLabel?: string; reviewState?: string; error?: string };
       if (!response.ok) throw new Error(body.error || "No se pudo guardar.");
-      onSaved(body.categoryLabel ?? "", body.reviewLabel ?? "");
+      setSaved(target);
+      setPending(null);
       setJustification("");
+      setDone({ undo: previous });
+      onSaved(body.categoryLabel ?? "", body.reviewLabel ?? "", body.reviewState ?? "");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo guardar.");
     } finally {
@@ -355,93 +380,66 @@ function ClassifyInline({
     }
   }
 
+  function pick(target: string) {
+    if (target === saved) return;
+    if (canReview) {
+      setPending(target);
+      return;
+    }
+    void save(target, "", saved || null);
+  }
+
+  const pendingLabel = pending ? pathOf(tree, pending).map((node) => node.name).join(" › ") : "";
+
   return (
     <div className="space-y-1.5">
-      <div className="flex flex-wrap gap-1.5">
-        <select
-          value={categoryId}
-          data-testid={`category-select-${id}`}
-          onChange={(event) => {
-            if (event.target.value === "__new__") {
-              setAdding("category");
-              return;
-            }
-            setCategoryId(event.target.value);
-            setSubId("");
-          }}
-          className="h-8 min-w-[120px] rounded-lg border border-border bg-white px-2 text-xs"
-          aria-label={`Categoría de ${id}`}
-        >
-          <option value="">Categoría</option>
-          {tree.map((item) => (
-            <option key={item.id} value={item.id}>{item.name}</option>
-          ))}
-          <option value="__new__">+ Nueva categoría…</option>
-        </select>
-        <select
-          value={subId}
-          data-testid={`subcategory-select-${id}`}
-          disabled={!group}
-          onChange={(event) => {
-            if (event.target.value === "__new__") {
-              setAdding("subcategory");
-              return;
-            }
-            setSubId(event.target.value);
-          }}
-          className="h-8 min-w-[120px] rounded-lg border border-border bg-white px-2 text-xs disabled:bg-slate-50"
-          aria-label={`Subcategoría de ${id}`}
-        >
-          <option value="">Subcategoría</option>
-          {group?.children.map((child) => (
-            <option key={child.id} value={child.id}>{child.name}</option>
-          ))}
-          {group ? <option value="__new__">+ Nueva subcategoría…</option> : null}
-        </select>
-      </div>
-      {adding ? (
-        <div className="flex items-center gap-1.5">
+      <CategoryMenu
+        tree={tree}
+        value={pending ?? saved}
+        disabled={busy}
+        attention={attention}
+        testId={`category-menu-${id}`}
+        onPick={pick}
+        onAdd={addCategory}
+      />
+      {pending ? (
+        <div className="space-y-1.5 rounded-lg border border-blue-200 bg-blue-50/60 p-2">
+          <p className="text-[11px] text-blue-900">Cambiar a <span className="font-medium">{pendingLabel}</span>. Como contador, escribe por qué.</p>
           <input
-            value={newName}
-            onChange={(event) => setNewName(event.target.value)}
-            placeholder={adding === "category" ? "Nueva categoría" : "Nueva subcategoría"}
-            className="h-8 min-w-[140px] rounded-lg border border-border px-2 text-xs"
-            aria-label="Nombre de la nueva categoría"
+            autoFocus
+            value={justification}
+            onChange={(event) => setJustification(event.target.value)}
+            minLength={8}
+            placeholder="Justificación (mínimo 8 letras)"
+            className="h-8 w-full rounded-lg border border-border bg-white px-2 text-xs"
+            aria-label="Justificación"
           />
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void addCategory(adding === "subcategory" ? categoryId : null)}
-            className="inline-flex h-8 items-center gap-1 rounded-lg bg-slate-900 px-2 text-xs font-medium text-white disabled:opacity-50"
-          >
-            <Plus className="size-3" /> Crear
-          </button>
-          <button type="button" onClick={() => { setAdding(null); setNewName(""); }} className="text-xs text-slate-500">Cancelar</button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={busy || justification.trim().length < 8}
+              onClick={() => void save(pending, justification, saved || null)}
+              data-testid={`save-category-${id}`}
+              className="rounded-lg bg-primary px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+            >
+              {busy ? "Guardando…" : "Guardar"}
+            </button>
+            <button type="button" onClick={() => setPending(null)} className="text-xs text-slate-500">Cancelar</button>
+          </div>
         </div>
       ) : null}
-      {canReview ? (
-        <input
-          value={justification}
-          onChange={(event) => setJustification(event.target.value)}
-          minLength={8}
-          placeholder="Justificación del contador"
-          className="h-8 w-full rounded-lg border border-border px-2 text-xs"
-          aria-label="Justificación"
-        />
+      {busy && !pending ? <p className="text-[11px] text-slate-500">Guardando…</p> : null}
+      {done && !busy && !pending ? (
+        <p className="flex items-center gap-2 text-[11px] text-emerald-700">
+          <Check className="size-3" /> Guardado{!canReview ? " como propuesta" : ""}
+          {done.undo && !canReview ? (
+            <button type="button" onClick={() => void save(done.undo as string, "", null)} className="font-medium text-primary underline-offset-2 hover:underline">
+              Deshacer
+            </button>
+          ) : null}
+        </p>
       ) : null}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void save()}
-          data-testid={`save-category-${id}`}
-          className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-        >
-          {busy ? "Guardando…" : "Guardar"}
-        </button>
-        {!canReview ? <span className="text-xs text-slate-400">Queda como propuesta</span> : null}
-      </div>
-      {error ? <p className="text-xs text-red-700">{error}</p> : null}
+      {error ? <p className="text-xs text-rose-700">{error}</p> : null}
     </div>
   );
 }

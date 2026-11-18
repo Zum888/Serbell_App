@@ -598,9 +598,10 @@ export async function createManualAccount(
   db: Db,
   actor: Actor,
   companyId: string,
-  input: { institution: string; name: string; mask: string; kind: string; openingBalanceCents: number },
+  input: { institution: string; name: string; mask: string; kind: string; openingBalanceCents: number; origin?: "manual" | "plaid_demo" },
 ) {
   assertCompanyAccess(actor, companyId);
+  const origin = input.origin === "plaid_demo" ? "plaid_demo" : "manual";
   const institution = input.institution.trim();
   const name = input.name.trim();
   const mask = input.mask.trim();
@@ -634,7 +635,7 @@ export async function createManualAccount(
       currency: "USD",
       availableBalanceCents: input.openingBalanceCents,
       kind,
-      origin: "manual",
+      origin,
       isDemonstration: true,
     },
   });
@@ -650,7 +651,7 @@ export async function createManualAccount(
       kind,
       currency: "USD",
       availableBalanceCents: input.openingBalanceCents,
-      origin: "manual",
+      origin,
     },
   });
   return id;
