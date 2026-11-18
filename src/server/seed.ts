@@ -185,7 +185,7 @@ const EXTRA_TICKETS: [string, string, string, string, number][] = [
   ["doc_x_grainger", COMPANY.rivera, "Grainger", "Grainger_1028.jpg", 8640],
 ];
 
-async function insertExtraDemo(db: Db) {
+export async function insertExtraDemo(db: Db) {
   for (const [id, accountId, day, merchant, amountCents] of EXTRA_QPL_TX) {
     await db.bankTransaction.create({
       data: {
