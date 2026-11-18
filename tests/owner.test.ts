@@ -19,8 +19,29 @@ const person = (userId: number, simulated = false): VerifiedIdentity => ({
   appVisibility: "private",
 });
 
-it("lets the local simulated viewer and the app owner switch profiles", () => {
+const apiKey = (): VerifiedIdentity => ({
+  verified: true,
+  simulated: false,
+  token: "",
+  sub: "key:1",
+  email: "",
+  emailVerified: false,
+  name: "ci-key",
+  idp: { provider: "cursor", sub: "1" },
+  stage: "production",
+  expiresAt: new Date("2026-12-01T00:00:00.000Z"),
+  claims: {},
+  kind: "key",
+  ownerUserId: 1,
+  appVisibility: "private",
+});
+
+it("admits the local simulated viewer and any verified signed-in person", () => {
   expect(isDemoOwner(person(0, true))).toBe(true);
   expect(isDemoOwner(person(358083753))).toBe(true);
-  expect(isDemoOwner(person(1))).toBe(false);
+  expect(isDemoOwner(person(1))).toBe(true);
+});
+
+it("refuses non-interactive API keys", () => {
+  expect(isDemoOwner(apiKey())).toBe(false);
 });
