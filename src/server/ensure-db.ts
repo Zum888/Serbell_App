@@ -46,11 +46,11 @@ export async function ensureDemoDatabase() {
   try {
     const file = resolveRuntimeFile();
     if (!file) return;
-    if (existsSync(file)) return;
+    if (existsSync(/*turbopackIgnore: true*/ file)) return;
 
     mkdirSync(path.dirname(file), { recursive: true });
 
-    if (existsSync(TEMPLATE_FILE)) {
+    if (existsSync(/*turbopackIgnore: true*/ TEMPLATE_FILE)) {
       copyFileSync(TEMPLATE_FILE, file);
       // SQLite must be able to write to the copy (and its journal); the source
       // may be read-only when it ships inside a read-only app image.

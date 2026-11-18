@@ -1,22 +1,22 @@
 import { NextResponse } from "next/server";
-import { requireIdentity } from "../../../../../cursor/identity";
 import { PROFILES } from "@/lib/ids";
 import { isAppError } from "@/lib/errors";
 import { safeNext } from "@/lib/utils";
+import { hasAccess } from "@/server/access";
 import { originOf } from "@/server/http";
-import { isDemoOwner } from "@/server/owner";
-import { COMPANY_COOKIE, saveDemoBinding, USER_COOKIE } from "@/server/session";
+import { COMPANY_COOKIE, currentViewerSub, saveDemoBinding, USER_COOKIE } from "@/server/session";
 
 export async function GET(request: Request) {
-  const identity = await requireIdentity(request);
-  if (identity instanceof Response) return identity;
-  if (!isDemoOwner(identity)) {
-    return new NextResponse(null, { status: 403, headers: { "cache-control": "private, no-store" } });
+  if (!(await hasAccess())) {
+    return NextResponse.redirect(new URL("/acceso?next=/", `${originOf(request)}/`), {
+      headers: { "cache-control": "private, no-store" },
+    });
   }
+  const viewerSub = await currentViewerSub();
   const url = new URL(request.url);
   const profile = PROFILES.find((item) => item.id === url.searchParams.get("user")) ?? PROFILES[0];
   try {
-    await saveDemoBinding(identity, profile.id);
+    await saveDemoBinding(viewerSub, profile.id);
   } catch (error) {
     if (isAppError(error)) {
       return NextResponse.json(

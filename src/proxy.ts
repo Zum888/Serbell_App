@@ -1,22 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { requireIdentity } from "../cursor/identity";
-import { isDemoOwner } from "@/server/owner";
 
-export async function proxy(request: NextRequest) {
-  const identity = await requireIdentity(request);
-  if (identity instanceof Response) {
-    return new NextResponse(null, {
-      status: 401,
-      headers: { "cache-control": "private, no-store" },
-    });
-  }
-  if (!isDemoOwner(identity)) {
-    return new NextResponse(null, {
-      status: 403,
-      headers: { "cache-control": "private, no-store" },
-    });
-  }
+/**
+ * The lab manages its own access: a password gate (src/server/access.ts) and a
+ * self-contained demo session, both enforced in the Node runtime where the
+ * secret is reliably available. Here we only mark responses private and
+ * uncacheable so a shared cache never serves one visitor's data to another.
+ */
+export function proxy(_request: NextRequest) {
   const response = NextResponse.next();
   response.headers.set("cache-control", "private, no-store");
   return response;

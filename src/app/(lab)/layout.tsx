@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { StateView } from "@/components/state-view";
+import { hasAccess } from "@/server/access";
 import { pageSession } from "@/server/session";
 
 export default async function LabLayout({ children }: { children: React.ReactNode }) {
+  if (!(await hasAccess())) redirect("/acceso?next=/");
   const session = await pageSession();
   if (!session) redirect("/api/session/enter?next=/");
   if (!session.actor) {
