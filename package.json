@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && tsx scripts/build-template.ts && next build; status=$?; tsx scripts/restore-template-stub.ts; exit $status",
     "start": "next start",
     "lint": "eslint",
     "db:reset": "prisma generate && rm -f prisma/dev.db prisma/dev.db-journal && prisma db push && tsx prisma/seed.ts",

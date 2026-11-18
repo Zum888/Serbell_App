@@ -104,7 +104,9 @@ export async function requireActor(): Promise<{ actor: Actor; companyId: string 
 }
 
 export async function pageSession() {
-  const viewerSub = await currentViewerSub();
+  const viewer = await resolveViewer();
+  if (!viewer) return null;
+  const viewerSub = viewer.sub;
   const session = await resolveSession(viewerSub);
   if (!session) return null;
   const shell = await getShell((await db()), session.actor);
