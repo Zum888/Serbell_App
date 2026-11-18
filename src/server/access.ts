@@ -1,5 +1,6 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { getIdentity } from "../../cursor/identity";
 
 const ACCESS_COOKIE = "sb_access";
 const ACCESS_PURPOSE = "serbell-access-v1";
@@ -48,6 +49,12 @@ export function accessConfigured(): boolean {
 /** True when the current request may use the lab. */
 export async function hasAccess(): Promise<boolean> {
   if (!gateEnforced()) return true;
+  // A viewer that Cursor itself signed in does not need the shared password. A
+  // signed-in person identity only exists on a Private or Team app, where the
+  // platform has already restricted access to the owner and the people they
+  // invite; a Public app never carries one, so there the password always applies.
+  const identity = await getIdentity(await headers());
+  if (identity.verified && identity.kind === "person") return true;
   const password = configuredPassword();
   if (!password) return false;
   const cookie = (await cookies()).get(ACCESS_COOKIE)?.value;
