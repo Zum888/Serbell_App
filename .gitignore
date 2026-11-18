@@ -37,6 +37,9 @@ yarn-error.log*
 # local data
 /prisma/*.db
 /prisma/*.db-journal
+# ...but ship the pre-seeded demo database so the hosted app never has to
+# build or seed one at runtime (a read-only app dir would make that fail).
+!/prisma/demo.db
 /storage/uploads/**
 !/storage/uploads/.gitkeep
 
