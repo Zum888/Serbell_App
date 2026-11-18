@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Record<string, unknown>;
     const cents = parseMoneyToCents(String(body.amount ?? ""));
     if (cents === null) throw new AppError("El monto tiene que ser un importe en USD.", 400, "AMOUNT_INVALID");
-    const id = await createFixedExpense(db(), actor, companyId, {
+    const id = await createFixedExpense((await db()), actor, companyId, {
       name: String(body.name ?? ""),
       vendor: String(body.vendor ?? ""),
       amountCents: cents,

@@ -8,7 +8,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const back = `/chat?documento=${id}`;
   try {
     const { actor } = await requireActor();
-    await postponeLink(db(), actor, id);
+    await postponeLink((await db()), actor, id);
     return redirectTo(request, back);
   } catch (error) {
     return redirectError(request, back, error);

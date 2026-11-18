@@ -13,8 +13,8 @@ export default async function ExpensesPage() {
   const session = await pageContext();
   if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para analizar sus gastos." />;
   const [analysis, report] = await Promise.all([
-    expenseAnalysis(db(), session.actor, session.companyId),
-    companyReport(db(), session.actor, session.companyId),
+    expenseAnalysis((await db()), session.actor, session.companyId),
+    companyReport((await db()), session.actor, session.companyId),
   ]);
   return (
     <section className="space-y-4">

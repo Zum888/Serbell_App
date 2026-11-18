@@ -12,7 +12,7 @@ export default async function ChatPage({
   const session = await pageContext();
   const params = await searchParams;
   if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para usar el chat." />;
-  const chat = await getChat(db(), session.actor, session.companyId, params.documento);
+  const chat = await getChat((await db()), session.actor, session.companyId, params.documento);
   return (
     <ChatScreen
       companyId={session.companyId}

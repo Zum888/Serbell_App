@@ -10,7 +10,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
   const session = await pageContext();
   const params = await searchParams;
   if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para editar sus categorías." />;
-  const tree = await listCategoryTree(db(), session.actor, session.companyId);
+  const tree = await listCategoryTree((await db()), session.actor, session.companyId);
   const subtotal = tree.reduce((sum, parent) => sum + parent.children.length, 0);
   return (
     <section className="space-y-5">

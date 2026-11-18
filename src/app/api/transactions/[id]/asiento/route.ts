@@ -20,7 +20,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const credits = form.getAll("creditCents").map(String);
   try {
     const { actor } = await requireActor();
-    await saveJournalEntry(db(), actor, id, {
+    await saveJournalEntry((await db()), actor, id, {
       subcategoryId: String(form.get("subcategoryId") ?? ""),
       justification: String(form.get("justification") ?? ""),
       lines: names.map((accountName, index) => ({

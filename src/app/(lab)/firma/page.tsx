@@ -9,7 +9,7 @@ export default async function FirmPage({ searchParams }: { searchParams: Promise
   const session = await pageContext();
   const params = await searchParams;
   try {
-    const summary = await getFirm(db(), session.actor);
+    const summary = await getFirm((await db()), session.actor);
     return (
       <div className="space-y-3">
         {params.error ? <StateView variant="error" title={params.error} testId="server-error" /> : null}

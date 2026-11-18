@@ -10,7 +10,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const back = safeNext(String(form.get("next") ?? ""), `/por-cobrar?factura=${id}`);
   try {
     const { actor } = await requireActor();
-    await linkInvoice(db(), actor, id, String(form.get("transactionId") ?? ""));
+    await linkInvoice((await db()), actor, id, String(form.get("transactionId") ?? ""));
     return redirectTo(request, back);
   } catch (error) {
     return redirectError(request, back, error);

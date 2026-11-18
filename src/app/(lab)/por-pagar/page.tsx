@@ -19,15 +19,15 @@ export default async function PayablesPage({
   if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para ver sus facturas." />;
   const company = session.companies.find((item) => item.id === session.companyId);
   const [{ folders, summary }, fixed] = await Promise.all([
-    invoiceDesk(db(), session.actor, session.companyId, "payable"),
-    fixedChecklist(db(), session.actor, session.companyId),
+    invoiceDesk((await db()), session.actor, session.companyId, "payable"),
+    fixedChecklist((await db()), session.actor, session.companyId),
   ]);
   const folder = folders.find((item) => item.partyId === params.parte) ?? null;
   let panel = null;
   let panelError = params.error;
   if (params.factura) {
     try {
-      panel = await invoicePanel(db(), session.actor, params.factura);
+      panel = await invoicePanel((await db()), session.actor, params.factura);
     } catch (error) {
       if (!isAppError(error)) throw error;
       panel = null;

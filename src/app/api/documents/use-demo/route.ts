@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   try {
     const { actor } = await requireActor();
     const bytes = await readFile(path.join(process.cwd(), "fixtures", "FleetSmarts_ticket.jpg"));
-    const saved = await saveUploadedDocument(db(), actor, {
+    const saved = await saveUploadedDocument((await db()), actor, {
       companyId,
       fileName: "FleetSmarts_ticket.jpg",
       mimeType: "image/jpeg",

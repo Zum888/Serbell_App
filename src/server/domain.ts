@@ -18,6 +18,7 @@ import { localProviders } from "@/providers/local";
 import type { Db } from "@/server/db";
 import { nid, sha256 } from "@/server/ids";
 import { dataRoot } from "@/server/paths";
+import { resolveViewer } from "@/server/viewer";
 import { ALLOWED_UPLOAD_TYPES, MAX_UPLOAD_BYTES, MAX_UPLOADS_PER_COMPANY } from "@/server/upload";
 
 async function conversationFor(db: Db, companyId: string) {
@@ -202,6 +203,15 @@ function describeMatch(result: MatchResult): string {
   return result.reasonsAgainst.join(" ") || "No hay un movimiento compatible.";
 }
 
+/** Local uploads stay where the seed expects them. A published visitor writes only inside their own folder. */
+async function uploadFolder(companyId: string): Promise<string> {
+  if (process.env.NODE_ENV !== "production") return path.join("storage", "uploads", companyId);
+  const viewer = await resolveViewer();
+  if (!viewer) throw new AppError("Escribe la contraseña para entrar al laboratorio.", 401, "NO_ACCESS");
+  const safe = viewer.sub.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 80);
+  return path.join("storage", "visitors", safe, companyId);
+}
+
 export async function saveUploadedDocument(
   db: Db,
   actor: Actor,
@@ -229,7 +239,8 @@ export async function saveUploadedDocument(
   });
   const id = nid("doc");
   const fileName = safeFileName(input.fileName);
-  const storagePath = path.join("storage", "uploads", input.companyId, `${id}-${fileName}`);
+  const folder = await uploadFolder(input.companyId);
+  const storagePath = path.join(folder, `${id}-${fileName}`);
   const absolute = path.join(dataRoot(), storagePath);
   await mkdir(path.dirname(absolute), { recursive: true });
   await writeFile(absolute, input.bytes);

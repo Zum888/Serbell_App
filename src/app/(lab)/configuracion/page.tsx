@@ -13,7 +13,7 @@ const ROLE: Record<string, string> = {
 export default async function SettingsPage() {
   const session = await pageContext();
   if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa." />;
-  const profile = await companyProfile(db(), session.actor, session.companyId);
+  const profile = await companyProfile((await db()), session.actor, session.companyId);
   return (
     <section className="max-w-2xl space-y-4">
       <div>

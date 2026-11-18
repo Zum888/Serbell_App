@@ -12,7 +12,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const { actor } = await requireActor();
     const amountCents = parseMoneyToCents(String(form.get("amount") ?? ""));
     if (amountCents === null) return redirectTo(request, back, "El importe no es válido.");
-    await updateExtraction(db(), actor, id, {
+    await updateExtraction((await db()), actor, id, {
       merchant: String(form.get("merchant") ?? ""),
       amountCents,
       occurredOn: String(form.get("occurredOn") ?? "") || null,

@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     const { actor, companyId } = await requireActor();
     if (!companyId) throw new AppError("Selecciona una empresa.", 400, "COMPANY_REQUIRED");
     const body = (await request.json()) as Record<string, unknown>;
-    const id = await createManualAccount(db(), actor, companyId, {
+    const id = await createManualAccount((await db()), actor, companyId, {
       institution: String(body.institution ?? ""),
       name: String(body.name ?? ""),
       mask: String(body.mask ?? ""),

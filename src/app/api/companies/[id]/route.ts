@@ -8,7 +8,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   try {
     const { id } = await context.params;
     const { actor } = await requireActor();
-    const company = await operationSnapshot(db(), actor, id);
+    const company = await operationSnapshot((await db()), actor, id);
     return NextResponse.json(company);
   } catch (error) {
     if (isAppError(error)) {

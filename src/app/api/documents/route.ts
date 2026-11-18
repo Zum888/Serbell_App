@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       return redirectTo(request, "/chat", "Selecciona un archivo.");
     }
     const upload = await readUploadFile(file);
-    const saved = await saveUploadedDocument(db(), actor, {
+    const saved = await saveUploadedDocument((await db()), actor, {
       companyId,
       fileName: file.name,
       mimeType: upload.mimeType,

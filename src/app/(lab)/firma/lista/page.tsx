@@ -27,9 +27,9 @@ export default async function FirmListPage({
   const tipo = params.tipo && TITLES[params.tipo] ? params.tipo : "revisar";
   try {
     if (tipo === "revisar") {
-      const groups = await reviewBoard(db(), session.actor);
+      const groups = await reviewBoard((await db()), session.actor);
       const viewer = params.movimiento
-        ? await getBoardReceipt(db(), session.actor, { transactionId: params.movimiento })
+        ? await getBoardReceipt((await db()), session.actor, { transactionId: params.movimiento })
         : null;
       const next = params.movimiento ? `/firma/lista?tipo=revisar&movimiento=${params.movimiento}` : "/firma/lista?tipo=revisar";
       return (
@@ -51,7 +51,7 @@ export default async function FirmListPage({
         </div>
       );
     }
-    const rows = await firmQueue(db(), session.actor, tipo);
+    const rows = await firmQueue((await db()), session.actor, tipo);
     return (
       <section className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">

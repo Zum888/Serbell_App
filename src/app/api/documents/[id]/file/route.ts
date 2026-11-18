@@ -10,7 +10,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   try {
     const { id } = await context.params;
     const { actor } = await requireActor();
-    const document = await readDocumentFile(db(), actor, id);
+    const document = await readDocumentFile((await db()), actor, id);
     const bytes = await readFile(/*turbopackIgnore: true*/ storageFile(document.storagePath));
     const download = new URL(request.url).searchParams.get("descarga") === "1";
     const fileName = document.fileName.replace(/"/g, "");

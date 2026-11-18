@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { grantCookie, passwordMatches } from "@/server/access";
 import { originOf } from "@/server/http";
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
     return NextResponse.redirect(back, { status: 303, headers: { "cache-control": "private, no-store" } });
   }
 
-  const cookie = grantCookie();
+  const cookie = grantCookie((await cookies()).get("sb_access")?.value);
   const response = NextResponse.redirect(new URL(next, `${origin}/`), {
     status: 303,
     headers: { "cache-control": "private, no-store" },

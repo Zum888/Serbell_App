@@ -20,15 +20,15 @@ export default async function MovementsPage({
   const filter = params.filtro || "todos";
   const q = params.q || "";
   try {
-    const tree = await listCategoryTree(db(), session.actor, session.companyId);
+    const tree = await listCategoryTree((await db()), session.actor, session.companyId);
     const categories = tree.map((parent) => ({
       id: parent.id,
       name: parent.name,
       children: parent.children.map((child) => ({ id: child.id, name: child.name })),
     }));
     if (params.vista === "enfoque") {
-      const home = await getHome(db(), session.actor, session.companyId);
-      const focus = await focusQueue(db(), session.actor, session.companyId, params.actual);
+      const home = await getHome((await db()), session.actor, session.companyId);
+      const focus = await focusQueue((await db()), session.actor, session.companyId, params.actual);
       return (
         <FocusMode
           data={{
@@ -48,16 +48,16 @@ export default async function MovementsPage({
       );
     }
     const [rows, counts, home] = await Promise.all([
-      listMovements(db(), session.actor, session.companyId, filter, q),
-      movementCounts(db(), session.actor, session.companyId),
-      getHome(db(), session.actor, session.companyId),
+      listMovements((await db()), session.actor, session.companyId, filter, q),
+      movementCounts((await db()), session.actor, session.companyId),
+      getHome((await db()), session.actor, session.companyId),
     ]);
     let detail = null;
     let receipt = null;
     if (params.fila) {
-      receipt = await getReceiptContext(db(), session.actor, params.fila);
+      receipt = await getReceiptContext((await db()), session.actor, params.fila);
     } else if (params.movimiento) {
-      detail = await getMovement(db(), session.actor, params.movimiento);
+      detail = await getMovement((await db()), session.actor, params.movimiento);
     }
     return (
       <MovementsScreen

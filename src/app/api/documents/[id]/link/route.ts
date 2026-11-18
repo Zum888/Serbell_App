@@ -10,7 +10,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const back = safeNext(String(form.get("next") ?? ""), `/chat?documento=${id}`);
   try {
     const { actor } = await requireActor();
-    await confirmLink(db(), actor, id, String(form.get("transactionId") ?? ""));
+    await confirmLink((await db()), actor, id, String(form.get("transactionId") ?? ""));
     return redirectTo(request, back);
   } catch (error) {
     return redirectError(request, back, error);

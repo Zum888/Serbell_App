@@ -25,8 +25,8 @@ export default async function AccountsPage({
   const params = await searchParams;
   if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para ver sus cuentas." />;
   const [accounts, report] = await Promise.all([
-    accountBreakdowns(db(), session.actor, session.companyId),
-    companyReport(db(), session.actor, session.companyId),
+    accountBreakdowns((await db()), session.actor, session.companyId),
+    companyReport((await db()), session.actor, session.companyId),
   ]);
   const selected = accounts.find((account) => account.id === params.cuenta) ?? null;
   if (params.cuenta && !selected) {

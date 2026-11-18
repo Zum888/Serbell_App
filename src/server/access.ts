@@ -1,9 +1,10 @@
 import { cookies, headers } from "next/headers";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { getIdentity } from "../../cursor/identity";
 
 const ACCESS_COOKIE = "sb_access";
 const ACCESS_PURPOSE = "serbell-access-v1";
+const VISITOR_ID = /^[a-f0-9]{32}$/;
 
 /**
  * The shared password that protects the published lab. It is read from the
@@ -24,9 +25,27 @@ export function gateEnforced(): boolean {
   return process.env.NODE_ENV === "production";
 }
 
-/** The opaque cookie value proving the visitor typed the right password. */
-function accessToken(password: string): string {
-  return createHmac("sha256", password).update(ACCESS_PURPOSE).digest("hex");
+/** Signs one browser's visitor id. The same password does not yield the same cookie. */
+function signVisitor(password: string, visitorId: string): string {
+  return createHmac("sha256", password).update(`${ACCESS_PURPOSE}:${visitorId}`).digest("hex");
+}
+
+/**
+ * The visitor id carried by a valid access cookie, or null when the cookie is
+ * missing, forged, or still the old shared token. A shared token is rejected
+ * so every browser is forced onto its own id.
+ */
+export function readSignedVisitor(cookieValue: string | undefined): string | null {
+  const password = configuredPassword();
+  if (!password || !cookieValue) return null;
+  const dot = cookieValue.indexOf(".");
+  if (dot <= 0) return null;
+  const visitorId = cookieValue.slice(0, dot);
+  const signature = cookieValue.slice(dot + 1);
+  if (!VISITOR_ID.test(visitorId) || !/^[a-f0-9]{64}$/.test(signature)) return null;
+  const expected = signVisitor(password, visitorId);
+  if (!safeEqual(signature, expected)) return null;
+  return visitorId;
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -58,7 +77,7 @@ export async function hasAccess(): Promise<boolean> {
   const password = configuredPassword();
   if (!password) return false;
   const cookie = (await cookies()).get(ACCESS_COOKIE)?.value;
-  return typeof cookie === "string" && safeEqual(cookie, accessToken(password));
+  return readSignedVisitor(cookie) !== null;
 }
 
 /** Validate a submitted password against the configured one. */
@@ -68,9 +87,14 @@ export function passwordMatches(candidate: string): boolean {
   return safeEqual(candidate, password);
 }
 
-/** The cookie to set once the visitor passes the gate; null when unconfigured. */
-export function grantCookie(): { name: string; value: string } | null {
+/**
+ * The cookie to set once the visitor passes the gate. A browser that already
+ * has a valid cookie keeps its visitor id. Anyone else receives a new random
+ * id. Null when the password is not configured.
+ */
+export function grantCookie(currentValue?: string | null): { name: string; value: string } | null {
   const password = configuredPassword();
   if (!password) return null;
-  return { name: ACCESS_COOKIE, value: accessToken(password) };
+  const visitorId = readSignedVisitor(currentValue ?? undefined) ?? randomBytes(16).toString("hex");
+  return { name: ACCESS_COOKIE, value: `${visitorId}.${signVisitor(password, visitorId)}` };
 }

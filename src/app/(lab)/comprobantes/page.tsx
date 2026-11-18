@@ -23,7 +23,7 @@ export default async function DocumentsPage({
   if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para ver sus comprobantes." />;
   const company = session.companies.find((item) => item.id === session.companyId);
   try {
-    const groups = await documentBoard(db(), session.actor, session.companyId);
+    const groups = await documentBoard((await db()), session.actor, session.companyId);
     const cards: GalleryCard[] = (Object.keys(groups) as (keyof typeof groups)[]).flatMap((column) =>
       groups[column].map((card) => ({
         id: card.id,
@@ -41,7 +41,7 @@ export default async function DocumentsPage({
       })),
     );
     const viewer = params.recibo || params.fila
-      ? await getBoardReceipt(db(), session.actor, { documentId: params.recibo, transactionId: params.fila })
+      ? await getBoardReceipt((await db()), session.actor, { documentId: params.recibo, transactionId: params.fila })
       : null;
     const nextParams = new URLSearchParams();
     if (params.recibo) nextParams.set("recibo", params.recibo);

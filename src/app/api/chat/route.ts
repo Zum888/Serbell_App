@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   const back = "/chat";
   try {
     const { actor } = await requireActor();
-    await postChat(db(), actor, companyId, text);
+    await postChat((await db()), actor, companyId, text);
     return redirectTo(request, back);
   } catch (error) {
     return redirectError(request, back, error);

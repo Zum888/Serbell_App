@@ -14,12 +14,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const json = wantsJson(request);
   try {
     const { actor } = await requireActor();
-    await changeClassification(db(), actor, id, {
+    await changeClassification((await db()), actor, id, {
       subcategoryId: String(form.get("subcategoryId") ?? ""),
       justification: String(form.get("justification") ?? ""),
     });
     if (json) {
-      const row = await db().bankTransaction.findUnique({
+      const row = await (await db()).bankTransaction.findUnique({
         where: { id },
         include: { classification: { include: { category: true, subcategory: true } } },
       });

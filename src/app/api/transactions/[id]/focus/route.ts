@@ -12,21 +12,21 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const { actor } = await requireActor();
     const action = String(form.get("action") ?? "confirm");
     if (action === "skip") {
-      await skipFocus(db(), actor, id);
+      await skipFocus((await db()), actor, id);
     } else if (action === "apply") {
-      await applyMerchantCategory(db(), actor, id, {
+      await applyMerchantCategory((await db()), actor, id, {
         subcategoryId: String(form.get("subcategoryId") ?? ""),
         justification: String(form.get("justification") ?? ""),
       });
     } else {
       const documentId = String(form.get("documentId") ?? "");
-      await confirmFocus(db(), actor, id, {
+      await confirmFocus((await db()), actor, id, {
         subcategoryId: String(form.get("subcategoryId") ?? ""),
         documentId: documentId || null,
         justification: String(form.get("justification") ?? ""),
       });
     }
-    return redirectTo(request, await nextFocusPath(db(), actor, id));
+    return redirectTo(request, await nextFocusPath((await db()), actor, id));
   } catch (error) {
     return redirectError(request, back, error);
   }

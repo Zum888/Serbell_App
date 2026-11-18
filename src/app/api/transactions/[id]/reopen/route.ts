@@ -9,7 +9,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const form = await request.formData();
   try {
     const { actor } = await requireActor();
-    await reopenTransaction(db(), actor, id, String(form.get("justification") ?? ""));
+    await reopenTransaction((await db()), actor, id, String(form.get("justification") ?? ""));
     return redirectTo(request, back);
   } catch (error) {
     return redirectError(request, back, error);

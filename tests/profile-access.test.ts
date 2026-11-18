@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { USER } from "@/lib/ids";
 import { assertProfileAllowed } from "@/server/session";
 
-const PUBLIC = "public-demo";
+const PUBLIC = `v_${"ab".repeat(16)}`;
 
 it("el visitante público solo puede usar el perfil de propietario", () => {
   expect(() => assertProfileAllowed(PUBLIC, USER.padrino, false)).not.toThrow();

@@ -11,9 +11,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   try {
     const { actor } = await requireActor();
     const undo = String(form.get("action") ?? "") === "undo";
-    await setBankReconciliation(db(), actor, id, undo ? "Unreconciled" : "Reconciled");
+    await setBankReconciliation((await db()), actor, id, undo ? "Unreconciled" : "Reconciled");
     if (undo) return redirectTo(request, back);
-    return redirectTo(request, await nextBankStep(db(), actor, id));
+    return redirectTo(request, await nextBankStep((await db()), actor, id));
   } catch (error) {
     return redirectError(request, back, error);
   }

@@ -8,7 +8,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const form = await request.formData();
   try {
     const { actor } = await requireActor();
-    await renameCategory(db(), actor, id, String(form.get("name") ?? ""));
+    await renameCategory((await db()), actor, id, String(form.get("name") ?? ""));
     return redirectTo(request, "/categorias");
   } catch (error) {
     return redirectError(request, "/categorias", error);

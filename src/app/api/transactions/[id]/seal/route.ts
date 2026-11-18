@@ -10,7 +10,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const back = safeNext(String(form.get("next") ?? ""), `/movimientos?movimiento=${id}`);
   try {
     const { actor } = await requireActor();
-    await sealTransaction(db(), actor, id);
+    await sealTransaction((await db()), actor, id);
     return redirectTo(request, back);
   } catch (error) {
     return redirectError(request, back, error);

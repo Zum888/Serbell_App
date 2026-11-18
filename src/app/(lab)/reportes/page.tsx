@@ -9,9 +9,9 @@ export default async function ReportsPage() {
   const session = await pageContext();
   if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para ver el reporte." />;
   const [report, history, fixed] = await Promise.all([
-    companyReport(db(), session.actor, session.companyId),
-    monthHistory(db(), session.actor, session.companyId),
-    fixedChecklist(db(), session.actor, session.companyId),
+    companyReport((await db()), session.actor, session.companyId),
+    monthHistory((await db()), session.actor, session.companyId),
+    fixedChecklist((await db()), session.actor, session.companyId),
   ]);
   const company = session.companies.find((item) => item.id === session.companyId);
   return (

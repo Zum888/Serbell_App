@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   const json = wantsJson(request);
   try {
     const { actor } = await requireActor();
-    const created = await addCategory(db(), actor, {
+    const created = await addCategory((await db()), actor, {
       companyId: String(form.get("companyId") ?? ""),
       parentId: parentId || null,
       name: String(form.get("name") ?? ""),

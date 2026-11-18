@@ -15,9 +15,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   }
   const { error } = await searchParams;
   const [home, duplicates, report] = await Promise.all([
-    getHome(db(), session.actor, session.companyId),
-    detectedDuplicates(db(), session.actor, session.companyId),
-    companyReport(db(), session.actor, session.companyId),
+    getHome((await db()), session.actor, session.companyId),
+    detectedDuplicates((await db()), session.actor, session.companyId),
+    companyReport((await db()), session.actor, session.companyId),
   ]);
   const reading = reportReading({ ...report, accountCount: report.accounts.length }).slice(0, 3);
   const periodLabel = report.firstDay && report.lastDay ? `${report.firstDay} a ${report.lastDay}` : null;

@@ -37,7 +37,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     let documentId = String(form.get("documentId") ?? "");
     if (file instanceof File && file.size > 0) {
       const upload = await readUploadFile(file);
-      documentId = await uploadReplacementDocument(db(), actor, id, {
+      documentId = await uploadReplacementDocument((await db()), actor, id, {
         fileName: file.name || "comprobante",
         mimeType: upload.mimeType,
         bytes: upload.bytes,
@@ -45,7 +45,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     } else if (!documentId) {
       throw new AppError("Elige un comprobante guardado o sube un archivo.", 400, "DOCUMENT_REQUIRED");
     } else {
-      await replaceTransactionDocument(db(), actor, id, documentId);
+      await replaceTransactionDocument((await db()), actor, id, documentId);
     }
     return redirectTo(request, movementPath(id, form, documentId));
   } catch (error) {

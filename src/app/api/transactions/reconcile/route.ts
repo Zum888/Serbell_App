@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     const { actor } = await requireActor();
     const body = (await request.json()) as { ids?: unknown };
     const ids = Array.isArray(body.ids) ? body.ids.filter((id): id is string => typeof id === "string") : [];
-    const reconciled = await reconcileTransactions(db(), actor, ids);
+    const reconciled = await reconcileTransactions((await db()), actor, ids);
     return NextResponse.json({ reconciled });
   } catch (error) {
     if (isAppError(error)) return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
