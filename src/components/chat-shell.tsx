@@ -6,6 +6,7 @@ import { ChatPinProvider } from "@/components/chat-pin";
 import { HomeChat } from "@/components/home-chat";
 import type { Briefing } from "@/lib/briefing";
 import type { HomeStart } from "@/lib/home-starts";
+import type { Pulse } from "@/lib/pulse";
 
 const PIN_KEY = "serbell-chat";
 const FLOW_KEY = "serbell-flujo";
@@ -14,11 +15,13 @@ export function ChatShell({
   name,
   briefing,
   starts,
+  pulse,
   children,
 }: {
   name: string;
   briefing: Briefing;
   starts: HomeStart[];
+  pulse: Pulse | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -26,7 +29,7 @@ export function ChatShell({
   const [flujo, setFlujo] = useState<string | null>(null);
   const [fromUrl, setFromUrl] = useState(false);
   const home = pathname === "/";
-  const bank = pathname.startsWith("/movimientos") || pathname.startsWith("/cuentas");
+  const bank = pathname.startsWith("/movimientos") || pathname.startsWith("/cuentas") || pathname.startsWith("/por-cobrar") || pathname.startsWith("/por-pagar") || pathname.startsWith("/reportes") || pathname.startsWith("/categorias");
 
   useEffect(() => {
     if (sessionStorage.getItem(PIN_KEY) === "1") {
@@ -58,7 +61,7 @@ export function ChatShell({
       <div className={dock ? "flex items-start gap-4" : show ? "space-y-8" : ""}>
         {show ? (
           <div className={dock ? "sticky top-0 flex h-[calc(100vh-5rem)] w-[320px] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-white p-3" : ""}>
-            <HomeChat dock={dock} landed={dock ? flujo : null} name={name} briefing={briefing} starts={starts} />
+            <HomeChat dock={dock} landed={dock ? flujo : null} name={name} briefing={briefing} starts={starts} pulse={pulse} />
           </div>
         ) : null}
         <div className="min-w-0 flex-1">{children}</div>
