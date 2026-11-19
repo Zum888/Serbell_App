@@ -4,6 +4,7 @@ import { PROFILES } from "@/lib/ids";
 import type { Actor } from "@/lib/permissions";
 import { SideNav } from "@/components/nav";
 import { PostLink } from "@/components/post-link";
+import { Simulator } from "@/components/simulator";
 
 export function Shell({
   actor,
@@ -60,6 +61,7 @@ export function Shell({
             )}
           </div>
           <div className="flex items-center gap-3">
+            <Simulator />
             <details className="relative">
               <summary className="flex size-9 cursor-pointer items-center justify-center rounded-full text-slate-500" aria-label="Notificaciones">
                 <Bell className="size-4" />
