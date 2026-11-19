@@ -41,7 +41,7 @@ export function SideNav({ firm }: { firm: boolean }) {
             data-testid={item.testId}
             className={cn(
               "flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-600",
-              active && "bg-blue-50 font-medium text-primary",
+              active && "bg-[#efede8] font-medium text-stone-900",
             )}
           >
             <Icon className="size-4" />

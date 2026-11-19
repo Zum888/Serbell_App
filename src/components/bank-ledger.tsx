@@ -161,7 +161,7 @@ export function BankLedger({
           {selected && ofAccount.some((row) => row.reconciliationState !== "Reconciled") ? (
             <Link
               href={`/cuentas?${new URLSearchParams({ cuenta: selected.id, paso: "conciliar", ...(withChat ? { con: "chat", ...(flujo ? { flujo } : {}) } : {}) }).toString()}`}
-              className="mt-1 inline-block text-xs font-medium text-violet-700"
+              className="mt-1 inline-block text-xs font-medium text-stone-800"
             >
               Conciliar con el banco
             </Link>
@@ -176,7 +176,7 @@ export function BankLedger({
                 setSpan(key);
                 setCalendarOpen(false);
               }}
-              className={span === key ? "rounded-full bg-violet-600 px-3 py-1.5 text-xs font-medium text-white" : "rounded-full px-3 py-1.5 text-xs text-slate-500 hover:bg-white"}
+              className={span === key ? "rounded-full bg-stone-900 px-3 py-1.5 text-xs font-medium text-[#f7f6f4]" : "rounded-full px-3 py-1.5 text-xs text-stone-500 hover:bg-white"}
             >
               {label}
             </button>
@@ -187,7 +187,7 @@ export function BankLedger({
               aria-label="Elegir fechas"
               aria-expanded={calendarOpen}
               onClick={() => setCalendarOpen((open) => !open)}
-              className={span === "custom" ? "grid size-8 place-items-center rounded-full bg-violet-600 text-white" : "grid size-8 place-items-center rounded-full border border-slate-200 bg-white text-slate-500"}
+              className={span === "custom" ? "grid size-8 place-items-center rounded-full bg-stone-900 text-[#f7f6f4]" : "grid size-8 place-items-center rounded-full border border-[#e6e1d8] bg-white text-stone-500"}
             >
               <Calendar className="size-4" />
             </button>
@@ -203,7 +203,7 @@ export function BankLedger({
                 </label>
                 <button
                   type="button"
-                  className="mt-3 w-full rounded-full bg-violet-600 py-1.5 text-xs font-medium text-white"
+                  className="mt-3 w-full rounded-full bg-stone-900 py-1.5 text-xs font-medium text-[#f7f6f4]"
                   onClick={() => {
                     const from = (document.getElementById("bank-from") as HTMLInputElement | null)?.value;
                     const to = (document.getElementById("bank-to") as HTMLInputElement | null)?.value;
@@ -248,14 +248,14 @@ export function BankLedger({
         />
         <Metric
           icon={<Wallet className="size-3.5" />}
-          iconClass="bg-violet-50 text-violet-600"
+          iconClass="bg-[#efede8] text-stone-700"
           label="Disponible"
           value={formatUsd(availableCents)}
           tone="text-slate-900"
           note={selected ? "Esta cuenta" : `Las ${accounts.length} cuentas`}
-          noteClass="text-violet-600"
+          noteClass="text-stone-500"
           series={lines.balance}
-          color="#7c3aed"
+          color="#57534e"
         />
       </div>
 
@@ -270,7 +270,7 @@ export function BankLedger({
               remember({ cuenta: null });
             }}
           >
-            <span className="flex size-7 items-center justify-center rounded-lg bg-violet-50 text-violet-700"><LayoutGrid className="size-3.5" /></span>
+            <span className="flex size-7 items-center justify-center rounded-lg bg-[#efede8] text-stone-800"><LayoutGrid className="size-3.5" /></span>
           </AccountTab>
           {accounts.map((account) => (
             <AccountTab
@@ -296,7 +296,7 @@ export function BankLedger({
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <div className="flex items-center rounded-full border border-slate-200 bg-white p-0.5">
           <Link href={focusHref} className="rounded-full px-3 py-1.5 text-xs text-slate-500">Modo enfoque</Link>
-          <span className="rounded-full bg-violet-100 px-3 py-1.5 text-xs font-medium text-violet-800">Vista detallada</span>
+          <span className="rounded-full bg-[#efede8] px-3 py-1.5 text-xs font-medium text-stone-800">Vista detallada</span>
         </div>
         {filters.map(([key, label]) => (
           <button
@@ -306,7 +306,7 @@ export function BankLedger({
               setFilter(key);
               remember({ filtro: key });
             }}
-            className={filter === key ? "rounded-full border border-violet-300 bg-white px-3 py-1.5 text-xs font-medium text-violet-700" : "rounded-full px-3 py-1.5 text-xs text-slate-500 hover:bg-white"}
+            className={filter === key ? "rounded-full border border-stone-900 bg-white px-3 py-1.5 text-xs font-medium text-stone-900" : "rounded-full px-3 py-1.5 text-xs text-stone-500 hover:bg-white"}
           >
             {label}
             <span className="ml-1 tabular-nums text-slate-400">{countFor[key]}</span>
@@ -381,7 +381,7 @@ function AccountTab({
       type="button"
       aria-current={active ? "page" : undefined}
       onClick={onSelect}
-      className={`flex h-[52px] shrink-0 items-center gap-2 rounded-2xl border bg-white px-2.5 text-left ${wide ? "w-[210px]" : ""} ${active ? "border-violet-400 shadow-sm" : "border-slate-200 hover:border-slate-300"}`}
+      className={`flex h-[52px] shrink-0 items-center gap-2 rounded-2xl border bg-white px-2.5 text-left ${wide ? "w-[210px]" : ""} ${active ? "border-stone-900 shadow-sm" : "border-[#e6e1d8] hover:border-stone-300"}`}
     >
       {children}
       <span className="min-w-0">
