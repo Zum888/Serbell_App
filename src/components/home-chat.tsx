@@ -1,22 +1,19 @@
 "use client";
 
-import { ArrowUp, Plus, Sparkles } from "lucide-react";
-import Link from "next/link";
+import { ArrowUp, Mic, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { DuplicateFlow } from "@/components/duplicate-flow";
 import { MissingFlow } from "@/components/missing-flow";
+import { NarratedFlow } from "@/components/narrated-flow";
+import { ProactiveHome } from "@/components/proactive-home";
 import { LoteFlow } from "@/components/lote-flow";
 import { InvoiceFlow } from "@/components/ticket-flow";
 import { GUIDE_REPLY, isTalk, talkReply, type Briefing } from "@/lib/briefing";
 import type { HomeStart } from "@/lib/home-starts";
 import { UNSUPPORTED_REPLY, parseIntent } from "@/lib/intent";
+import type { Pulse, PulseFlow } from "@/lib/pulse";
 import { useChatPin } from "@/components/chat-pin";
 import { greetingName } from "@/lib/labels";
-
-const PROMPTS = [
-  ["Analizar mis gastos", "Analiza mis gastos"],
-  ["¿Cuánto gané?", "¿Cuánto gané?"],
-] as const;
 
 type Bubble = { id: string; role: "user" | "assistant"; body: string };
 
@@ -25,27 +22,31 @@ const LANDED: Record<string, string> = {
   lote: "Te dejé en Bancos para seguir el lote.",
   duplicado: "Te dejé en Bancos para revisar los duplicados.",
   faltantes: "Te dejé en Bancos con los comprobantes que faltaban.",
+  cobro: "Te dejé en Por cobrar, en el recordatorio.",
+  clasificar: "Te dejé en los gastos para seguir la clasificación.",
+  efectivo: "Te dejé en el flujo de efectivo.",
 };
 
 export function HomeChat({
   name,
   briefing,
-  starts,
+  pulse,
   dock = false,
   landed = null,
 }: {
   name: string;
   briefing: Briefing;
   starts: HomeStart[];
+  pulse: Pulse | null;
   dock?: boolean;
   landed?: string | null;
 }) {
   const [messages, setMessages] = useState<Bubble[]>([]);
   const [text, setText] = useState("");
-  const [flow, setFlow] = useState<"factura" | "lote" | "duplicado" | "faltantes" | null>(null);
+  const [flow, setFlow] = useState<PulseFlow | null>(null);
   const pin = useChatPin();
 
-  function openFlow(next: "factura" | "lote" | "duplicado" | "faltantes") {
+  function openFlow(next: PulseFlow) {
     pin(next);
     setMessages([]);
     setFlow(next);
@@ -124,6 +125,10 @@ export function HomeChat({
             <h1 className="sr-only">Pedir comprobantes</h1>
             <MissingFlow />
           </div>
+        ) : flow && pulse?.stories[flow] ? (
+          <div className="mx-auto w-full max-w-2xl flex-1">
+            <NarratedFlow testId={`${flow}-flow`} story={pulse.stories[flow]} />
+          </div>
         ) : landedLine ? (
           <div className="mx-auto w-full max-w-2xl flex-1">
             <p className="text-[15px] leading-7 text-slate-800">{landedLine}</p>
@@ -143,80 +148,24 @@ export function HomeChat({
               ),
             )}
           </div>
+        ) : pulse ? (
+          <ProactiveHome name={name} pulse={pulse} onFlow={openFlow} />
         ) : (
-          <div className="w-full max-w-2xl text-center">
-            <h1 className="text-4xl font-medium tracking-tight text-slate-900">
-              Buenos días, {greetingName(name)}
-            </h1>
+          <div className="mx-auto w-full max-w-2xl">
+            <h1 className="text-4xl font-medium tracking-tight text-slate-900">Buenos días, {greetingName(name)}</h1>
             <p className="mt-3 text-[15px] text-slate-500">{briefing.companyName}. ¿Por dónde seguimos?</p>
-            <div className="mt-8">
-              <Composer text={text} setText={setText} onSubmit={() => ask(text)} />
-            </div>
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <button
-                type="button"
-                data-testid="flow-factura"
-                onClick={() => openFlow("factura")}
-                className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:text-slate-950"
-              >
-                Conciliar una factura
-              </button>
-              <button
-                type="button"
-                data-testid="flow-lote"
-                onClick={() => openFlow("lote")}
-                className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:text-slate-950"
-              >
-                Conciliar un lote
-              </button>
-              <button
-                type="button"
-                data-testid="flow-duplicado"
-                onClick={() => openFlow("duplicado")}
-                className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:text-slate-950"
-              >
-                Revisar duplicados
-              </button>
-              <button
-                type="button"
-                data-testid="flow-faltantes"
-                onClick={() => openFlow("faltantes")}
-                className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:text-slate-950"
-              >
-                Pedir comprobantes
-              </button>
-              {PROMPTS.map(([label, prompt]) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => ask(prompt)}
-                  className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-600 shadow-sm hover:text-slate-950"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {starts.length > 0 ? (
-              <p className="mt-8 text-sm text-slate-500">
-                También:{" "}
-                {starts.slice(0, 3).map((start, index) => (
-                  <span key={start.id}>
-                    {index > 0 ? " · " : null}
-                    <Link href={start.href} data-testid={`home-start-${start.id}`} className="text-slate-700 underline-offset-2 hover:underline">
-                      {start.title.toLowerCase()}
-                    </Link>
-                  </span>
-                ))}
-              </p>
-            ) : null}
           </div>
         )}
       </div>
 
-      {talking || dock ? (
-        <div className="mx-auto mt-4 w-full max-w-2xl">
-          <Composer text={text} setText={setText} onSubmit={() => ask(text)} />
-        </div>
+      <div className="mx-auto mt-4 w-full max-w-3xl">
+        <Composer text={text} setText={setText} onSubmit={() => ask(text)} wide={!dock && !talking} />
+      </div>
+      {!dock && !talking ? (
+        <p className="mt-3 text-center text-xs text-slate-500">
+          <span className="mr-1 inline-block size-1.5 rounded-full bg-emerald-500" />
+          Serbell está monitoreando tus finanzas 24/7
+        </p>
       ) : null}
     </section>
   );
@@ -230,27 +179,28 @@ function FlowChip({ label, testId, onClick }: { label: string; testId: string; o
   );
 }
 
-function Composer({ text, setText, onSubmit }: { text: string; setText: (value: string) => void; onSubmit: () => void }) {
+function Composer({ text, setText, onSubmit, wide = false }: { text: string; setText: (value: string) => void; onSubmit: () => void; wide?: boolean }) {
   return (
     <form
-      className="flex items-end gap-2 rounded-3xl border border-white bg-white px-3 py-2 shadow-sm"
+      className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 shadow-sm"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit();
       }}
     >
-      <span className="mb-1.5 grid size-8 place-items-center rounded-full text-slate-400">
-        <Plus className="size-4" />
-      </span>
+      <Sparkles className="ml-1 size-4 shrink-0 text-violet-500" />
       <input
         value={text}
         onChange={(event) => setText(event.target.value)}
-        placeholder="Escribe a Serbell"
+        placeholder={wide ? "Escribe o pídele algo a Serbell..." : "Escribe a Serbell"}
         aria-label="Mensaje para Serbell"
-        className="mb-1 h-9 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
+        className="h-9 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
       />
-      <button type="submit" aria-label="Enviar" className="grid size-9 place-items-center rounded-full bg-slate-900 text-white">
-        {text.trim() ? <ArrowUp className="size-4" /> : <Sparkles className="size-4" />}
+      <span className="grid size-8 place-items-center text-slate-400" aria-hidden>
+        <Mic className="size-4" />
+      </span>
+      <button type="submit" aria-label="Enviar" className="grid size-9 place-items-center rounded-full bg-violet-700 text-white">
+        <ArrowUp className="size-4" />
       </button>
     </form>
   );
