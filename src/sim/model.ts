@@ -255,7 +255,6 @@ export function say(scene: Scene, role: SimMessage["role"], body: string): Scene
   return {
     ...scene,
     processing: null,
-    dragOver: false,
     messages: [...scene.messages, { id: `m-${scene.messages.length + 1}`, role, body }],
   };
 }
