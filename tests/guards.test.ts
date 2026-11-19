@@ -1,5 +1,4 @@
 import { expect, it } from "vitest";
-import { accessConfigured, passwordMatches } from "@/server/access";
 import { clearLoginFailures, clientAddress, loginAllowed, loginBucketKey, noteLoginFailure, resetLoginLimits } from "@/server/login-limit";
 import { requestIsSameOrigin } from "@/server/same-origin";
 import { originOf } from "@/server/http";
@@ -42,20 +41,6 @@ it("locks the password gate after eight failures", () => {
   expect(loginAllowed("203.0.113.4", now + 15 * 60 * 1000)).toBe(true);
   clearLoginFailures("203.0.113.4");
   expect(loginAllowed("203.0.113.4", now)).toBe(true);
-});
-
-it("abre con la contraseña guardada y sigue cerrado si no hay ninguna", () => {
-  const previous = process.env.SERBELL_ACCESS_PASSWORD;
-  process.env.SERBELL_ACCESS_PASSWORD = "corta";
-  expect(passwordMatches("corta")).toBe(true);
-  expect(accessConfigured()).toBe(true);
-  process.env.SERBELL_ACCESS_PASSWORD = "";
-  expect(passwordMatches("corta")).toBe(false);
-  expect(accessConfigured()).toBe(false);
-  process.env.SERBELL_ACCESS_PASSWORD = "clave-de-prueba";
-  expect(passwordMatches("clave-de-prueba")).toBe(true);
-  if (previous === undefined) delete process.env.SERBELL_ACCESS_PASSWORD;
-  else process.env.SERBELL_ACCESS_PASSWORD = previous;
 });
 
 it("no junta a todos los visitantes en un mismo límite cuando falta la dirección", () => {

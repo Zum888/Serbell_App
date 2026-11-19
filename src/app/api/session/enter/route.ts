@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { PROFILES } from "@/lib/ids";
 import { isAppError } from "@/lib/errors";
 import { safeNext } from "@/lib/utils";
-import { hasAccess } from "@/server/access";
 import { originOf } from "@/server/http";
 import { COMPANY_COOKIE, currentViewerSub, saveDemoBinding, USER_COOKIE } from "@/server/session";
 
@@ -14,11 +13,6 @@ export function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await hasAccess())) {
-    return NextResponse.redirect(new URL("/acceso?next=/", `${originOf(request)}/`), {
-      headers: { "cache-control": "private, no-store" },
-    });
-  }
   const form = await request.formData();
   const viewerSub = await currentViewerSub();
   const profile = PROFILES.find((item) => item.id === String(form.get("user") ?? "")) ?? PROFILES[0];

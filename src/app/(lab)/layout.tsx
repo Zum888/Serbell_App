@@ -1,7 +1,5 @@
-import { redirect } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { StateView } from "@/components/state-view";
-import { hasAccess } from "@/server/access";
 import { pageSession } from "@/server/session";
 
 function isRedirect(error: unknown) {
@@ -14,7 +12,6 @@ function isRedirect(error: unknown) {
 }
 
 export default async function LabLayout({ children }: { children: React.ReactNode }) {
-  if (!(await hasAccess())) redirect("/acceso?next=/");
   let session;
   try {
     session = await pageSession();

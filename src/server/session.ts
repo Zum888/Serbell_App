@@ -3,7 +3,6 @@ import { getIdentity } from "../../cursor/identity";
 import { PROFILE_COMPANY, PROFILES, USER } from "@/lib/ids";
 import { AppError } from "@/lib/errors";
 import type { Actor } from "@/lib/permissions";
-import { hasAccess } from "@/server/access";
 import { db } from "@/server/db";
 import { getShell, loadActor } from "@/server/queries";
 import { isAnonymousViewer, resolveViewer } from "@/server/viewer";
@@ -37,19 +36,11 @@ export function profileById(userId: string) {
 export async function currentViewerSub(): Promise<string> {
   const viewer = await resolveViewer();
   if (viewer) return viewer.sub;
-  throw new AppError("Escribe la contraseña para entrar al laboratorio.", 401, "NO_ACCESS");
+  throw new AppError("No se pudo abrir tu copia del laboratorio.", 401, "NO_ACCESS");
 }
 
-/** Reject the request unless the visitor passed the access gate (hosted only). */
-async function requireAccess() {
-  if (!(await hasAccess())) {
-    throw new AppError("Escribe la contraseña para entrar al laboratorio.", 401, "NO_ACCESS");
-  }
-}
-
-/** A gate for API routes: the visitor must have passed the password gate. Returns the viewer key. */
+/** The visitor key for this browser. Each browser has its own demo copy. */
 export async function requireViewer(): Promise<string> {
-  await requireAccess();
   return currentViewerSub();
 }
 
@@ -96,7 +87,6 @@ async function resolveSession(viewerSub: string) {
 }
 
 export async function requireActor(): Promise<{ actor: Actor; companyId: string | null; viewerSub: string }> {
-  await requireAccess();
   const viewerSub = await currentViewerSub();
   const session = await resolveSession(viewerSub);
   if (!session) throw new AppError("No hay una sesión de laboratorio.", 401, "NO_SESSION");
