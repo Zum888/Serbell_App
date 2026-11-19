@@ -122,6 +122,7 @@ function Player({ flow, onExit }: { flow: Flow; onExit: () => void }) {
   }, [step, speed]);
 
   useEffect(() => {
+    if (step?.drag) return;
     const target = step?.cursor;
     if (!target) return;
     const node = document.querySelector(`[data-sim="${target}"]`);
@@ -145,8 +146,12 @@ function Player({ flow, onExit }: { flow: Flow; onExit: () => void }) {
     const start = from.getBoundingClientRect();
     const end = to.getBoundingClientRect();
     setGhost({ x: start.left, y: start.top, live: false });
-    const frame = requestAnimationFrame(() => setGhost({ x: end.left + 20, y: end.top + 16, live: true }));
-    return () => cancelAnimationFrame(frame);
+    setCursor({ x: start.left + 24, y: start.top + 16, click: false });
+    const timer = window.setTimeout(() => {
+      setGhost({ x: end.left + 36, y: end.top + 8, live: true });
+      setCursor({ x: end.left + 64, y: end.top + 24, click: false });
+    }, 120);
+    return () => window.clearTimeout(timer);
   }, [index, step]);
 
   useEffect(() => {
@@ -179,14 +184,15 @@ function Player({ flow, onExit }: { flow: Flow; onExit: () => void }) {
   return (
     <>
       <div className="fixed bottom-0 right-0 top-16 z-40 overflow-auto bg-background" style={{ left: 232 }}>
-        <SimStage scene={scene} compose={typed} mark={mark} onChoice={choose} onField={edit} />
+        <SimStage scene={scene} compose={typed} mark={mark} dragging={Boolean(ghost)} onChoice={choose} onField={edit} />
       </div>
       {ghost ? (
-        <div className="pointer-events-none fixed z-[60] rounded-2xl border border-border bg-white px-3 py-2 text-sm shadow-lg transition-all duration-700" style={{ left: ghost.x, top: ghost.y }}>
-          {scene.fileLabel}
+        <div data-sim="ghost" className={`pointer-events-none fixed z-[60] w-44 -rotate-3 rounded-xl border border-border bg-white p-3 text-[11px] leading-5 text-slate-500 shadow-2xl ${ghost.live ? "transition-all duration-1000 ease-in-out" : ""}`} style={{ left: ghost.x, top: ghost.y }}>
+          <p className="font-semibold text-slate-800">{scene.fileLabel.includes("HomeDepot") ? "HOME DEPOT" : scene.fileLabel}</p>
+          {scene.fileLabel.includes("HomeDepot") ? <p className="mt-2 font-semibold text-slate-800">USD {scene.fields.total}</p> : <p className="mt-2">Soltando en el chat</p>}
         </div>
       ) : null}
-      <div className="pointer-events-none fixed z-[60] transition-all duration-700 ease-out" style={{ left: cursor.x, top: cursor.y }}>
+      <div className="pointer-events-none fixed z-[61] transition-all duration-1000 ease-in-out" style={{ left: cursor.x, top: cursor.y }}>
         <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
           <path d="M4 2 L4 18 L8.5 14.2 L12.2 20 L14.6 19 L11 13.2 L17 13 Z" fill="#0f172a" stroke="white" strokeWidth="1.2" />
         </svg>
