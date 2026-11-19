@@ -129,7 +129,7 @@ export function MovementsScreen({
   companyId: string;
   balanceLabel: string;
   rows: Row[];
-  counts: { todos: number; sinCategoria: number; sinComprobante: number; porConciliar: number; porRevisar: number; aprobados: number };
+  counts: { todos: number; sinCategoria: number; sinComprobante: number; porConciliar: number; porRevisar: number; aprobados: number; inflows: number; outflows: number };
   filter: string;
   q: string;
   error?: string;
@@ -178,11 +178,13 @@ export function MovementsScreen({
           <p className="text-xs text-slate-500">{companyName}</p>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-semibold">Movimientos</h1>
+              <h1 className="text-2xl font-semibold">Bancos</h1>
               <p className="text-sm text-slate-500">{selectedAccount ? `${selectedAccount.institution} ····${selectedAccount.mask}` : periodOf(rows) || "Todos los bancos, por fecha"}</p>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-slate-500">{balanceLabel}</p>
+            <div className="text-right" data-testid="bank-totals">
+              <p className="text-sm font-semibold tabular-nums text-emerald-600">Ingresos {formatUsd(counts.inflows)}</p>
+              <p className="text-sm font-semibold tabular-nums text-rose-600">Gastos {formatUsd(counts.outflows)}</p>
+              <p className="text-xs text-slate-500">{balanceLabel}</p>
               {selectedAccount && rows.some((row) => row.reconciliationState !== "Reconciled") ? (
                 <Link href={`/cuentas?cuenta=${selectedAccount.id}&paso=conciliar`} className="text-sm font-medium text-primary">Conciliar con el banco</Link>
               ) : null}

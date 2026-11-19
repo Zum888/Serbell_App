@@ -58,7 +58,7 @@ export function talkReply(kind: Talk, briefing: Briefing): string {
   if (kind === "track_movement") {
     if (briefing.movements.length === 0) return "No hay movimientos guardados para rastrear.";
     const lines = briefing.movements.slice(0, 4).map((row) => `${row.postedOn} · ${row.merchant} · ${formatUsd(row.amountCents)} · ${row.category}`);
-    return `Estos son los movimientos más recientes. Ábrelos en Movimientos para el comprobante y la conciliación. ${lines.join(". ")}.`;
+    return `Estos son los movimientos más recientes. Ábrelos en Bancos para el comprobante y la conciliación. ${lines.join(". ")}.`;
   }
   const net =
     briefing.net === 0
