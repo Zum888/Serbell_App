@@ -6,4 +6,4 @@ export const MISSING_RECEIPTS = [
 
 export const MISSING_IDS: readonly string[] = MISSING_RECEIPTS.map((item) => item.id);
 
-export const MISSING_HREF = "/movimientos?faltantes=1";
+export const MISSING_HREF = "/movimientos?faltantes=1&con=chat&flujo=faltantes";

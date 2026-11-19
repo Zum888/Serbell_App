@@ -1,3 +1,4 @@
+import { ChatRail } from "@/components/chat-rail";
 import { FocusMode } from "@/components/focus-mode";
 import { MovementsScreen } from "@/components/movements-screen";
 import { StateView } from "@/components/state-view";
@@ -13,7 +14,7 @@ import { getHome, getMovement, getReceiptContext, listCategoryTree, listMovement
 export default async function MovementsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filtro?: string; q?: string; movimiento?: string; error?: string; fila?: string; recibo?: string; vista?: string; actual?: string; duplicado?: string; decision?: string; faltantes?: string; cuenta?: string; factura?: string; lote?: string }>;
+  searchParams: Promise<{ filtro?: string; q?: string; movimiento?: string; error?: string; fila?: string; recibo?: string; vista?: string; actual?: string; duplicado?: string; decision?: string; faltantes?: string; cuenta?: string; factura?: string; lote?: string; con?: string; flujo?: string }>;
 }) {
   const session = await pageContext();
   const params = await searchParams;
@@ -59,7 +60,8 @@ export default async function MovementsPage({
     } else if (params.movimiento) {
       detail = await getMovement((await db()), session.actor, params.movimiento);
     }
-    return (
+    const withChat = params.con === "chat";
+    const screen = (
       <MovementsScreen
         companyName={home.company.name}
         companyId={session.companyId}
@@ -80,7 +82,16 @@ export default async function MovementsPage({
         duplicate={params.duplicado === "sunpass"}
         decision={params.decision}
         missing={params.faltantes === "1"}
+        withChat={withChat}
+        flujo={params.flujo}
       />
+    );
+    if (!withChat) return screen;
+    return (
+      <div className="flex items-start gap-4">
+        <ChatRail flujo={params.flujo} />
+        <div className="min-w-0 flex-1">{screen}</div>
+      </div>
     );
   } catch (error) {
     if (isAppError(error)) return <StateView variant="error" title={error.message} testId="server-error" />;
