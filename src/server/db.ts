@@ -30,8 +30,7 @@ function clientFor(file: string): PrismaClient {
 
 /**
  * The database for this request. Local design work uses the single dev file.
- * A published app never does: each visitor gets a private copy, and only a
- * few of those copies are kept.
+ * A published app gives each browser its own copy of the fictional data.
  */
 export async function db(): Promise<PrismaClient> {
   if (!gateEnforced()) {
@@ -41,7 +40,7 @@ export async function db(): Promise<PrismaClient> {
   }
   const viewer = await resolveViewer();
   if (!viewer) {
-    throw new AppError("Escribe la contraseña para entrar al laboratorio.", 401, "NO_ACCESS");
+    throw new AppError("No se pudo abrir tu copia del laboratorio.", 401, "NO_ACCESS");
   }
   return clientFor(await visitorDatabaseFile(viewer.databaseKey));
 }
