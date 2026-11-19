@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Flag, Lock, LockOpen, Paperclip, Plus } from "lucide-react";
+import { Check, Flag, Lock, LockOpen, MessageSquare, Paperclip, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -29,10 +29,9 @@ type Row = {
   documentId: string | null;
   documentName: string | null;
   invoiceNumber: string | null;
+  comment: string | null;
   suggested: boolean;
 };
-
-type Group = { id: string; name: string; children: { id: string; name: string }[] };
 
 export function MovementsTable({
   rows,
@@ -43,7 +42,7 @@ export function MovementsTable({
   companyId,
 }: {
   rows: Row[];
-  categories: Group[];
+  categories: CategoryNode[];
   canReview: boolean;
   filter: string;
   q: string;
@@ -53,7 +52,7 @@ export function MovementsTable({
   const [selected, setSelected] = useState<Record<string, true>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tree, setTree] = useState<Group[]>(categories);
+  const [tree, setTree] = useState<CategoryNode[]>(categories);
   const [labels, setLabels] = useState<Record<string, string>>({});
   const [reviews, setReviews] = useState<Record<string, { label: string; state: string }>>({});
   const [suggestions, setSuggestions] = useState<Record<string, boolean>>({});
@@ -167,10 +166,10 @@ export function MovementsTable({
       </div>
       {error ? <p className="px-4 pb-3 text-sm text-red-700" data-testid="reconcile-error">{error}</p> : null}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[980px] text-left text-sm">
+        <table className="w-full table-fixed text-left text-sm">
           <thead className="text-xs text-slate-500">
             <tr className="border-y border-slate-200">
-              <th className="px-3 py-2 font-medium">
+              <th className="w-10 px-3 py-2 font-medium">
                 <input
                   type="checkbox"
                   aria-label="Seleccionar abiertos"
@@ -185,14 +184,15 @@ export function MovementsTable({
                   }}
                 />
               </th>
-              <th className="px-3 py-2 font-medium">Fecha</th>
+              <th className="w-16 px-3 py-2 font-medium">Fecha</th>
               <th className="px-3 py-2 font-medium">Movimiento</th>
-              <th className="px-3 py-2 font-medium">Categoría</th>
-              <th className="px-3 py-2 text-right font-medium">Ingresos USD</th>
-              <th className="px-3 py-2 text-right font-medium">Gastos USD</th>
-              <th className="px-3 py-2 font-medium">Comprobante</th>
-              <th className="px-3 py-2 font-medium">Conciliación</th>
-              <th className="px-3 py-2 text-center font-medium">Contador</th>
+              <th className="w-[220px] px-3 py-2 font-medium">Categoría</th>
+              <th className="w-10 px-2 py-2 font-medium"><span className="sr-only">Comentario</span></th>
+              <th className="w-24 px-2 py-2 text-right font-medium">Ingresos USD</th>
+              <th className="w-24 px-2 py-2 text-right font-medium">Gastos USD</th>
+              <th className="w-36 px-2 py-2 font-medium">Comprobante</th>
+              <th className="w-28 px-2 py-2 font-medium">Conciliación</th>
+              <th className="w-16 px-2 py-2 text-center font-medium">Contador</th>
             </tr>
           </thead>
           <tbody>
@@ -216,7 +216,11 @@ export function MovementsTable({
                   }}
                 >
                   <td className="px-3 py-2.5">
-                    {selectable(row) ? (
+                    {isReconciled ? (
+                      <span aria-label="Conciliado" className="inline-flex size-7 items-center justify-center rounded-full bg-emerald-600 text-white">
+                        <Check className="size-3.5" />
+                      </span>
+                    ) : selectable(row) ? (
                       <input
                         type="checkbox"
                         aria-label={`Seleccionar ${row.merchant}`}
@@ -238,7 +242,7 @@ export function MovementsTable({
                     <Link href={detailHref(row)} className="font-medium text-slate-900 hover:underline">{row.merchant}</Link>
                     <p className="text-xs text-slate-500">{row.description}</p>
                   </td>
-                  <td className="min-w-[160px] px-3 py-2.5">
+                  <td className="w-[220px] px-3 py-2.5">
                     <div className="flex items-center gap-1.5">
                       <p data-testid={`category-label-${row.id}`} className="sr-only">{label}</p>
                       <ClassifyInline
@@ -261,10 +265,13 @@ export function MovementsTable({
                       {suggested && !row.sealed ? <span className="rounded-full bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">IA</span> : null}
                     </div>
                   </td>
-                  <td className="money-in px-3 py-2.5 text-right whitespace-nowrap font-medium tabular-nums">{row.amountCents > 0 ? formatCentsPlain(row.amountCents) : ""}</td>
+                  <td className="px-2 py-2.5">
+                    <CommentButton id={row.id} initial={row.comment} next={next} />
+                  </td>
+                  <td className="money-in w-[7.5rem] px-3 py-2.5 text-right whitespace-nowrap font-medium tabular-nums">{row.amountCents > 0 ? formatCentsPlain(row.amountCents) : ""}</td>
                   <td className="money-out px-3 py-2.5 text-right whitespace-nowrap font-medium tabular-nums">{row.amountCents < 0 ? formatCentsPlain(row.amountCents) : ""}</td>
                   <td className="px-3 py-2.5">
-                    <ReceiptPill row={row} href={receiptHref(row)} />
+                    <ReceiptPill row={row} href={receiptHref(row)} reconciled={isReconciled} />
                   </td>
                   <td className="px-3 py-2.5" data-testid="bank-recon">
                     {isReconciled ? (
@@ -346,11 +353,12 @@ function periodOf(rows: Row[]) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-function ReceiptPill({ row, href }: { row: Row; href: string }) {
+function ReceiptPill({ row, href, reconciled }: { row: Row; href: string; reconciled: boolean }) {
   const stateLabel = DOCUMENT_LABEL[row.documentState] ?? row.documentState;
+  const tone = reconciled ? "text-emerald-700" : "text-violet-700";
   if (row.invoiceNumber) {
     return (
-      <Link href={href} data-testid={`receipt-${row.id}`} data-state={row.documentState} className="inline-flex items-center gap-1 text-xs font-medium text-violet-700">
+      <Link href={href} data-testid={`receipt-${row.id}`} data-state={row.documentState} className={`inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium ${tone}`}>
         <Paperclip className="size-3.5" />
         Invoice {row.invoiceNumber}
         <span data-testid="doc-state" data-label={stateLabel} className="sr-only">{stateLabel}</span>
@@ -359,7 +367,7 @@ function ReceiptPill({ row, href }: { row: Row; href: string }) {
   }
   if (row.documentState === "Linked") {
     return (
-      <Link href={href} data-testid={`receipt-${row.id}`} data-state={row.documentState} className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+      <Link href={href} data-testid={`receipt-${row.id}`} data-state={row.documentState} className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-emerald-700">
         <Paperclip className="size-3.5" />
         Ticket
         <span data-testid="doc-state" data-label={stateLabel} className="sr-only">{stateLabel}</span>
@@ -404,8 +412,8 @@ function ClassifyInline({
   canReview: boolean;
   attention: boolean;
   next: string;
-  tree: Group[];
-  onTree: (updater: (current: Group[]) => Group[]) => void;
+  tree: CategoryNode[];
+  onTree: (updater: (current: CategoryNode[]) => CategoryNode[]) => void;
   onSaved: (categoryLabel: string, reviewLabel: string, reviewState: string) => void;
 }) {
   const [saved, setSaved] = useState(subcategoryId);
@@ -433,11 +441,11 @@ function ClassifyInline({
     const response = await fetch("/api/categories", { method: "POST", headers: { accept: "application/json" }, body: form });
     const body = (await response.json()) as { id?: string; name?: string; error?: string };
     if (!response.ok || !body.id || !body.name) throw new Error(body.error || "No se pudo agregar.");
-    const node = { id: body.id, name: body.name };
+    const node = { id: body.id, name: body.name, children: [] };
     if (parentId) {
-      onTree((current) => current.map((item) => (item.id === parentId ? { ...item, children: [...item.children, node] } : item)));
+      onTree((current) => insertNode(current, parentId, node));
     } else {
-      onTree((current) => [...current, { ...node, children: [] }]);
+      onTree((current) => [...current, node]);
     }
     return node;
   }
@@ -487,7 +495,6 @@ function ClassifyInline({
         value={pending ?? saved}
         disabled={busy}
         attention={attention}
-        leaf
         placeholder="Sin categoría"
         testId={`category-menu-${id}`}
         onPick={pick}
@@ -531,6 +538,81 @@ function ClassifyInline({
         </p>
       ) : null}
       {error ? <p className="text-xs text-rose-700">{error}</p> : null}
+    </div>
+  );
+}
+
+function insertNode(nodes: CategoryNode[], parentId: string, node: CategoryNode): CategoryNode[] {
+  return nodes.map((item) => {
+    if (item.id === parentId) return { ...item, children: [...(item.children ?? []), node] };
+    return { ...item, children: insertNode(item.children ?? [], parentId, node) };
+  });
+}
+
+function CommentButton({ id, initial, next }: { id: string; initial: string | null; next: string }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(initial ?? "");
+  const [saved, setSaved] = useState(initial ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function send() {
+    const body = text.trim();
+    if (body.length < 2 || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.set("body", body);
+      form.set("next", next);
+      const response = await fetch(`/api/transactions/${id}/comment`, {
+        method: "POST",
+        headers: { accept: "application/json" },
+        body: form,
+      });
+      const payload = (await response.json()) as { body?: string; error?: string };
+      if (!response.ok) throw new Error(payload.error || "No se pudo guardar el comentario.");
+      setSaved(payload.body ?? body);
+      setOpen(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo guardar el comentario.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-label={saved ? "Editar comentario" : "Dejar un comentario"}
+        title={saved || "Dejar un comentario"}
+        onClick={() => setOpen((current) => !current)}
+        className={`inline-flex size-7 items-center justify-center rounded-full border ${saved ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-500 hover:border-slate-400"}`}
+      >
+        <MessageSquare className="size-3.5" />
+      </button>
+      {open ? (
+        <div className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-border bg-white p-2 shadow-lg">
+          <textarea
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            rows={3}
+            placeholder="Comentario"
+            aria-label="Comentario del movimiento"
+            className="w-full resize-none rounded-lg border border-border px-2 py-1 text-xs"
+          />
+          {error ? <p className="mt-1 text-[11px] text-rose-700">{error}</p> : null}
+          <button
+            type="button"
+            disabled={busy || text.trim().length < 2}
+            onClick={() => void send()}
+            className="mt-2 rounded-lg bg-slate-900 px-2 py-1 text-[11px] font-medium text-white disabled:opacity-50"
+          >
+            {busy ? "Guardando…" : "Guardar"}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
