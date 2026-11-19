@@ -82,12 +82,12 @@ function movementWhere(filter: string) {
   return {};
 }
 
-export async function listMovements(db: Db, actor: Actor, companyId: string, filter: string, q: string) {
+export async function listMovements(db: Db, actor: Actor, companyId: string, filter: string, q: string, accountId?: string) {
   if (!companyRole(actor, companyId)) {
     throw new AppError("El servidor rechazó la solicitud: no tienes acceso a esta empresa.", 403, "COMPANY_FORBIDDEN");
   }
   const rows = await db.bankTransaction.findMany({
-    where: { companyId, ...movementWhere(filter) },
+    where: { companyId, ...movementWhere(filter), ...(accountId ? { accountId } : {}) },
     include: {
       classification: { include: { category: true, subcategory: true } },
       account: true,
@@ -140,12 +140,12 @@ export async function listMovements(db: Db, actor: Actor, companyId: string, fil
     }));
 }
 
-export async function movementCounts(db: Db, actor: Actor, companyId: string) {
+export async function movementCounts(db: Db, actor: Actor, companyId: string, accountId?: string) {
   if (!companyRole(actor, companyId)) {
     throw new AppError("El servidor rechazó la solicitud: no tienes acceso a esta empresa.", 403, "COMPANY_FORBIDDEN");
   }
   const rows = await db.bankTransaction.findMany({
-    where: { companyId },
+    where: { companyId, ...(accountId ? { accountId } : {}) },
     select: { accountingState: true, documentState: true, reviewState: true, reconciliationState: true },
   });
   return {

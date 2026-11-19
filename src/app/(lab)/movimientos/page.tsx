@@ -2,6 +2,7 @@ import { FocusMode } from "@/components/focus-mode";
 import { MovementsScreen } from "@/components/movements-screen";
 import { StateView } from "@/components/state-view";
 import { isAppError } from "@/lib/errors";
+import { LOTE } from "@/lib/lote";
 import { formatUsd } from "@/lib/money";
 import { canReview } from "@/lib/permissions";
 import { db } from "@/server/db";
@@ -12,7 +13,7 @@ import { getHome, getMovement, getReceiptContext, listCategoryTree, listMovement
 export default async function MovementsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filtro?: string; q?: string; movimiento?: string; error?: string; fila?: string; recibo?: string; vista?: string; actual?: string; duplicado?: string; decision?: string; faltantes?: string }>;
+  searchParams: Promise<{ filtro?: string; q?: string; movimiento?: string; error?: string; fila?: string; recibo?: string; vista?: string; actual?: string; duplicado?: string; decision?: string; faltantes?: string; cuenta?: string; factura?: string; lote?: string }>;
 }) {
   const session = await pageContext();
   const params = await searchParams;
@@ -42,10 +43,14 @@ export default async function MovementsPage({
         />
       );
     }
-    const [rows, counts, home] = await Promise.all([
-      listMovements((await db()), session.actor, session.companyId, filter, q),
-      movementCounts((await db()), session.actor, session.companyId),
-      getHome((await db()), session.actor, session.companyId),
+    const home = await getHome((await db()), session.actor, session.companyId);
+    const account = params.cuenta ? home.accounts.find((item) => item.id === params.cuenta) : undefined;
+    if (params.cuenta && !account) {
+      return <StateView variant="error" title="Esa cuenta no está en esta empresa." testId="server-error" />;
+    }
+    const [rows, counts] = await Promise.all([
+      listMovements((await db()), session.actor, session.companyId, filter, q, account?.id),
+      movementCounts((await db()), session.actor, session.companyId, account?.id),
     ]);
     let detail = null;
     let receipt = null;
@@ -58,7 +63,11 @@ export default async function MovementsPage({
       <MovementsScreen
         companyName={home.company.name}
         companyId={session.companyId}
-        balanceLabel={`Disponible en las ${home.accountCount} cuentas · ${formatUsd(home.balanceCents)}`}
+        balanceLabel={account ? `${account.institution} ····${account.mask} · ${formatUsd(account.availableBalanceCents)}` : `Disponible en las ${home.accountCount} cuentas · ${formatUsd(home.balanceCents)}`}
+        accounts={home.accounts.map((item) => ({ id: item.id, institution: item.institution, mask: item.mask, availableBalanceCents: item.availableBalanceCents }))}
+        accountId={account?.id}
+        found={params.factura === "lista" ? ["tx_qpl_fs_20394"] : params.lote === "lista" ? LOTE.map((item) => item.id) : []}
+        notice={params.factura === "lista" ? "factura" : params.lote === "lista" ? "lote" : undefined}
         rows={rows}
         counts={counts}
         filter={filter}

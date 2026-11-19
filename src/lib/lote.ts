@@ -18,6 +18,6 @@ export function loteStartHref() {
 export function loteNextHref(id: string) {
   const index = LOTE.findIndex((item) => item.id === id);
   const next = index >= 0 ? LOTE[index + 1] : undefined;
-  if (!next) return `/cuentas?cuenta=${LOTE_ACCOUNT}&lote=lista`;
+  if (!next) return `/movimientos?cuenta=${LOTE_ACCOUNT}&lote=lista`;
   return `/cuentas?cuenta=${LOTE_ACCOUNT}&paso=conciliar&actual=${next.id}&lote=1`;
 }

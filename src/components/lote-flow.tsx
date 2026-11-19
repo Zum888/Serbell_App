@@ -77,7 +77,7 @@ export function LoteFlow() {
       ) : null}
 
       {step >= 7 ? (
-        <p className="text-[15px] leading-7 text-slate-800">Te llevo a Cuentas bancarias para conciliarlos con los movimientos.</p>
+        <p className="text-[15px] leading-7 text-slate-800">Te llevo a conciliarlos con los movimientos del banco.</p>
       ) : null}
       <div ref={endRef} />
     </div>

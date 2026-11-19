@@ -69,7 +69,7 @@ export function InvoiceFlow() {
         </ul>
       ) : null}
 
-      {step >= 7 ? <p className="text-[15px] leading-7 text-slate-800">Te llevo a Cuentas bancarias para conciliarla con el movimiento.</p> : null}
+      {step >= 7 ? <p className="text-[15px] leading-7 text-slate-800">Te llevo a conciliarla con el movimiento del banco.</p> : null}
     </div>
   );
 }

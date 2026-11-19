@@ -7,7 +7,7 @@ import { requireActor } from "@/server/session";
 
 export async function POST(request: Request) {
   const form = await request.formData();
-  const back = "/cuentas";
+  const back = "/movimientos";
   try {
     const { actor, companyId } = await requireActor();
     if (!companyId) throw new AppError("Selecciona una empresa.", 400, "COMPANY_REQUIRED");
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       kind: String(form.get("kind") ?? ""),
       openingBalanceCents: cents,
     });
-    return redirectTo(request, `/cuentas?cuenta=${id}`);
+    return redirectTo(request, `/movimientos?cuenta=${id}`);
   } catch (error) {
     return redirectError(request, back, error);
   }

@@ -5,7 +5,6 @@ import {
   BarChart3,
   CircleHelp,
   FileText,
-  Landmark,
   MessageSquare,
   Receipt,
   Settings,
@@ -19,7 +18,6 @@ import { cn } from "@/lib/utils";
 const items = [
   { href: "/", firmHref: "/firma", label: "Chat nuevo", icon: MessageSquare, testId: "nav-inicio" },
   { href: "/movimientos", label: "Movimientos", icon: ArrowLeftRight, testId: "nav-movimientos" },
-  { href: "/cuentas", label: "Cuentas bancarias", icon: Landmark, testId: "nav-cuentas" },
   { href: "/comprobantes", label: "Comprobantes", icon: FileText, testId: "nav-comprobantes" },
   { href: "/categorias", label: "Categorías", icon: Tags, testId: "nav-categorias" },
   { href: "/por-cobrar", label: "Por cobrar", icon: Wallet, testId: "nav-cobrar" },
@@ -34,7 +32,7 @@ export function SideNav({ firm }: { firm: boolean }) {
     <nav className="flex flex-1 flex-col gap-1 px-3">
       {items.map((item) => {
         const href = item.firmHref && firm ? item.firmHref : item.href;
-        const active = pathname === href;
+        const active = pathname === href || (href === "/movimientos" && pathname.startsWith("/cuentas"));
         const Icon = item.icon;
         return (
           <Link
