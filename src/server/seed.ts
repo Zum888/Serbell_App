@@ -1,5 +1,7 @@
 import path from "node:path";
 import { ACCOUNT, CAT, COMPANY, FIRM_ID, TX, USER } from "@/lib/ids";
+import { MISSING_IDS } from "@/lib/missing-receipts";
+import { normalizeMerchant } from "@/lib/matching";
 import type { Db } from "@/server/db";
 import { sha256 } from "@/server/ids";
 import { stampReliableMatcherLinks } from "@/server/domain";
@@ -332,6 +334,145 @@ export async function insertAutoMatchedReceipts(db: Db) {
   }
 }
 
+const KEEP_OPEN = new Set<string>([
+  TX.fs20394,
+  TX.sunpass03,
+  TX.sunpass27,
+  TX.brian,
+  TX.ace,
+  ...MISSING_IDS,
+]);
+
+function purchaseCategory(companyId: string, merchant: string, amountCents: number) {
+  const tree = companyId === COMPANY.qpl ? CAT.qpl : CAT.rivera;
+  if (amountCents > 0) return { categoryId: tree.ingresos, subcategoryId: tree.servicios };
+  const name = merchant.toLowerCase();
+  if (/shell|pilot|race|flying|love|travel|fuel|gas|ta /.test(name) || name === "ta travel center") {
+    return { categoryId: tree.transporte, subcategoryId: tree.combustible };
+  }
+  if (/sunpass|peaje/.test(name)) return { categoryId: tree.transporte, subcategoryId: tree.peajes };
+  if (/napa|autozone|pep boys|fleet/.test(name)) return { categoryId: tree.operacion, subcategoryId: tree.equipo };
+  return { categoryId: tree.operacion, subcategoryId: tree.mantenimiento };
+}
+
+function wantsReceipt(merchant: string, description: string) {
+  const text = `${merchant} ${description}`;
+  return !/zelle|pago a la tarjeta/i.test(text);
+}
+
+function ticketName(merchant: string, day: string) {
+  const slug = merchant.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "");
+  return `${slug}_${day.slice(5, 7)}${day.slice(8, 10)}.jpg`;
+}
+
+/** Most card charges already carry the receipt that the checklist joined. */
+export async function linkMostReceipts(db: Db, extraSkip: string[] = []) {
+  const skip = new Set<string>([...KEEP_OPEN, ...extraSkip]);
+  const rows = await db.bankTransaction.findMany({
+    include: { account: true, links: true, classification: true },
+    orderBy: { postedOn: "asc" },
+  });
+  const openDocs = await db.document.findMany({
+    where: { status: "pending" },
+    include: { extraction: true, links: true },
+  });
+  const used = new Set<string>();
+
+  for (const tx of rows) {
+    if (skip.has(tx.id) || tx.links.some((link) => link.status === "confirmed")) continue;
+    if (!wantsReceipt(tx.merchant, tx.description)) continue;
+    const amount = Math.abs(tx.amountCents);
+    const merchant = normalizeMerchant(tx.merchant);
+    const day = tx.postedOn.toISOString().slice(0, 10);
+    const ready = openDocs.find((doc) => {
+      if (used.has(doc.id) || doc.companyId !== tx.companyId || doc.links.some((link) => link.status === "confirmed")) return false;
+      const extracted = doc.extraction;
+      if (!extracted?.merchant || extracted.amountCents == null) return false;
+      return normalizeMerchant(extracted.merchant) === merchant && Math.abs(extracted.amountCents) === amount;
+    });
+    const category = purchaseCategory(tx.companyId, tx.merchant, tx.amountCents);
+    const actorId = tx.companyId === COMPANY.qpl ? USER.padrino : USER.luis;
+    let documentId = ready?.id;
+    if (ready) {
+      used.add(ready.id);
+      await db.document.update({ where: { id: ready.id }, data: { status: "linked" } });
+      await db.documentExtraction.update({
+        where: { documentId: ready.id },
+        data: {
+          occurredOn: tx.postedOn,
+          categoryId: category.categoryId,
+          subcategoryId: category.subcategoryId,
+          verifiedAt: noon("2026-10-29"),
+          verifiedById: actorId,
+          notice: "Serbell encontró el comprobante y lo unió al movimiento.",
+        },
+      });
+    } else {
+      documentId = `doc_m_${tx.id.replace(/^tx_/, "")}`;
+      const file = store(tx.companyId, `${documentId}.jpg`, Buffer.from(`serbell-linked-${tx.id}`));
+      await db.document.create({
+        data: {
+          id: documentId,
+          companyId: tx.companyId,
+          uploadedById: actorId,
+          fileName: ticketName(tx.merchant, day),
+          mimeType: "image/jpeg",
+          status: "linked",
+          ...file,
+        },
+      });
+      await db.documentExtraction.create({
+        data: {
+          id: `ext_${documentId}`,
+          documentId,
+          merchant: tx.merchant,
+          amountCents: amount,
+          currency: "USD",
+          occurredOn: tx.postedOn,
+          categoryId: category.categoryId,
+          subcategoryId: category.subcategoryId,
+          source: "serbell",
+          verifiedAt: noon("2026-10-29"),
+          verifiedById: actorId,
+          isDemonstration: true,
+          notice: "Coincide con el movimiento del banco.",
+        },
+      });
+    }
+    if (!documentId) continue;
+    await db.transactionDocumentLink.create({
+      data: {
+        id: `link_m_${tx.id.replace(/^tx_/, "")}`,
+        transactionId: tx.id,
+        documentId,
+        status: "confirmed",
+        confirmedById: actorId,
+        confirmedAt: noon("2026-10-29"),
+      },
+    });
+    await db.bankTransaction.update({
+      where: { id: tx.id },
+      data: {
+        documentState: "Linked",
+        ...(tx.amountCents < 0 ? { description: `CHECKCARD · Tarjeta ····${tx.account.mask}` } : {}),
+        ...(tx.accountingState === "Uncategorized" ? { accountingState: "Proposed" } : {}),
+      },
+    });
+    if (!tx.classification) {
+      await db.transactionClassification.create({
+        data: {
+          id: `class_${tx.id}`,
+          transactionId: tx.id,
+          categoryId: category.categoryId,
+          subcategoryId: category.subcategoryId,
+          source: "serbell",
+          state: "Proposed",
+        },
+      });
+    }
+  }
+}
+
 export async function seedDatabase(db: Db) {
   await db.accountingFirm.create({
     data: { id: FIRM_ID, name: "Despacho Contable" },
@@ -624,7 +765,9 @@ export async function seedDatabase(db: Db) {
   await insertQplDemonstrationAccounts(db);
   await insertExtraDemo(db);
   await insertAutoMatchedReceipts(db);
+  await linkMostReceipts(db, ["tx_qpl_demo_pilot"]);
   await stampReliableMatcherLinks(db);
+  await linkMostReceipts(db);
   await db.accountingReview.create({
     data: {
       id: "rev_15012",
