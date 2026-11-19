@@ -90,8 +90,8 @@ export function FocusMode({ data }: { data: FocusData }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-2xl font-semibold">Bancos</h1>
         <div className="flex gap-2">
-          <span className="rounded-full bg-slate-900 px-3 py-1.5 text-xs text-white">Modo enfoque</span>
-          <Link href="/movimientos" className="rounded-full border border-border px-3 py-1.5 text-xs text-slate-600">Vista detallada</Link>
+          <span className="rounded-full bg-violet-100 px-3 py-1.5 text-xs font-medium text-violet-800">Modo enfoque</span>
+          <Link href="/movimientos" className="rounded-full px-3 py-1.5 text-xs text-slate-500">Vista detallada</Link>
         </div>
       </div>
       <div className="mt-3">

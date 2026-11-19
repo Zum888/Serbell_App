@@ -1,9 +1,9 @@
 "use client";
 
-import { LayoutGrid, Plus } from "lucide-react";
+import { Calendar, CreditCard, LayoutGrid, Plus, Search, TrendingUp, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { Sparkline } from "@/components/charts";
+import { AreaChart } from "@/components/charts";
 import { DuplicatePanel } from "@/components/duplicate-panel";
 import { MissingPanel } from "@/components/missing-panel";
 import { MovementsTable } from "@/components/movements-table";
@@ -50,6 +50,15 @@ const filters = [
   ["aprobados", "Aprobados"],
 ] as const;
 
+const periods = [
+  ["7", "7 días"],
+  ["30", "30 días"],
+  ["90", "3 meses"],
+  ["year", "Este año"],
+] as const;
+
+type Span = (typeof periods)[number][0] | "custom";
+
 export function BankLedger({
   companyName,
   companyId,
@@ -90,19 +99,32 @@ export function BankLedger({
   const [accountId, setAccountId] = useState(initialAccountId ?? "");
   const [filter, setFilter] = useState(initialFilter || "todos");
   const [query, setQuery] = useState(initialQuery);
+  const [span, setSpan] = useState<Span>("30");
+  const [custom, setCustom] = useState<{ start: string; end: string } | null>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const selected = accounts.find((account) => account.id === accountId) ?? null;
   const ofAccount = accountId ? rows.filter((row) => row.accountId === accountId) : rows;
-  const counts = totals(ofAccount);
+  const anchor = latestDay(ofAccount.length ? ofAccount : rows);
+  const { start, end } = rangeFor(anchor, span, custom);
+  const periodRows = ofAccount.filter((row) => row.postedOn >= start && row.postedOn <= end);
+  const counts = totals(periodRows);
   const needle = query.trim().toLowerCase();
-  const visible = ofAccount.filter((row) => matches(row, filter, needle));
   const spotlight = duplicate ? (DUPLICATE_IDS as readonly string[]) : missing ? MISSING_IDS : found;
+  const inPeriod = new Set(periodRows.map((row) => row.id));
+  const carried = spotlight.length
+    ? ofAccount.filter((row) => spotlight.includes(row.id) && !inPeriod.has(row.id) && matches(row, filter, needle))
+    : [];
+  const visible = [...carried, ...periodRows.filter((row) => matches(row, filter, needle))];
   const ordered = spotlight.length
     ? [...visible.filter((row) => spotlight.includes(row.id)), ...visible.filter((row) => !spotlight.includes(row.id))]
     : visible;
   const ready = ofAccount.filter((row) => MISSING_IDS.includes(row.id) && row.documentState === "Linked").length;
   const allAvailable = accounts.reduce((sum, account) => sum + account.availableBalanceCents, 0);
   const availableCents = selected ? selected.availableBalanceCents : allAvailable;
-  const lines = trend(ofAccount, availableCents);
+  const lines = seriesFor(periodRows, start, end, availableCents);
+  const inflowDelta = deltaLabel(counts.inflows, sumSigned(ofAccount, start, end, "in", span));
+  const outflowDelta = deltaLabel(counts.outflows, sumSigned(ofAccount, start, end, "out", span));
+  const focusHref = `/movimientos?${new URLSearchParams({ vista: "enfoque", ...(withChat ? { con: "chat", ...(flujo ? { flujo } : {}) } : {}) }).toString()}`;
   const countFor: Record<string, number> = {
     todos: counts.todos,
     "sin-categoria": counts.sinCategoria,
@@ -130,80 +152,152 @@ export function BankLedger({
   }
 
   return (
-    <section className="min-w-0 rounded-2xl border border-border bg-white">
-      <div className="border-b border-border px-4 py-4">
-        <p className="text-xs text-slate-500">{companyName}</p>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold">Bancos</h1>
-            <p className="text-sm text-slate-500">{selected ? `${selected.institution} ····${selected.mask}` : periodOf(ofAccount) || "Todos los bancos, por fecha"}</p>
-          </div>
+    <section className="min-w-0">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs text-slate-500">{companyName}</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Bancos</h1>
+          <p className="text-sm text-slate-500">{periodTitle(start, end, span)}</p>
           {selected && ofAccount.some((row) => row.reconciliationState !== "Reconciled") ? (
             <Link
               href={`/cuentas?${new URLSearchParams({ cuenta: selected.id, paso: "conciliar", ...(withChat ? { con: "chat", ...(flujo ? { flujo } : {}) } : {}) }).toString()}`}
-              className="text-sm font-medium text-primary"
+              className="mt-1 inline-block text-xs font-medium text-violet-700"
             >
               Conciliar con el banco
             </Link>
           ) : null}
         </div>
-        <div className="mt-4 rounded-2xl bg-slate-50 p-3">
-          <div data-testid="bank-totals" className="grid grid-cols-3 gap-2">
-            <Total label="Ingresos" value={formatUsd(counts.inflows)} tone="text-emerald-600" points={lines.inflows} color="#059669" fill />
-            <Total label="Gastos" value={formatUsd(counts.outflows)} tone="text-rose-600" points={lines.outflows} color="#e11d48" fill />
-            <Total
-              label="Disponible"
-              value={formatUsd(availableCents)}
-              tone="text-slate-900"
-              points={lines.balance}
-              color="#334155"
-              hint={selected ? "Esta cuenta" : `Las ${accounts.length} cuentas`}
-            />
+        <div className="flex items-center gap-1">
+          {periods.map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                setSpan(key);
+                setCalendarOpen(false);
+              }}
+              className={span === key ? "rounded-full bg-violet-600 px-3 py-1.5 text-xs font-medium text-white" : "rounded-full px-3 py-1.5 text-xs text-slate-500 hover:bg-white"}
+            >
+              {label}
+            </button>
+          ))}
+          <div className="relative">
+            <button
+              type="button"
+              aria-label="Elegir fechas"
+              aria-expanded={calendarOpen}
+              onClick={() => setCalendarOpen((open) => !open)}
+              className={span === "custom" ? "grid size-8 place-items-center rounded-full bg-violet-600 text-white" : "grid size-8 place-items-center rounded-full border border-slate-200 bg-white text-slate-500"}
+            >
+              <Calendar className="size-4" />
+            </button>
+            {calendarOpen ? (
+              <div className="absolute right-0 z-20 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-3 shadow-lg">
+                <label className="block text-xs text-slate-500">
+                  Desde
+                  <input type="date" defaultValue={start} id="bank-from" className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-2 text-sm" />
+                </label>
+                <label className="mt-2 block text-xs text-slate-500">
+                  Hasta
+                  <input type="date" defaultValue={end} id="bank-to" className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-2 text-sm" />
+                </label>
+                <button
+                  type="button"
+                  className="mt-3 w-full rounded-full bg-violet-600 py-1.5 text-xs font-medium text-white"
+                  onClick={() => {
+                    const from = (document.getElementById("bank-from") as HTMLInputElement | null)?.value;
+                    const to = (document.getElementById("bank-to") as HTMLInputElement | null)?.value;
+                    if (!from || !to) return;
+                    setCustom(from <= to ? { start: from, end: to } : { start: to, end: from });
+                    setSpan("custom");
+                    setCalendarOpen(false);
+                  }}
+                >
+                  Ver esas fechas
+                </button>
+              </div>
+            ) : null}
           </div>
-          <div className="mt-3 flex items-center gap-2">
-            <nav aria-label="Cambiar de cuenta" data-testid="account-switcher" className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
-              <AccountTab
-                active={!selected}
-                title="Todas"
-                detail={formatUsd(allAvailable)}
-                onSelect={() => {
-                  setAccountId("");
-                  remember({ cuenta: null });
-                }}
-              >
-                <span className="flex size-7 items-center justify-center rounded-lg bg-slate-100 text-slate-700"><LayoutGrid className="size-3.5" /></span>
-              </AccountTab>
-              {accounts.map((account) => {
-                const active = account.id === accountId;
-                const accent = bankAccent(account.institution);
-                return (
-                  <AccountTab
-                    key={account.id}
-                    active={active}
-                    title={account.institution}
-                    detail={`····${account.mask} · ${formatUsd(account.availableBalanceCents)}`}
-                    wide
-                    onSelect={() => {
-                      setAccountId(account.id);
-                      remember({ cuenta: account.id });
-                    }}
-                  >
-                    <span className="flex size-7 shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold text-white" style={{ backgroundColor: accent }}>{accountInitials(account.institution)}</span>
-                  </AccountTab>
-                );
-              })}
-            </nav>
-            <Link href="/cuentas/conectar" data-testid="add-account" className="shrink-0 rounded-lg px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100">
-              <Plus className="mr-1 inline size-3.5" /> Agregar
-            </Link>
-          </div>
-        </div>
-        <div className="mt-3 flex gap-2">
-          <Link href="/movimientos?vista=enfoque" className="rounded-full border border-border px-3 py-1.5 text-xs text-slate-600">Modo enfoque</Link>
-          <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-800">Vista detallada</span>
         </div>
       </div>
-      <div className="flex flex-wrap gap-1 px-4 py-3">
+
+      <div data-testid="bank-totals" className="mt-4 grid gap-3 lg:grid-cols-3">
+        <Metric
+          icon={<TrendingUp className="size-3.5" />}
+          iconClass="bg-emerald-50 text-emerald-600"
+          label="Ingresos"
+          value={formatUsd(counts.inflows)}
+          tone="text-slate-900"
+          note={inflowDelta}
+          noteClass="text-emerald-600"
+          series={lines.inflows}
+          color="#059669"
+          fromZero
+        />
+        <Metric
+          icon={<CreditCard className="size-3.5" />}
+          iconClass="bg-rose-50 text-rose-600"
+          label="Gastos"
+          value={formatUsd(counts.outflows)}
+          tone="text-slate-900"
+          note={outflowDelta}
+          noteClass="text-rose-600"
+          series={lines.outflows}
+          color="#e11d48"
+          fromZero
+        />
+        <Metric
+          icon={<Wallet className="size-3.5" />}
+          iconClass="bg-violet-50 text-violet-600"
+          label="Disponible"
+          value={formatUsd(availableCents)}
+          tone="text-slate-900"
+          note={selected ? "Esta cuenta" : `Las ${accounts.length} cuentas`}
+          noteClass="text-violet-600"
+          series={lines.balance}
+          color="#7c3aed"
+        />
+      </div>
+
+      <div className="mt-4 flex items-center gap-2">
+        <nav aria-label="Cambiar de cuenta" data-testid="account-switcher" className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
+          <AccountTab
+            active={!selected}
+            title="Todas"
+            detail={formatUsd(allAvailable)}
+            onSelect={() => {
+              setAccountId("");
+              remember({ cuenta: null });
+            }}
+          >
+            <span className="flex size-7 items-center justify-center rounded-lg bg-violet-50 text-violet-700"><LayoutGrid className="size-3.5" /></span>
+          </AccountTab>
+          {accounts.map((account) => (
+            <AccountTab
+              key={account.id}
+              active={account.id === accountId}
+              title={account.institution}
+              detail={`···${account.mask} · ${formatUsd(account.availableBalanceCents)}`}
+              wide
+              onSelect={() => {
+                setAccountId(account.id);
+                remember({ cuenta: account.id });
+              }}
+            >
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold text-white" style={{ backgroundColor: bankAccent(account.institution) }}>{accountInitials(account.institution)}</span>
+            </AccountTab>
+          ))}
+        </nav>
+        <Link href="/cuentas/conectar" data-testid="add-account" className="shrink-0 px-2 text-sm text-slate-500 hover:text-slate-800">
+          <Plus className="mr-1 inline size-3.5" /> Agregar cuenta
+        </Link>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <div className="flex items-center rounded-full border border-slate-200 bg-white p-0.5">
+          <Link href={focusHref} className="rounded-full px-3 py-1.5 text-xs text-slate-500">Modo enfoque</Link>
+          <span className="rounded-full bg-violet-100 px-3 py-1.5 text-xs font-medium text-violet-800">Vista detallada</span>
+        </div>
         {filters.map(([key, label]) => (
           <button
             key={key}
@@ -212,52 +306,57 @@ export function BankLedger({
               setFilter(key);
               remember({ filtro: key });
             }}
-            className={filter === key ? "rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-900" : "rounded-lg px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"}
+            className={filter === key ? "rounded-full border border-violet-300 bg-white px-3 py-1.5 text-xs font-medium text-violet-700" : "rounded-full px-3 py-1.5 text-xs text-slate-500 hover:bg-white"}
           >
             {label}
-            <span className="ml-1 text-slate-400">{countFor[key]}</span>
+            <span className="ml-1 tabular-nums text-slate-400">{countFor[key]}</span>
           </button>
         ))}
-      </div>
-      <form
-        className="px-4 pb-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          remember({ q: query });
-        }}
-      >
-        <Input
-          name="q"
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            remember({ q: event.target.value });
+        <form
+          className="relative ml-auto w-full sm:w-56"
+          onSubmit={(event) => {
+            event.preventDefault();
+            remember({ q: query });
           }}
-          placeholder="Buscar movimiento..."
-        />
-      </form>
-      {notice === "factura" ? <p data-testid="invoice-reconciled" className="px-4 pb-3 text-sm text-emerald-800">La factura quedó conciliada con el movimiento del banco.</p> : null}
-      {notice === "lote" ? <p data-testid="batch-reconciled" className="px-4 pb-3 text-sm text-emerald-800">El lote quedó conciliado con los movimientos del banco.</p> : null}
-      {duplicate ? <DuplicatePanel decision={decision} /> : null}
-      {missing ? <MissingPanel ready={ready} /> : null}
-      {error ? <div className="px-4 pb-3"><StateView variant="error" title={error} testId="server-error" /></div> : null}
-      {ordered.length === 0 ? (
-        <div className="px-4 pb-4">
-          <StateView variant="empty" title="No hay movimientos con este filtro." />
-        </div>
-      ) : (
-        <MovementsTable
-          rows={ordered}
-          categories={categories}
-          canReview={canReview}
-          filter={filter}
-          q={query}
-          companyId={companyId}
-          accountId={accountId || undefined}
-          showBank={!selected}
-          marked={[...spotlight]}
-        />
-      )}
+        >
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+          <Input
+            name="q"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              remember({ q: event.target.value });
+            }}
+            placeholder="Buscar movimiento..."
+            className="h-9 rounded-full pl-8"
+          />
+        </form>
+      </div>
+
+      <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        {notice === "factura" ? <p data-testid="invoice-reconciled" className="px-4 pt-3 text-sm text-emerald-800">La factura quedó conciliada con el movimiento del banco.</p> : null}
+        {notice === "lote" ? <p data-testid="batch-reconciled" className="px-4 pt-3 text-sm text-emerald-800">El lote quedó conciliado con los movimientos del banco.</p> : null}
+        {duplicate ? <DuplicatePanel decision={decision} /> : null}
+        {missing ? <MissingPanel ready={ready} /> : null}
+        {error ? <div className="px-4 py-3"><StateView variant="error" title={error} testId="server-error" /></div> : null}
+        {ordered.length === 0 ? (
+          <div className="px-4 py-4">
+            <StateView variant="empty" title="No hay movimientos con este filtro." />
+          </div>
+        ) : (
+          <MovementsTable
+            rows={ordered}
+            categories={categories}
+            canReview={canReview}
+            filter={filter}
+            q={query}
+            companyId={companyId}
+            accountId={accountId || undefined}
+            showBank={!selected}
+            marked={[...spotlight]}
+          />
+        )}
+      </div>
     </section>
   );
 }
@@ -282,7 +381,7 @@ function AccountTab({
       type="button"
       aria-current={active ? "page" : undefined}
       onClick={onSelect}
-      className={`flex h-12 shrink-0 items-center gap-2 rounded-xl border bg-white px-2.5 text-left ${wide ? "w-[188px]" : ""} ${active ? "border-slate-300 bg-slate-50" : "border-slate-200 hover:border-slate-300"}`}
+      className={`flex h-[52px] shrink-0 items-center gap-2 rounded-2xl border bg-white px-2.5 text-left ${wide ? "w-[210px]" : ""} ${active ? "border-violet-400 shadow-sm" : "border-slate-200 hover:border-slate-300"}`}
     >
       {children}
       <span className="min-w-0">
@@ -293,14 +392,39 @@ function AccountTab({
   );
 }
 
-function Total({ label, value, tone, points, color, hint, fill = false }: { label: string; value: string; tone: string; points: number[]; color: string; hint?: string; fill?: boolean }) {
+function Metric({
+  icon,
+  iconClass,
+  label,
+  value,
+  tone,
+  note,
+  noteClass,
+  series,
+  color,
+  fromZero = false,
+}: {
+  icon: React.ReactNode;
+  iconClass: string;
+  label: string;
+  value: string;
+  tone: string;
+  note: string | null;
+  noteClass: string;
+  series: { label: string; value: number }[];
+  color: string;
+  fromZero?: boolean;
+}) {
   return (
-    <div className="rounded-xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-200">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</p>
-      <p className={`mt-1 text-lg font-semibold tabular-nums ${tone}`}>{value}</p>
-      {hint ? <p className="mt-0.5 text-[11px] text-slate-500">{hint}</p> : null}
-      <Sparkline points={points} color={color} fill={fill} />
-    </div>
+    <article className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+      <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
+        <span className={`grid size-7 place-items-center rounded-lg ${iconClass}`}>{icon}</span>
+        {label}
+      </div>
+      <p className={`mt-3 text-[22px] font-semibold tracking-tight tabular-nums ${tone}`}>{value}</p>
+      {note ? <p className={`mt-1 text-xs font-medium ${noteClass}`}>{note}</p> : <p className="mt-1 text-xs text-transparent">.</p>}
+      <AreaChart series={series} color={color} fromZero={fromZero} />
+    </article>
   );
 }
 
@@ -337,37 +461,130 @@ function matches(row: Row, filter: string, needle: string) {
   return true;
 }
 
-function trend(rows: Row[], availableCents: number) {
+function seriesFor(rows: Row[], start: string, end: string, availableCents: number) {
+  const days = eachDay(start, end);
   const byDay = new Map<string, { inflow: number; outflow: number; net: number }>();
   for (const row of rows) {
-    const day = row.postedOn || "0000-01-01";
-    const bucket = byDay.get(day) ?? { inflow: 0, outflow: 0, net: 0 };
+    const bucket = byDay.get(row.postedOn) ?? { inflow: 0, outflow: 0, net: 0 };
     if (row.amountCents > 0) bucket.inflow += row.amountCents;
     else if (row.amountCents < 0) bucket.outflow += Math.abs(row.amountCents);
     bucket.net += row.amountCents;
-    byDay.set(day, bucket);
+    byDay.set(row.postedOn, bucket);
   }
-  const days = [...byDay.keys()].sort();
   const net = days.reduce((sum, day) => sum + (byDay.get(day)?.net ?? 0), 0);
   let running = availableCents - net;
-  const balance = days.map((day) => {
-    running += byDay.get(day)?.net ?? 0;
-    return running;
+  let cumIn = 0;
+  let cumOut = 0;
+  const points = (days.length ? days : [end]).map((day) => {
+    const bucket = byDay.get(day);
+    cumIn += bucket?.inflow ?? 0;
+    cumOut += bucket?.outflow ?? 0;
+    running += bucket?.net ?? 0;
+    return { day, label: shortDay(day), inflows: cumIn, outflows: cumOut, balance: running };
   });
   return {
-    inflows: days.map((day) => byDay.get(day)?.inflow ?? 0),
-    outflows: days.map((day) => byDay.get(day)?.outflow ?? 0),
-    balance: balance.length ? balance : [availableCents],
+    inflows: points.map((point) => ({ label: point.label, value: point.inflows })),
+    outflows: points.map((point) => ({ label: point.label, value: point.outflows })),
+    balance: points.map((point) => ({ label: point.label, value: point.balance })),
   };
 }
 
-function periodOf(rows: { postedOn: string }[]) {
-  const day = rows.find((row) => row.postedOn)?.postedOn;
-  if (!day) return "";
-  const [year, month] = day.split("-").map(Number);
-  if (!year || !month) return "";
-  const label = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1, 12))).replace(" de ", " ");
-  return label.charAt(0).toUpperCase() + label.slice(1);
+function sumSigned(rows: Row[], start: string, end: string, kind: "in" | "out", span: Span) {
+  const length = eachDay(start, end).length || 1;
+  const previousWindow = span === "30" ? monthBounds(addDays(start, -1)) : { start: addDays(addDays(start, -1), -(length - 1)), end: addDays(start, -1) };
+  let previous = 0;
+  let early = 0;
+  let late = 0;
+  const mid = addDays(start, Math.floor(length / 2));
+  for (const row of rows) {
+    const amount = kind === "in" ? (row.amountCents > 0 ? row.amountCents : 0) : row.amountCents < 0 ? Math.abs(row.amountCents) : 0;
+    if (!amount) continue;
+    if (row.postedOn >= previousWindow.start && row.postedOn <= previousWindow.end) previous += amount;
+    else if (row.postedOn >= start && row.postedOn < mid) early += amount;
+    else if (row.postedOn >= mid && row.postedOn <= end) late += amount;
+  }
+  if (previous > 0) return { currentBase: previous, label: span === "30" ? "vs. mes anterior" : "vs. periodo anterior" };
+  if (early > 0) return { currentBase: early, compare: late, label: "vs. la primera mitad" };
+  return null;
+}
+
+function deltaLabel(current: number, prior: { currentBase: number; compare?: number; label: string } | null) {
+  if (!prior || prior.currentBase <= 0) return null;
+  const next = prior.compare ?? current;
+  const pct = Math.round(((next - prior.currentBase) / prior.currentBase) * 100);
+  if (!Number.isFinite(pct) || pct === 0) return null;
+  const sign = pct > 0 ? "+" : "";
+  return `${sign}${pct}% ${prior.label}`;
+}
+
+function latestDay(rows: Row[]) {
+  return rows.reduce((max, row) => (row.postedOn > max ? row.postedOn : max), rows[0]?.postedOn || "2026-10-31");
+}
+
+function rangeFor(end: string, span: Span, custom: { start: string; end: string } | null) {
+  if (span === "custom" && custom) return custom;
+  const month = monthBounds(end);
+  if (span === "7") return { start: addDays(end, -6), end };
+  if (span === "90") return { start: shiftMonth(month.start, -2), end: month.end };
+  if (span === "year") return { start: `${end.slice(0, 4)}-01-01`, end: month.end };
+  return month;
+}
+
+function monthBounds(iso: string) {
+  const [year, month] = iso.split("-").map(Number);
+  const last = new Date(Date.UTC(year, month, 0, 12)).getUTCDate();
+  const mm = String(month).padStart(2, "0");
+  return { start: `${year}-${mm}-01`, end: `${year}-${mm}-${String(last).padStart(2, "0")}` };
+}
+
+function shiftMonth(iso: string, delta: number) {
+  const [year, month] = iso.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1 + delta, 1, 12)).toISOString().slice(0, 10);
+}
+
+function eachDay(start: string, end: string) {
+  const days: string[] = [];
+  const first = Date.parse(`${start}T12:00:00.000Z`);
+  const last = Date.parse(`${end}T12:00:00.000Z`);
+  if (!Number.isFinite(first) || !Number.isFinite(last) || last < first) return days;
+  for (let cursor = first; cursor <= last && days.length < 400; cursor += 86_400_000) {
+    days.push(new Date(cursor).toISOString().slice(0, 10));
+  }
+  return days;
+}
+
+function addDays(iso: string, days: number) {
+  const value = Date.parse(`${iso}T12:00:00.000Z`);
+  if (!Number.isFinite(value)) return iso;
+  return new Date(value + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+function shortDay(iso: string) {
+  const [, month, day] = iso.split("-");
+  const index = Number(month) - 1;
+  return `${Number(day)} ${MONTHS[index] ?? ""}`.trim();
+}
+
+function periodTitle(start: string, end: string, span: Span) {
+  if (span === "year") return end.slice(0, 4);
+  if (start.slice(0, 7) === end.slice(0, 7)) return monthYear(start);
+  if (start.slice(0, 4) === end.slice(0, 4)) return `${monthName(start)} – ${monthName(end)} ${end.slice(0, 4)}`;
+  return `${monthYear(start)} – ${monthYear(end)}`;
+}
+
+function monthYear(iso: string) {
+  const [year, month] = iso.split("-").map(Number);
+  if (!year || !month) return iso;
+  const label = new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1, 12)));
+  return label.replace(" de ", " ").replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function monthName(iso: string) {
+  const month = Number(iso.split("-")[1]);
+  const label = new Intl.DateTimeFormat("es-MX", { month: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2026, month - 1, 1, 12)));
+  return label.replace(".", "");
 }
 
 function bankAccent(institution: string) {
