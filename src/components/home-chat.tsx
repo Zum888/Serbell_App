@@ -3,6 +3,7 @@
 import { Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { TicketFlow } from "@/components/ticket-flow";
 import { GUIDE_REPLY, isTalk, talkReply, type Briefing } from "@/lib/briefing";
 import type { HomeStart } from "@/lib/home-starts";
 import { UNSUPPORTED_REPLY, parseIntent } from "@/lib/intent";
@@ -22,6 +23,7 @@ type Bubble = { id: string; role: "user" | "assistant"; body: string };
 export function HomeChat({ name, briefing, starts }: { name: string; briefing: Briefing; starts: HomeStart[] }) {
   const [messages, setMessages] = useState<Bubble[]>([]);
   const [text, setText] = useState("");
+  const [flow, setFlow] = useState<"ticket" | null>(null);
 
   function ask(raw: string) {
     const value = raw.trim();
@@ -54,6 +56,7 @@ export function HomeChat({ name, briefing, starts }: { name: string; briefing: B
           onClick={() => {
             setMessages([]);
             setText("");
+            setFlow(null);
           }}
           className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-300"
         >
@@ -61,14 +64,45 @@ export function HomeChat({ name, briefing, starts }: { name: string; briefing: B
         </button>
       </header>
       <div className="flex flex-1 flex-col px-5 py-6">
-        {messages.length === 0 ? (
+        {flow === "ticket" ? (
+          <div className="flex flex-1 flex-col">
+            <h1 className="sr-only">Conciliar un ticket</h1>
+            <TicketFlow />
+          </div>
+        ) : messages.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center text-center">
             <p className="text-sm text-slate-500">{formatTodayLabel()}</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight">
               Buenos días, <span className="text-primary">{greetingName(name)}.</span>
             </h1>
             <div className="mt-8 w-full max-w-lg text-left">
-              <p className="text-sm leading-6 text-slate-600">{openingLine(starts.length)}</p>
+              <p className="text-sm font-medium text-slate-900">Flujos</p>
+              <ul className="mt-2 space-y-2">
+                <li>
+                  <button
+                    type="button"
+                    data-testid="flow-ticket"
+                    onClick={() => setFlow("ticket")}
+                    className="flex w-full items-center justify-between gap-3 rounded-2xl border border-border bg-white px-4 py-3 text-left transition hover:border-slate-300"
+                  >
+                    <span>
+                      <span className="block text-sm font-medium text-slate-900">Conciliar un ticket</span>
+                      <span className="mt-0.5 block text-xs leading-5 text-slate-500">Sube el ticket, lo lee, lo cruza con el banco y pone la categoría.</span>
+                    </span>
+                    <span className="shrink-0 text-xs font-medium text-primary">Arrancar</span>
+                  </button>
+                </li>
+                <li>
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-border px-4 py-3 text-left">
+                    <span>
+                      <span className="block text-sm font-medium text-slate-900">Conciliar un lote</span>
+                      <span className="mt-0.5 block text-xs leading-5 text-slate-500">Tickets y facturas mezclados. Lo armamos cuando este quede.</span>
+                    </span>
+                    <span className="shrink-0 text-xs font-medium text-slate-400">Después</span>
+                  </div>
+                </li>
+              </ul>
+              <p className="mt-6 text-sm leading-6 text-slate-600">{openingLine(starts.length)}</p>
               <ul className="mt-3 space-y-2">
                 {starts.map((start) => (
                   <li key={start.id}>
