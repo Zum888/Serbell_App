@@ -12,7 +12,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const { actor } = await requireActor();
     const undo = String(form.get("action") ?? "") === "undo";
     await setBankReconciliation((await db()), actor, id, undo ? "Unreconciled" : "Reconciled");
-    if (undo) return redirectTo(request, back);
+    if (undo || String(form.get("stay") ?? "") === "1") return redirectTo(request, back);
     return redirectTo(request, await nextBankStep((await db()), actor, id));
   } catch (error) {
     return redirectError(request, back, error);

@@ -20,7 +20,7 @@ function kindLabel(kind: string) {
 export default async function AccountsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cuenta?: string; paso?: string; actual?: string; error?: string }>;
+  searchParams: Promise<{ cuenta?: string; paso?: string; actual?: string; error?: string; factura?: string }>;
 }) {
   const session = await pageContext();
   const params = await searchParams;
@@ -57,6 +57,7 @@ export default async function AccountsPage({
     return (
       <BankStep
         error={params.error}
+        fromInvoice={params.factura === "1"}
         data={{
           accountHref: `/cuentas?cuenta=${selected.id}`,
           progress: `${selected.unreconciledCount} de ${selected.movements.length} sin conciliar`,
@@ -133,6 +134,11 @@ export default async function AccountsPage({
             <p className="mt-2 text-sm text-slate-500">El saldo disponible es el guardado en esta cuenta.</p>
           )}
         </div>
+        {params.factura === "lista" ? (
+          <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800" data-testid="invoice-reconciled">
+            La factura quedó conciliada con el movimiento del banco.
+          </p>
+        ) : null}
         {params.error ? <p className="text-sm text-red-700" data-testid="server-error">{params.error}</p> : null}
         <div className="grid gap-3 sm:grid-cols-4">
           <article className="rounded-2xl border border-border bg-white p-4">

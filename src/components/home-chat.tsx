@@ -1,20 +1,17 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { ArrowUp, Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { TicketFlow } from "@/components/ticket-flow";
+import { InvoiceFlow } from "@/components/ticket-flow";
 import { GUIDE_REPLY, isTalk, talkReply, type Briefing } from "@/lib/briefing";
 import type { HomeStart } from "@/lib/home-starts";
 import { UNSUPPORTED_REPLY, parseIntent } from "@/lib/intent";
 import { greetingName } from "@/lib/labels";
-import { formatTodayLabel } from "@/lib/dates";
 
 const PROMPTS = [
   ["Analizar mis gastos", "Analiza mis gastos"],
   ["Revisar duplicados", "Revisar duplicados"],
-  ["Clientes que deben", "Clientes que deben"],
-  ["Rastrear un movimiento", "Rastréame un movimiento"],
   ["¿Cuánto gané?", "¿Cuánto gané?"],
 ] as const;
 
@@ -23,7 +20,7 @@ type Bubble = { id: string; role: "user" | "assistant"; body: string };
 export function HomeChat({ name, briefing, starts }: { name: string; briefing: Briefing; starts: HomeStart[] }) {
   const [messages, setMessages] = useState<Bubble[]>([]);
   const [text, setText] = useState("");
-  const [flow, setFlow] = useState<"ticket" | null>(null);
+  const [flow, setFlow] = useState(false);
 
   function ask(raw: string) {
     const value = raw.trim();
@@ -31,6 +28,7 @@ export function HomeChat({ name, briefing, starts }: { name: string; briefing: B
     const intent = parseIntent(value);
     const body = isTalk(intent.type) ? talkReply(intent.type, briefing) : intent.type === "unsupported" ? UNSUPPORTED_REPLY : GUIDE_REPLY;
     const stamp = `${Date.now()}-${messages.length}`;
+    setFlow(false);
     setMessages((current) => [
       ...current,
       { id: `u-${stamp}`, role: "user", body: value },
@@ -39,147 +37,122 @@ export function HomeChat({ name, briefing, starts }: { name: string; briefing: B
     setText("");
   }
 
+  function reset() {
+    setMessages([]);
+    setText("");
+    setFlow(false);
+  }
+
+  const talking = flow || messages.length > 0;
+
   return (
-    <section data-testid="home-chat" className="flex min-h-[520px] flex-col rounded-3xl border border-border bg-white">
-      <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
-        <div className="flex items-center gap-3">
-          <span className="flex size-9 items-center justify-center rounded-full bg-slate-950 text-white">
-            <Sparkles className="size-4" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold">Serbell</p>
-            <p className="text-xs text-slate-500">{briefing.companyName}</p>
-          </div>
+    <section data-testid="home-chat" className="flex min-h-[calc(100vh-7.5rem)] flex-col">
+      {talking ? (
+        <div className="mb-2 flex justify-end">
+          <button type="button" onClick={reset} className="text-xs text-slate-500 hover:text-slate-800">
+            Nuevo chat
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setMessages([]);
-            setText("");
-            setFlow(null);
-          }}
-          className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-300"
-        >
-          Nuevo chat
-        </button>
-      </header>
-      <div className="flex flex-1 flex-col px-5 py-6">
-        {flow === "ticket" ? (
-          <div className="flex flex-1 flex-col">
-            <h1 className="sr-only">Conciliar un ticket</h1>
-            <TicketFlow />
+      ) : null}
+
+      <div className={`flex flex-1 flex-col ${talking ? "" : "items-center justify-center"}`}>
+        {flow ? (
+          <div className="mx-auto w-full max-w-2xl flex-1">
+            <h1 className="sr-only">Conciliar una factura</h1>
+            <InvoiceFlow />
           </div>
-        ) : messages.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center text-center">
-            <p className="text-sm text-slate-500">{formatTodayLabel()}</p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight">
-              Buenos días, <span className="text-primary">{greetingName(name)}.</span>
-            </h1>
-            <div className="mt-8 w-full max-w-lg text-left">
-              <p className="text-sm font-medium text-slate-900">Flujos</p>
-              <ul className="mt-2 space-y-2">
-                <li>
-                  <button
-                    type="button"
-                    data-testid="flow-ticket"
-                    onClick={() => setFlow("ticket")}
-                    className="flex w-full items-center justify-between gap-3 rounded-2xl border border-border bg-white px-4 py-3 text-left transition hover:border-slate-300"
-                  >
-                    <span>
-                      <span className="block text-sm font-medium text-slate-900">Conciliar un ticket</span>
-                      <span className="mt-0.5 block text-xs leading-5 text-slate-500">Sube el ticket, lo lee, lo cruza con el banco y pone la categoría.</span>
-                    </span>
-                    <span className="shrink-0 text-xs font-medium text-primary">Arrancar</span>
-                  </button>
-                </li>
-                <li>
-                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-dashed border-border px-4 py-3 text-left">
-                    <span>
-                      <span className="block text-sm font-medium text-slate-900">Conciliar un lote</span>
-                      <span className="mt-0.5 block text-xs leading-5 text-slate-500">Tickets y facturas mezclados. Lo armamos cuando este quede.</span>
-                    </span>
-                    <span className="shrink-0 text-xs font-medium text-slate-400">Después</span>
-                  </div>
-                </li>
-              </ul>
-              <p className="mt-6 text-sm leading-6 text-slate-600">{openingLine(starts.length)}</p>
-              <ul className="mt-3 space-y-2">
-                {starts.map((start) => (
-                  <li key={start.id}>
-                    <Link
-                      href={start.href}
-                      data-testid={`home-start-${start.id}`}
-                      className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-white px-4 py-3 transition hover:border-slate-300"
-                    >
-                      <span>
-                        <span className="block text-sm font-medium text-slate-900">{start.title}</span>
-                        <span className="mt-0.5 block text-xs leading-5 text-slate-500">{start.detail}</span>
-                      </span>
-                      <span className="shrink-0 text-xs font-medium text-primary">{start.action}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+        ) : talking ? (
+          <div className="mx-auto w-full max-w-2xl flex-1 space-y-6">
+            <h1 className="sr-only">Buenos días, {greetingName(name)}.</h1>
+            {messages.map((message) =>
+              message.role === "user" ? (
+                <p key={message.id} className="ml-auto w-fit max-w-[80%] rounded-3xl bg-white px-4 py-2.5 text-[15px] leading-6 text-slate-800 shadow-sm">
+                  {message.body}
+                </p>
+              ) : (
+                <p key={message.id} className="max-w-[42rem] text-[15px] leading-7 text-slate-800">
+                  {message.body}
+                </p>
+              ),
+            )}
           </div>
         ) : (
-          <div className="flex flex-1 flex-col">
-            <h1 className="sr-only">Buenos días, {greetingName(name)}.</h1>
-            <div className="space-y-3">
-              {messages.map((message) => (
-                <article
-                  key={message.id}
-                  className={
-                    message.role === "user"
-                      ? "ml-auto max-w-[85%] rounded-2xl bg-slate-950 px-4 py-3 text-sm text-white"
-                      : "max-w-[85%] rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700"
-                  }
+          <div className="w-full max-w-2xl text-center">
+            <h1 className="text-4xl font-medium tracking-tight text-slate-900">
+              Buenos días, {greetingName(name)}
+            </h1>
+            <p className="mt-3 text-[15px] text-slate-500">{briefing.companyName}. ¿Por dónde seguimos?</p>
+            <div className="mt-8">
+              <Composer text={text} setText={setText} onSubmit={() => ask(text)} />
+            </div>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                data-testid="flow-factura"
+                onClick={() => setFlow(true)}
+                className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:text-slate-950"
+              >
+                Conciliar una factura
+              </button>
+              {PROMPTS.map(([label, prompt]) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => ask(prompt)}
+                  className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-600 shadow-sm hover:text-slate-950"
                 >
-                  <p className="whitespace-pre-wrap">{message.body}</p>
-                </article>
+                  {label}
+                </button>
               ))}
             </div>
+            {starts.length > 0 ? (
+              <p className="mt-8 text-sm text-slate-500">
+                También:{" "}
+                {starts.slice(0, 3).map((start, index) => (
+                  <span key={start.id}>
+                    {index > 0 ? " · " : null}
+                    <Link href={start.href} data-testid={`home-start-${start.id}`} className="text-slate-700 underline-offset-2 hover:underline">
+                      {start.title.toLowerCase()}
+                    </Link>
+                  </span>
+                ))}
+              </p>
+            ) : null}
           </div>
         )}
       </div>
-      <div className="border-t border-border px-4 py-4">
-        <div className="mb-3 flex flex-wrap gap-2">
-          {PROMPTS.map(([label, prompt]) => (
-            <button
-              key={prompt}
-              type="button"
-              onClick={() => ask(prompt)}
-              className="rounded-full border border-border bg-white px-3 py-1.5 text-xs text-slate-600 hover:border-slate-300"
-            >
-              {label}
-            </button>
-          ))}
+
+      {talking ? (
+        <div className="mx-auto mt-4 w-full max-w-2xl">
+          <Composer text={text} setText={setText} onSubmit={() => ask(text)} />
         </div>
-        <form
-          className="flex items-center gap-2 rounded-full border border-border bg-white px-3 py-2 shadow-sm"
-          onSubmit={(event) => {
-            event.preventDefault();
-            ask(text);
-          }}
-        >
-          <Sparkles className="size-4 text-primary" />
-          <input
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            placeholder="Pregúntame sobre tu empresa..."
-            aria-label="Mensaje para Serbell"
-            className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none"
-          />
-          <button type="submit" className="rounded-full bg-slate-950 px-4 py-2 text-xs font-medium text-white">
-            Enviar
-          </button>
-        </form>
-      </div>
+      ) : null}
     </section>
   );
 }
 
-function openingLine(count: number) {
-  if (count <= 1) return "Esto es lo que conviene atender primero.";
-  return `Encontré ${count} pendientes. Elige con cuál empezar.`;
+function Composer({ text, setText, onSubmit }: { text: string; setText: (value: string) => void; onSubmit: () => void }) {
+  return (
+    <form
+      className="flex items-end gap-2 rounded-3xl border border-white bg-white px-3 py-2 shadow-sm"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+    >
+      <span className="mb-1.5 grid size-8 place-items-center rounded-full text-slate-400">
+        <Plus className="size-4" />
+      </span>
+      <input
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        placeholder="Escribe a Serbell"
+        aria-label="Mensaje para Serbell"
+        className="mb-1 h-9 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
+      />
+      <button type="submit" aria-label="Enviar" className="grid size-9 place-items-center rounded-full bg-slate-900 text-white">
+        {text.trim() ? <ArrowUp className="size-4" /> : <Sparkles className="size-4" />}
+      </button>
+    </form>
+  );
 }
