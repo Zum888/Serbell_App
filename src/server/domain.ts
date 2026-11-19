@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { dayKey, isDay } from "@/lib/dates";
 import { AppError } from "@/lib/errors";
+import { isTalk, talkReply } from "@/lib/briefing";
 import { NOTE_REPLY, UNSUPPORTED_REPLY, parseIntent } from "@/lib/intent";
 import type { MatchResult } from "@/lib/matching";
 import { normalizeMerchant } from "@/lib/matching";
@@ -18,6 +19,7 @@ import { localProviders } from "@/providers/local";
 import type { Db } from "@/server/db";
 import { nid, sha256 } from "@/server/ids";
 import { dataRoot } from "@/server/paths";
+import { loadBriefing } from "@/server/assistant";
 import { resolveViewer } from "@/server/viewer";
 import { ALLOWED_UPLOAD_TYPES, MAX_UPLOAD_BYTES, MAX_UPLOADS_PER_COMPANY } from "@/server/upload";
 
@@ -1276,7 +1278,9 @@ export async function postChat(db: Db, actor: Actor, companyId: string, text: st
 
   let reply = NOTE_REPLY;
   try {
-    if (intent.type === "unsupported") {
+    if (isTalk(intent.type)) {
+      reply = talkReply(intent.type, await loadBriefing(db, actor, companyId));
+    } else if (intent.type === "unsupported") {
       reply = UNSUPPORTED_REPLY;
     } else if (intent.type === "note") {
       reply = NOTE_REPLY;

@@ -20,12 +20,6 @@ export function redirectTo(req: Request, path: string, error?: string) {
 }
 
 export function redirectError(req: Request, path: string, error: unknown) {
-  if (isAppError(error) && (error.status === 401 || error.status === 403)) {
-    return NextResponse.json(
-      { error: error.message, code: error.code },
-      { status: error.status, headers: { "cache-control": "private, no-store" } },
-    );
-  }
   if (isAppError(error)) return redirectTo(req, path, error.message);
   throw error;
 }

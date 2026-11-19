@@ -5,9 +5,22 @@ const EXTRA_CATEGORIES: [string, string, string, string][] = [
   ["cat_qpl_renta", COMPANY.qpl, "cat_qpl_administracion", "Renta y servicios"],
   ["cat_qpl_nomina", COMPANY.qpl, "cat_qpl_administracion", "Nómina"],
   ["cat_qpl_seguros", COMPANY.qpl, "cat_qpl_operacion", "Seguros"],
+  ["cat_qpl_diesel", COMPANY.qpl, "cat_qpl_transporte", "Diésel"],
+  ["cat_qpl_unidades", COMPANY.qpl, "cat_qpl_transporte", "Mantenimiento de unidades"],
+  ["cat_qpl_hospedaje", COMPANY.qpl, "cat_qpl_transporte", "Hospedaje"],
+  ["cat_qpl_refacciones", COMPANY.qpl, "cat_qpl_operacion", "Refacciones"],
+  ["cat_qpl_oficina", COMPANY.qpl, "cat_qpl_administracion", "Oficina"],
+  ["cat_qpl_fletes", COMPANY.qpl, "cat_qpl_ingresos", "Fletes"],
   ["cat_riv_renta", COMPANY.rivera, "cat_riv_administracion", "Renta y servicios"],
   ["cat_riv_nomina", COMPANY.rivera, "cat_riv_administracion", "Nómina"],
   ["cat_riv_seguros", COMPANY.rivera, "cat_riv_operacion", "Seguros"],
+  ["cat_riv_diesel", COMPANY.rivera, "cat_riv_transporte", "Diésel"],
+  ["cat_riv_unidades", COMPANY.rivera, "cat_riv_transporte", "Mantenimiento de unidades"],
+  ["cat_riv_hospedaje", COMPANY.rivera, "cat_riv_transporte", "Hospedaje"],
+  ["cat_riv_refacciones", COMPANY.rivera, "cat_riv_operacion", "Refacciones"],
+  ["cat_riv_materiales", COMPANY.rivera, "cat_riv_operacion", "Materiales"],
+  ["cat_riv_oficina", COMPANY.rivera, "cat_riv_administracion", "Oficina"],
+  ["cat_riv_obras", COMPANY.rivera, "cat_riv_ingresos", "Obras"],
 ];
 
 type FixedRow = {

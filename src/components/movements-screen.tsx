@@ -31,9 +31,10 @@ type Row = {
 type Receipt = {
   transactionId: string;
   merchant: string;
+  amountCents: number;
   sealed: boolean;
   document: { id: string; fileName: string; mimeType: string } | null;
-  choices: { id: string; fileName: string }[];
+  choices: { id: string; fileName: string; merchant: string | null; amountCents: number | null }[];
   auditNote: string | null;
 };
 
@@ -131,7 +132,11 @@ export function MovementsScreen({
             <Link href="/movimientos?vista=enfoque" className="rounded-full border border-border px-3 py-1.5 text-xs text-slate-600">Modo enfoque</Link>
             <span className="rounded-full bg-slate-900 px-3 py-1.5 text-xs text-white">Vista detallada</span>
           </div>
-          <p className="mt-1 text-sm text-slate-500">Un clic en Conciliar deja la fila conciliada. Marca varias filas abiertas y concílialas juntas. El comprobante se abre a la derecha.</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {canReview
+              ? "En Por revisar apruebas o pides una aclaración. El círculo verde marca la conciliación bancaria. El comprobante sugiere uno y deja el resto en la búsqueda."
+              : "Si la fila dice «Con tu contador», ya está en su cola. El círculo verde marca la conciliación bancaria."}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2 px-4 py-3">
           {filters.map(([key, label]) => (
@@ -174,6 +179,7 @@ function Drawer({ detail, error, filter, q }: { detail: Detail; error?: string; 
         </div>
         <Link href={`/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}`} className="text-sm text-slate-500">Cerrar</Link>
       </div>
+      <p data-testid="drawer-classification" className="mt-3 text-sm text-slate-700">{detail.categoryLabel || "Sin categoría"}</p>
       <CategoryForm
         id={detail.id}
         subcategoryId={detail.subcategoryId}

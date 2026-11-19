@@ -1,14 +1,12 @@
-import { AlertTriangle, Layers, Paperclip, Scale, Sparkles, TrendingDown, Upload, Wallet } from "lucide-react";
+import { AlertTriangle, Layers, Scale, Sparkles, TrendingDown, Wallet } from "lucide-react";
 import Link from "next/link";
+import { HomeChat } from "@/components/home-chat";
 import { Sparkline } from "@/components/charts";
-import { formatTodayLabel } from "@/lib/dates";
-import { greetingName } from "@/lib/labels";
+import type { Briefing } from "@/lib/briefing";
 import { formatUsd } from "@/lib/money";
-import { Input } from "@/components/ui/input";
 
 export function HomeScreen({
   name,
-  companyId,
   balanceCents,
   accountCount,
   accounts,
@@ -20,9 +18,9 @@ export function HomeScreen({
   uncategorizedCount,
   uncategorizedExpenseCents,
   periodLabel,
+  briefing,
 }: {
   name: string;
-  companyId: string;
   balanceCents: number;
   accountCount: number;
   accounts: { institution: string; mask: string }[];
@@ -34,6 +32,7 @@ export function HomeScreen({
   uncategorizedCount: number;
   uncategorizedExpenseCents: number;
   periodLabel: string | null;
+  briefing: Briefing;
 }) {
   const accountLine = accounts.map((account) => `${account.institution} ····${account.mask}`).join(" · ");
   return (
@@ -82,46 +81,13 @@ export function HomeScreen({
       </section>
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-4">
-          <section className="relative overflow-hidden rounded-3xl border border-border bg-white px-6 pb-24 pt-8 text-center">
-            <p className="text-sm text-slate-500">{formatTodayLabel()}</p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight">
-              Buenos días, <span className="text-primary">{greetingName(name)}.</span>
-            </h1>
-            <p className="mt-2 text-slate-500">¿En qué te gustaría que te ayude hoy?</p>
-            <form action="/api/chat" method="post" className="mx-auto mt-6 flex max-w-xl items-center gap-2 rounded-full border border-border bg-white px-3 py-2 shadow-sm">
-              <Sparkles className="size-4 text-primary" />
-              <input type="hidden" name="companyId" value={companyId} />
-              <Input name="text" required placeholder="Pregúntame sobre tu empresa..." className="h-9 border-0 shadow-none focus:border-0" />
-              <Link href="/comprobantes" aria-label="Ver comprobantes de demostración" className="text-slate-500">
-                <Paperclip className="size-4" />
-              </Link>
-              <button className="flex size-9 items-center justify-center rounded-full bg-primary text-white" type="submit" aria-label="Enviar">
-                <Upload className="size-4" />
-              </button>
-            </form>
-            <div className="mt-4 flex flex-wrap justify-center gap-2">
-              <Link href="/gastos" className="rounded-full border border-border bg-white px-3 py-2 text-sm text-slate-600">
-                Analizar mis gastos
-              </Link>
-              <Link href="/comprobantes" className="rounded-full border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-medium text-primary">
-                Ver comprobantes
-              </Link>
-              <Link href="/por-cobrar" className="rounded-full border border-border bg-white px-3 py-2 text-sm text-slate-600">
-                Revisar mis cobros
-              </Link>
-            </div>
-            <svg viewBox="0 0 1200 140" className="absolute bottom-0 left-0 h-24 w-full" preserveAspectRatio="none" aria-hidden>
-              <path d="M0 70 C 220 130 380 10 620 60 C 840 100 1000 30 1200 80 L 1200 140 L 0 140 Z" fill="#dbeafe" />
-              <path d="M0 96 C 260 50 480 130 760 84 C 940 52 1080 110 1200 78 L 1200 140 L 0 140 Z" fill="#93c5fd" />
-            </svg>
-          </section>
-
+        <HomeChat name={name} briefing={briefing} />
+        <aside className="space-y-4">
           <section data-testid="home-reading" className="rounded-2xl border border-border bg-white p-4">
             <h2 className="flex items-center gap-2 text-sm font-semibold">
-              <Sparkles className="size-4 text-primary" /> Serbell
+              <Sparkles className="size-4 text-primary" /> Lectura de hoy
             </h2>
-            <ul className="mt-3 space-y-2">
+            <ul className="mt-3 space-y-3">
               {reading.map((line) => (
                 <li key={line} className="flex gap-2 text-sm text-slate-600">
                   <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
@@ -130,15 +96,8 @@ export function HomeScreen({
               ))}
             </ul>
           </section>
-        </div>
-
-        <aside className="rounded-2xl border border-border bg-white p-4">
-          <h2 className="flex items-center gap-2 text-base font-semibold">
-            <Sparkles className="size-4 text-primary" /> Tu resumen de hoy
-          </h2>
-          <p className="mt-2 text-xs text-slate-500">El duplicado, si aparece, sale de los comprobantes guardados.</p>
           {duplicates.length === 0 ? (
-            <Link href="/comprobantes" className="mt-3 flex items-start gap-3 rounded-xl border border-border p-3 text-sm">
+            <Link href="/comprobantes" className="flex items-start gap-3 rounded-2xl border border-border bg-white p-4 text-sm">
               <Layers className="mt-0.5 size-4 text-slate-400" />
               <span>
                 <span className="block font-medium">No hay comprobantes duplicados</span>
@@ -146,7 +105,7 @@ export function HomeScreen({
               </span>
             </Link>
           ) : (
-            <Link href={`/comprobantes?foco=${duplicates[0].id}`} data-testid="duplicate-card" className="mt-3 flex items-start gap-3 rounded-xl border border-rose-100 bg-rose-50/40 p-3 text-sm">
+            <Link href={`/comprobantes?foco=${duplicates[0].id}`} data-testid="duplicate-card" className="flex items-start gap-3 rounded-2xl border border-border bg-white p-4 text-sm">
               <Layers className="mt-0.5 size-4 text-rose-500" />
               <span>
                 <span className="block font-medium">
@@ -161,7 +120,7 @@ export function HomeScreen({
               </span>
             </Link>
           )}
-          <Link href="/reportes" className="mt-3 flex items-start gap-3 rounded-xl border border-border p-3 text-sm hover:border-slate-300">
+          <Link href="/reportes" className="flex items-start gap-3 rounded-2xl border border-border bg-white p-4 text-sm hover:border-slate-300">
             <Scale className="mt-0.5 size-4 text-primary" />
             <span>
               <span className="block font-medium">Ver el reporte del periodo</span>

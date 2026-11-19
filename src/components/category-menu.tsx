@@ -172,7 +172,7 @@ export function CategoryMenu({
           label
             ? "border-border bg-white text-slate-700 hover:border-slate-300"
             : attention
-              ? "border-amber-300 bg-amber-50 font-medium text-amber-800 hover:border-amber-400"
+              ? "border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300"
               : "border-border bg-white text-slate-500 hover:border-slate-300"
         } ${open ? "ring-2 ring-primary/30" : ""}`}
       >

@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarClock, Copy, Gauge, Receipt, Sparkles, Tag } from "lucide-react";
+import { CalendarClock, Copy, Gauge, Receipt, Sparkles, Tag } from "lucide-react";
 import Link from "next/link";
 import { monthName, shortMonth } from "@/lib/fixed";
 import { cashDays, change, headline, percentLabel, subline, waterfall, weekly, type MonthTotals } from "@/lib/insights";
@@ -31,9 +31,7 @@ export function ReportScreen({
   const monthKey = (report.lastDay ?? new Date().toISOString().slice(0, 10)).slice(0, 7);
   const current: MonthTotals = { month: monthKey, inflows: report.inflows, outflows: report.outflows, net: report.net };
   const previous = history.filter((row) => row.month < monthKey).at(-1) ?? null;
-  const series: MonthTotals[] = [...history.filter((row) => row.month < monthKey), current];
   const margin = report.inflows > 0 ? report.net / report.inflows : null;
-  const prevMargin = previous && previous.inflows > 0 ? previous.net / previous.inflows : null;
   const runway = cashDays(report.storedBalanceCents, report.outflows, Math.max(report.daily.length, 1));
   const uncategorizedShare = report.outflows > 0 ? report.uncategorizedExpenseCents / report.outflows : 0;
   const steps = waterfall({ closingCents: report.storedBalanceCents, inflows: report.inflows, categories: report.categories });
@@ -90,48 +88,33 @@ export function ReportScreen({
     });
   }
 
+  const incomeDelta = change(report.inflows, previous?.inflows);
+  const expenseDelta = change(report.outflows, previous?.outflows);
+  const netDelta = change(report.net, previous?.net);
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
-      <section className="relative overflow-hidden rounded-3xl bg-slate-950 p-6 text-white sm:p-8" data-testid="report-hero">
-        <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-emerald-500/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 left-1/3 size-72 rounded-full bg-blue-500/20 blur-3xl" />
-        <div className="relative">
-          <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-emerald-300/90">
-            <Sparkles className="size-3.5" /> Lectura automática · {companyName}
+    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="space-y-4">
+        <section className="relative overflow-hidden rounded-[28px] bg-[#0b1220] px-6 py-8 text-white sm:px-8" data-testid="report-hero">
+          <div className="pointer-events-none absolute -right-16 top-0 size-56 rounded-full bg-emerald-400/10 blur-3xl" />
+          <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.22em] text-emerald-200/80">
+            <Sparkles className="size-3.5" /> {companyName}
           </p>
-          <h1 className="mt-3 max-w-3xl text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">{headline(current, previous)}</h1>
-          <p className="mt-2 max-w-2xl text-sm text-slate-300">{subline(current, previous)}</p>
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
-            <HeroFigure label="Ingresos" value={formatUsd(report.inflows)} tone="text-emerald-300" />
-            <HeroFigure label="Gastos" value={formatUsd(report.outflows)} tone="text-rose-300" />
-            <HeroFigure label="Neto" value={formatUsd(report.net)} tone={report.net < 0 ? "text-rose-300" : "text-white"} testId="report-net" />
+          <h1 className="mt-4 max-w-3xl text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">{headline(current, previous)}</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">{subline(current, previous)}</p>
+          <div className="mt-8 grid gap-6 sm:grid-cols-3">
+            <HeroFigure label="Ingresos" value={formatUsd(report.inflows)} delta={incomeDelta} tone="text-emerald-300" />
+            <HeroFigure label="Gastos" value={formatUsd(report.outflows)} delta={expenseDelta} tone="text-rose-200" />
+            <HeroFigure label="Neto" value={formatUsd(report.net)} delta={netDelta} tone="text-white" testId="report-net" />
           </div>
-          <p className="mt-5 text-[11px] text-slate-400">
-            {monthName(monthKey)} · {report.count} movimientos guardados
-            {previous ? ` · ${history.filter((row) => row.month < monthKey).map((row) => shortMonth(row.month)).join(" y ")}: historial de demostración` : ""}. Calculado con reglas, sin inventar datos.
+          <p className="mt-6 text-[11px] text-slate-500">
+            {monthName(monthKey)} · {report.count} movimientos
+            {margin === null ? "" : ` · margen ${Math.round(margin * 100)}%`}
+            {runway === null ? "" : ` · ${runway} días de caja`}.
           </p>
-        </div>
-      </section>
-
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Ingresos" value={compact(report.inflows)} delta={change(report.inflows, previous?.inflows)} good="up" bars={series.map((row) => ({ label: shortMonth(row.month), value: row.inflows }))} color="#10b981" />
-        <Kpi label="Gastos" value={compact(report.outflows)} delta={change(report.outflows, previous?.outflows)} good="down" bars={series.map((row) => ({ label: shortMonth(row.month), value: row.outflows }))} color="#f43f5e" />
-        <Kpi
-          label="Margen neto"
-          value={margin === null ? "—" : `${Math.round(margin * 100)}%`}
-          delta={margin !== null && prevMargin !== null ? margin - prevMargin : null}
-          deltaLabel={margin !== null && prevMargin !== null ? `${margin - prevMargin >= 0 ? "+" : ""}${Math.round((margin - prevMargin) * 100)} pts` : undefined}
-          good="up"
-          bars={series.map((row) => ({ label: shortMonth(row.month), value: Math.max(0, row.net) }))}
-          color="#6366f1"
-        />
-        <Kpi label="Caja disponible" value={compact(report.storedBalanceCents)} delta={change(report.storedBalanceCents, previous?.closingBalanceCents)} good="up" bars={[...history.filter((row) => row.month < monthKey).map((row) => ({ label: shortMonth(row.month), value: row.closingBalanceCents })), { label: shortMonth(monthKey), value: report.storedBalanceCents }]} color="#0ea5e9" />
-      </section>
-
-      <section className="grid gap-3 lg:grid-cols-2">
-        <article className="rounded-2xl border border-border bg-white p-5">
+        </section>
+        <article className="rounded-[28px] border border-border bg-white p-6">
           <div className="flex items-baseline justify-between">
-            <h2 className="text-sm font-semibold">Flujo de efectivo por semana</h2>
+            <h2 className="text-base font-semibold tracking-tight">Cómo se movió el dinero</h2>
             <p className="flex items-center gap-3 text-[11px] text-slate-500">
               <span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-emerald-500" /> Entradas</span>
               <span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-rose-400" /> Salidas</span>
@@ -139,35 +122,29 @@ export function ReportScreen({
           </div>
           <WeeklyChart weeks={weeks} />
         </article>
-        <article className="rounded-2xl border border-border bg-white p-5">
-          <h2 className="text-sm font-semibold">De dónde vino y a dónde se fue</h2>
-          <p className="text-[11px] text-slate-500">Del saldo inicial al saldo actual de las cuentas.</p>
-          <Waterfall steps={steps} />
+        <article className="rounded-[28px] border border-border bg-white p-6">
+          <h2 className="text-base font-semibold tracking-tight">A dónde se fue el gasto</h2>
+          <CategoryMix categories={report.categories} previous={previous?.categories ?? null} previousLabel={previous ? shortMonth(previous.month) : null} />
+          <details className="mt-4">
+            <summary className="cursor-pointer text-xs font-medium text-slate-500">De dónde vino el saldo</summary>
+            <Waterfall steps={steps} />
+          </details>
         </article>
-      </section>
+      </div>
+      <aside className="space-y-3" data-testid="report-signals">
+        <p className="px-1 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Para resolver</p>
+        {signals.length === 0 ? <p className="rounded-2xl border border-border bg-white p-4 text-sm text-slate-500">Nada pendiente en esta lectura.</p> : null}
+        {signals.map((signal) => (
+          <article key={signal.title} className="rounded-2xl border border-border bg-white p-4">
+            <span className={`grid size-8 place-items-center rounded-full ${signal.tone}`}><signal.icon className="size-4" /></span>
+            <p className="mt-3 text-sm font-semibold leading-5">{signal.title}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{signal.body}</p>
+            {signal.href ? <Link href={signal.href} className="mt-3 inline-flex text-xs font-medium text-primary">{signal.cta}</Link> : null}
+          </article>
+        ))}
+      </aside>
 
-      <section>
-        <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold"><AlertTriangle className="size-4 text-amber-500" /> Señales para ti</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="report-signals">
-          {signals.map((signal) => (
-            <article key={signal.title} className="flex flex-col rounded-2xl border border-border bg-white p-4">
-              <span className={`grid size-8 place-items-center rounded-lg ${signal.tone}`}><signal.icon className="size-4" /></span>
-              <p className="mt-3 text-sm font-semibold">{signal.title}</p>
-              <p className="mt-1 flex-1 text-xs leading-relaxed text-slate-500">{signal.body}</p>
-              {signal.href ? (
-                <Link href={signal.href} className="mt-3 text-xs font-medium text-primary">{signal.cta} →</Link>
-              ) : null}
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-border bg-white p-5">
-        <h2 className="text-sm font-semibold">Gasto por categoría</h2>
-        <CategoryMix categories={report.categories} previous={previous?.categories ?? null} previousLabel={previous ? shortMonth(previous.month) : null} />
-      </section>
-
-      <details className="rounded-2xl border border-border bg-white">
+      <details className="rounded-2xl border border-border bg-white xl:col-span-2">
         <summary className="cursor-pointer px-5 py-4 text-sm font-semibold">Detalle por subcategoría y cuentas</summary>
         <div className="space-y-5 border-t border-border px-5 py-4">
           <div className="overflow-hidden rounded-xl border border-border">
@@ -210,58 +187,17 @@ export function ReportScreen({
   );
 }
 
-function HeroFigure({ label, value, tone, testId }: { label: string; value: string; tone: string; testId?: string }) {
+function HeroFigure({ label, value, delta, tone, testId }: { label: string; value: string; delta: number | null; tone: string; testId?: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur">
-      <p className="text-[11px] uppercase tracking-wider text-slate-400">{label}</p>
-      <p data-testid={testId} className={`mt-1 text-xl font-semibold tabular-nums tracking-tight ${tone}`}>{value}</p>
+    <div>
+      <p className="text-[11px] uppercase tracking-[0.16em] text-slate-400">{label}</p>
+      <p data-testid={testId} className={`mt-2 text-2xl font-semibold tabular-nums tracking-tight sm:text-3xl ${tone}`}>{value}</p>
+      {delta !== null ? (
+        <p className={`mt-1 text-xs ${delta >= 0 ? "text-emerald-300" : "text-rose-300"}`}>{percentLabel(delta)} vs. el mes anterior</p>
+      ) : (
+        <p className="mt-1 text-xs text-slate-500">Sin mes anterior</p>
+      )}
     </div>
-  );
-}
-
-function Kpi({
-  label,
-  value,
-  delta,
-  deltaLabel,
-  good,
-  bars,
-  color,
-}: {
-  label: string;
-  value: string;
-  delta: number | null;
-  deltaLabel?: string;
-  good: "up" | "down";
-  bars: { label: string; value: number }[];
-  color: string;
-}) {
-  const max = Math.max(...bars.map((bar) => bar.value), 1);
-  const positive = delta !== null && (good === "up" ? delta >= 0 : delta <= 0);
-  return (
-    <article className="rounded-2xl border border-border bg-white p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-500">{label}</p>
-        {delta !== null ? (
-          <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${positive ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
-            {delta >= 0 ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
-            {deltaLabel ?? percentLabel(delta)}
-          </span>
-        ) : null}
-      </div>
-      <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
-      <div className="mt-3 flex h-12 items-end gap-1.5">
-        {bars.map((bar, index) => (
-          <div key={bar.label} className="flex flex-1 flex-col items-center gap-1">
-            <div
-              className="w-full rounded-md"
-              style={{ height: `${Math.max(6, (bar.value / max) * 40)}px`, background: color, opacity: index === bars.length - 1 ? 1 : 0.25 }}
-            />
-            <span className="text-[10px] text-slate-400">{bar.label}</span>
-          </div>
-        ))}
-      </div>
-    </article>
   );
 }
 

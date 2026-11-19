@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ReceiptFrame } from "@/components/receipt-frame";
-import { Button } from "@/components/ui/button";
+import { ReceiptPicker } from "@/components/receipt-picker";
 
 export function ReceiptPanel({
   receipt,
@@ -11,9 +11,10 @@ export function ReceiptPanel({
   receipt: {
     transactionId: string;
     merchant: string;
+    amountCents: number;
     sealed: boolean;
     document: { id: string; fileName: string; mimeType: string } | null;
-    choices: { id: string; fileName: string }[];
+    choices: { id: string; fileName: string; merchant?: string | null; amountCents?: number | null }[];
     auditNote: string | null;
   };
   filter: string;
@@ -24,6 +25,11 @@ export function ReceiptPanel({
   if (filter && filter !== "todos") params.set("filtro", filter);
   if (q) params.set("q", q);
   const closeHref = `/movimientos${params.size ? `?${params}` : ""}`;
+  const hidden: Record<string, string> = {
+    filtro: filter === "todos" ? "" : filter,
+    q,
+    recibo: receipt.document?.id ?? "",
+  };
   return (
     <aside data-testid="receipt-panel" className="rounded-2xl border border-border bg-white p-4 lg:sticky lg:top-4">
       <p className="text-xs text-slate-500">Comprobante</p>
@@ -47,23 +53,15 @@ export function ReceiptPanel({
       {receipt.sealed ? (
         <p className="mt-3 text-xs text-slate-500">Sellado. El servidor rechaza el cambio del comprobante.</p>
       ) : (
-        <div className="mt-4 space-y-4">
-          <form action={`/api/transactions/${receipt.transactionId}/document`} method="post" className="space-y-2">
-            <input type="hidden" name="filtro" value={filter === "todos" ? "" : filter} />
-            <input type="hidden" name="q" value={q} />
-            <input type="hidden" name="recibo" value={receipt.document?.id ?? ""} />
-            <label className="block text-xs text-slate-500">
-              {receipt.document ? "Otro comprobante guardado" : "Comprobante guardado"}
-              <select name="documentId" data-testid="receipt-choice" className="mt-1 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm" defaultValue="">
-                <option value="">Elegir</option>
-                {receipt.choices.map((choice) => (
-                  <option key={choice.id} value={choice.id}>{choice.fileName}</option>
-                ))}
-              </select>
-            </label>
-            <Button type="submit" variant="outline" data-testid="receipt-use">Usar este</Button>
-          </form>
-          <p className="text-xs text-slate-500">Los comprobantes son de demostración. No se pueden subir ni descargar.</p>
+        <div className="mt-4">
+          <ReceiptPicker
+            action={`/api/transactions/${receipt.transactionId}/document`}
+            hidden={hidden}
+            choices={receipt.choices}
+            merchant={receipt.merchant}
+            amountCents={receipt.amountCents}
+          />
+          <p className="mt-3 text-xs text-slate-500">Los comprobantes son de demostración. No se pueden subir ni descargar.</p>
         </div>
       )}
     </aside>

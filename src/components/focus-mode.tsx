@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ReceiptFrame } from "@/components/receipt-frame";
+import { ReceiptPicker } from "@/components/receipt-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ACCOUNTING_LABEL, DOCUMENT_LABEL, RECONCILIATION_LABEL, REVIEW_LABEL } from "@/lib/labels";
@@ -18,7 +19,7 @@ export type FocusData = {
   pending: number;
   merchantPending: number;
   suggestions: Suggestion[];
-  choices: { id: string; fileName: string }[];
+  choices: { id: string; fileName: string; merchant?: string | null; amountCents?: number | null }[];
   error?: string;
   categories: { name: string; children: { id: string; name: string }[] }[];
   current: {
@@ -197,19 +198,13 @@ export function FocusMode({ data }: { data: FocusData }) {
             )}
             <div className="mt-4 space-y-3">
               <p className="text-sm font-medium">Cambiar comprobante</p>
-              <form action={`/api/transactions/${current.id}/document`} method="post" className="space-y-2">
-                <input type="hidden" name="next" value={here} />
-                <label className="block text-xs text-slate-500">
-                  Otro comprobante guardado
-                  <select name="documentId" data-testid="receipt-choice" className="mt-1 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm" defaultValue="">
-                    <option value="">Elegir</option>
-                    {data.choices.map((choice) => (
-                      <option key={choice.id} value={choice.id}>{choice.fileName}</option>
-                    ))}
-                  </select>
-                </label>
-                <Button type="submit" variant="outline" data-testid="receipt-use">Usar este</Button>
-              </form>
+              <ReceiptPicker
+                action={`/api/transactions/${current.id}/document`}
+                hidden={{ next: here }}
+                choices={data.choices}
+                merchant={current.merchant}
+                amountCents={current.amountCents}
+              />
               <p className="text-xs text-slate-500">Los comprobantes son de demostración. No se pueden subir ni descargar.</p>
             </div>
           </aside>

@@ -1,5 +1,6 @@
 import { Check, FileText, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { GUIDE_REPLY } from "@/lib/briefing";
 import { formatUsd } from "@/lib/money";
 import { StateView } from "@/components/state-view";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,9 @@ export function ChatScreen({
             <p className="text-sm font-semibold">Serbell</p>
             <p className="text-xs text-slate-500">Asistente del laboratorio · {companyName}</p>
           </div>
+          <Link href="/" className="ml-auto rounded-full border border-border px-3 py-1.5 text-xs font-medium text-slate-600">
+            Nuevo chat
+          </Link>
         </header>
         <div className="space-y-3 px-4 py-4">
           {error ? <StateView variant="error" title={error} testId="server-error" /> : null}
@@ -82,7 +86,25 @@ export function ChatScreen({
             </form>
           </div>
         </div>
-        <form action="/api/chat" method="post" className="flex gap-2 border-t border-border p-3">
+        <div className="flex flex-wrap gap-2 border-t border-border px-3 pt-3">
+          {[
+            ["Analizar mis gastos", "Analiza mis gastos"],
+            ["Revisar duplicados", "Revisar duplicados"],
+            ["¿Quién debe?", "¿Quién debe?"],
+            ["Rastréame un movimiento", "Rastréame un movimiento"],
+            ["¿Cuánto gané?", "¿Cuánto gané?"],
+          ].map(([label, prompt]) => (
+            <form key={prompt} action="/api/chat" method="post">
+              <input type="hidden" name="companyId" value={companyId} />
+              <input type="hidden" name="text" value={prompt} />
+              <button type="submit" className="rounded-full border border-border px-3 py-1.5 text-xs text-slate-600 hover:border-slate-300">
+                {label}
+              </button>
+            </form>
+          ))}
+        </div>
+        <p className="px-4 pt-2 text-xs text-slate-500">{GUIDE_REPLY}</p>
+        <form action="/api/chat" method="post" className="flex gap-2 p-3">
           <input type="hidden" name="companyId" value={companyId} />
           <Input name="text" required placeholder="Escribe un mensaje a Serbell..." />
           <Button type="submit">Enviar</Button>

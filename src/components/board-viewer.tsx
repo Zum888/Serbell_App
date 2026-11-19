@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { ReceiptFrame } from "@/components/receipt-frame";
+import { ReceiptPicker } from "@/components/receipt-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export type BoardViewerData = {
   document: { id: string; fileName: string; mimeType: string; merchant: string; amountLabel: string; dateLabel: string } | null;
-  movement: { id: string; merchant: string; amountLabel: string; dateLabel: string; sealed: boolean } | null;
+  movement: { id: string; merchant: string; amountCents?: number; amountLabel: string; dateLabel: string; sealed: boolean } | null;
   candidates: { transactionId: string; merchant: string; amountLabel: string; dateLabel: string }[];
-  choices: { id: string; fileName: string }[];
+  choices: { id: string; fileName: string; merchant?: string | null; amountCents?: number | null }[];
   duplicate: boolean;
   duplicateOfName: string | null;
   conflict: boolean;
@@ -74,19 +75,13 @@ export function BoardViewer({ viewer, error }: { viewer: BoardViewerData; error?
       ) : null}
       {!sealed && viewer.movement && viewer.document ? (
         <div className="mt-4 space-y-4">
-          <form action={`/api/transactions/${viewer.movement.id}/document`} method="post" className="space-y-2">
-            <input type="hidden" name="next" value={viewer.next} />
-            <label className="block text-xs text-slate-500">
-              Otro comprobante guardado
-              <select name="documentId" data-testid="receipt-choice" className="mt-1 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm" defaultValue="">
-                <option value="">Elegir</option>
-                {viewer.choices.map((choice) => (
-                  <option key={choice.id} value={choice.id}>{choice.fileName}</option>
-                ))}
-              </select>
-            </label>
-            <Button type="submit" variant="outline" data-testid="receipt-use">Usar este</Button>
-          </form>
+          <ReceiptPicker
+            action={`/api/transactions/${viewer.movement.id}/document`}
+            hidden={{ next: viewer.next }}
+            choices={viewer.choices}
+            merchant={viewer.movement.merchant}
+            amountCents={viewer.movement.amountCents ?? null}
+          />
           <p className="text-xs text-slate-500">Los comprobantes son de demostración. No se pueden subir ni descargar.</p>
         </div>
       ) : null}
