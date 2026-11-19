@@ -1,4 +1,5 @@
 import { dayKey, isDay } from "@/lib/dates";
+import { CAT, COMPANY, TX } from "@/lib/ids";
 import { MISSING_RECEIPTS } from "@/lib/missing-receipts";
 import { AppError } from "@/lib/errors";
 import { isTalk, talkReply } from "@/lib/briefing";
@@ -790,6 +791,60 @@ export async function uploadReplacementDocument(
     bytes: file.bytes,
   });
   return replaceTransactionDocument(db, actor, transactionId, saved.id);
+}
+
+export async function prepareFleetSmartsMatch(db: Db, actor: Actor) {
+  assertCompanyAccess(actor, COMPANY.qpl);
+  const linked = await db.transactionDocumentLink.findFirst({
+    where: { transactionId: TX.fs20394, status: "confirmed" },
+  });
+  if (linked) return { transactionId: TX.fs20394, linked: true };
+  const id = "doc_qpl_fs_20394";
+  await db.document.upsert({
+    where: { id },
+    update: { fileName: "FleetSmarts_20394.jpg", status: "pending" },
+    create: {
+      id,
+      companyId: COMPANY.qpl,
+      uploadedById: actor.id,
+      fileName: "FleetSmarts_20394.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 0,
+      storagePath: "demo/doc_qpl_fs_20394",
+      fileHash: sha256(Buffer.from("serbell-lab-fleetsmarts-20394")),
+      status: "pending",
+    },
+  });
+  const occurredOn = new Date("2026-10-12T12:00:00.000Z");
+  await db.documentExtraction.upsert({
+    where: { documentId: id },
+    update: {
+      merchant: "FleetSmarts",
+      amountCents: 20394,
+      occurredOn,
+      categoryId: CAT.qpl.transporte,
+      subcategoryId: CAT.qpl.combustible,
+      verifiedAt: new Date(),
+      verifiedById: actor.id,
+    },
+    create: {
+      id: "ext_qpl_fs_20394",
+      documentId: id,
+      merchant: "FleetSmarts",
+      amountCents: 20394,
+      currency: "USD",
+      occurredOn,
+      categoryId: CAT.qpl.transporte,
+      subcategoryId: CAT.qpl.combustible,
+      source: "demonstration",
+      isDemonstration: true,
+      notice: "Serbell leyó el ticket y lo comparó con el movimiento del banco.",
+      verifiedAt: new Date(),
+      verifiedById: actor.id,
+    },
+  });
+  await matchDocument(db, id);
+  return { transactionId: TX.fs20394, linked: false };
 }
 
 export async function stampReliableMatcherLinks(db: Db) {

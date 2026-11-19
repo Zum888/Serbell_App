@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CategoryForm, pairsToGroups } from "@/components/category-form";
 import { DuplicatePanel } from "@/components/duplicate-panel";
 import { MissingPanel } from "@/components/missing-panel";
+import { MovementMatch } from "@/components/movement-match";
 import { MovementsTable } from "@/components/movements-table";
 import { ReceiptPanel } from "@/components/receipt-panel";
 import { accountInitials } from "@/lib/accounts";
@@ -64,8 +65,17 @@ type Detail = {
   bankState: string;
   sealed: boolean;
   sealedAt: string | null;
+  categoryId: string;
   subcategoryId: string;
   categoryLabel: string;
+  match: {
+    linked: boolean;
+    documentId: string;
+    fileName: string;
+    postedDay: string;
+    checks: { id: string; label: string }[];
+    suggested: boolean;
+  } | null;
   pairs: { subcategoryId: string; label: string }[];
   catalog: string[];
   journal: { lines: { id: string; accountName: string; debitCents: number; creditCents: number }[] } | null;
@@ -144,6 +154,7 @@ export function MovementsScreen({
     aprobados: counts.aprobados,
   };
   const side = receipt || detail;
+  const wide = Boolean(detail?.match);
   const spotlight = duplicate ? (DUPLICATE_IDS as readonly string[]) : missing ? MISSING_IDS : found;
   const selectedAccount = accounts.find((account) => account.id === accountId) ?? null;
   function listHref(overrides: { filtro?: string; cuenta?: string | null } = {}) {
@@ -161,7 +172,7 @@ export function MovementsScreen({
     : rows;
   const ready = rows.filter((row) => MISSING_IDS.includes(row.id) && row.documentState === "Linked").length;
   return (
-    <div className={side ? "grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_400px]" : ""}>
+    <div className={!side ? "" : wide ? "grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_480px]" : "grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_400px]"}>
       <section className="min-w-0 rounded-2xl border border-border bg-white">
         <div className="border-b border-border px-4 py-4">
           <p className="text-xs text-slate-500">{companyName}</p>
@@ -237,7 +248,14 @@ export function MovementsScreen({
           <MovementsTable rows={ordered} categories={categories} canReview={canReview} filter={filter} q={q} companyId={companyId} accountId={accountId} showBank={!selectedAccount} marked={[...spotlight]} />
         )}
       </section>
-      {receipt ? <ReceiptPanel receipt={receipt} filter={filter} q={q} error={error} /> : detail ? <Drawer detail={detail} error={error} filter={filter} q={q} accountId={accountId} /> : null}
+      {receipt ? <ReceiptPanel receipt={receipt} filter={filter} q={q} error={error} /> : detail?.match ? (
+        <MovementMatch
+          detail={{ ...detail, match: detail.match }}
+          categories={categories}
+          closeHref={stay(filter, q, accountId)}
+          next={stay(filter, q, accountId, `movimiento=${detail.id}`)}
+        />
+      ) : detail ? <Drawer detail={detail} error={error} filter={filter} q={q} accountId={accountId} /> : null}
     </div>
   );
 }
