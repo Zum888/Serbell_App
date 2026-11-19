@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BankStep } from "@/components/bank-step";
-import { ChatRail } from "@/components/chat-rail";
 import { StateView } from "@/components/state-view";
 import { movementRunningCents } from "@/lib/accounts";
 import { LOTE, LOTE_ACCOUNT, loteItem, loteNextHref } from "@/lib/lote";
@@ -148,13 +147,7 @@ export default async function AccountsPage({
         }}
       />
     );
-    if (!chat) return step;
-    return (
-      <div className="flex items-start gap-4">
-        <ChatRail flujo={params.flujo || "lote"} />
-        <div className="min-w-0 flex-1">{step}</div>
-      </div>
-    );
+    return step;
   }
   redirect("/movimientos");
 }

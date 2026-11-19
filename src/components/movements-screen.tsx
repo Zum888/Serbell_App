@@ -1,14 +1,8 @@
-import { LayoutGrid, Plus } from "lucide-react";
 import Link from "next/link";
+import { BankLedger } from "@/components/bank-ledger";
 import { CategoryForm, pairsToGroups } from "@/components/category-form";
-import { DuplicatePanel } from "@/components/duplicate-panel";
-import { MissingPanel } from "@/components/missing-panel";
 import { MovementMatch } from "@/components/movement-match";
-import { MovementsTable } from "@/components/movements-table";
 import { ReceiptPanel } from "@/components/receipt-panel";
-import { accountInitials } from "@/lib/accounts";
-import { DUPLICATE_IDS } from "@/lib/duplicates";
-import { MISSING_IDS } from "@/lib/missing-receipts";
 import { ACCOUNTING_LABEL, RECONCILIATION_LABEL } from "@/lib/labels";
 import { formatUsd } from "@/lib/money";
 import { StateView } from "@/components/state-view";
@@ -17,6 +11,8 @@ import { Input } from "@/components/ui/input";
 
 type Row = {
   id: string;
+  accountId: string;
+  accountingState: string;
   postedOn: string;
   merchant: string;
   description: string;
@@ -95,30 +91,10 @@ type Detail = {
   history: { id: string; action: string; actor: string; at: string; justification: string | null; note: string | null }[];
 };
 
-function bankAccent(institution: string) {
-  const name = institution.toLowerCase();
-  if (name.includes("amex") || name.includes("american express")) return "#016FD0";
-  if (name.includes("america")) return "#C41230";
-  if (name.includes("chase")) return "#0B5CAB";
-  if (name.includes("wells")) return "#D71E28";
-  return "#5B21B6";
-}
-
-const filters = [
-  ["todos", "Todos"],
-  ["sin-categoria", "Sin categorizar"],
-  ["sin-comprobante", "Sin comprobantes"],
-  ["por-conciliar", "Por conciliar"],
-  ["por-revisar", "Por revisar"],
-  ["aprobados", "Aprobados"],
-] as const;
-
 export function MovementsScreen({
   companyName,
   companyId,
-  balanceLabel,
   rows,
-  counts,
   filter,
   q,
   error,
@@ -138,9 +114,7 @@ export function MovementsScreen({
 }: {
   companyName: string;
   companyId: string;
-  balanceLabel: string;
   rows: Row[];
-  counts: { todos: number; sinCategoria: number; sinComprobante: number; porConciliar: number; porRevisar: number; aprobados: number; inflows: number; outflows: number };
   filter: string;
   q: string;
   error?: string;
@@ -158,138 +132,29 @@ export function MovementsScreen({
   withChat?: boolean;
   flujo?: string;
 }) {
-  const countFor: Record<string, number> = {
-    todos: counts.todos,
-    "sin-categoria": counts.sinCategoria,
-    "sin-comprobante": counts.sinComprobante,
-    "por-conciliar": counts.porConciliar,
-    "por-revisar": counts.porRevisar,
-    aprobados: counts.aprobados,
-  };
   const side = receipt || detail;
   const wide = Boolean(detail?.match);
-  const spotlight = duplicate ? (DUPLICATE_IDS as readonly string[]) : missing ? MISSING_IDS : found;
-  const selectedAccount = accounts.find((account) => account.id === accountId) ?? null;
-  const allAvailable = accounts.reduce((sum, account) => sum + account.availableBalanceCents, 0);
-  const availableCents = selectedAccount ? selectedAccount.availableBalanceCents : allAvailable;
-  function listHref(overrides: { filtro?: string; cuenta?: string | null } = {}) {
-    const params = new URLSearchParams();
-    const filtro = overrides.filtro ?? filter;
-    const cuenta = overrides.cuenta === undefined ? accountId : overrides.cuenta;
-    if (filtro) params.set("filtro", filtro);
-    if (q) params.set("q", q);
-    if (cuenta) params.set("cuenta", cuenta);
-    if (withChat) {
-      params.set("con", "chat");
-      if (flujo) params.set("flujo", flujo);
-    }
-    const text = params.toString();
-    return text ? `/movimientos?${text}` : "/movimientos";
-  }
-  const ordered = spotlight.length
-    ? [...rows.filter((row) => spotlight.includes(row.id)), ...rows.filter((row) => !spotlight.includes(row.id))]
-    : rows;
-  const ready = rows.filter((row) => MISSING_IDS.includes(row.id) && row.documentState === "Linked").length;
   return (
     <div className={!side ? "" : wide ? "grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_480px]" : "grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_400px]"}>
-      <section className="min-w-0 rounded-2xl border border-border bg-white">
-        <div className="border-b border-border px-4 py-4">
-          <p className="text-xs text-slate-500">{companyName}</p>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-semibold">Bancos</h1>
-              <p className="text-sm text-slate-500">{selectedAccount ? `${selectedAccount.institution} ····${selectedAccount.mask}` : periodOf(rows) || "Todos los bancos, por fecha"}</p>
-            </div>
-            {selectedAccount && rows.some((row) => row.reconciliationState !== "Reconciled") ? (
-              <Link href={`/cuentas?${new URLSearchParams({ cuenta: selectedAccount.id, paso: "conciliar", ...(withChat ? { con: "chat", ...(flujo ? { flujo } : {}) } : {}) }).toString()}`} className="text-sm font-medium text-primary">Conciliar con el banco</Link>
-            ) : null}
-          </div>
-          <div className="mt-4 rounded-2xl bg-slate-50 p-3">
-            <div data-testid="bank-totals" className="grid grid-cols-3 gap-2">
-              <div className="rounded-xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-200">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Ingresos</p>
-                <p className="mt-1 text-lg font-semibold tabular-nums text-emerald-600">{formatUsd(counts.inflows)}</p>
-              </div>
-              <div className="rounded-xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-200">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Gastos</p>
-                <p className="mt-1 text-lg font-semibold tabular-nums text-rose-600">{formatUsd(counts.outflows)}</p>
-              </div>
-              <div className="rounded-xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-200" title={balanceLabel}>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Disponible</p>
-                <p className="mt-1 text-lg font-semibold tabular-nums text-slate-900">{formatUsd(availableCents)}</p>
-                <p className="mt-0.5 text-[11px] text-slate-500">{selectedAccount ? "Esta cuenta" : `Las ${accounts.length} cuentas`}</p>
-              </div>
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <nav aria-label="Cambiar de cuenta" data-testid="account-switcher" className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
-                <Link href={listHref({ cuenta: null })} aria-current={selectedAccount ? undefined : "page"} className={`flex h-12 shrink-0 items-center gap-2 rounded-xl border bg-white px-2.5 ${selectedAccount ? "border-slate-200 hover:border-slate-300" : "border-slate-300 bg-slate-50"}`}>
-                  <span className="flex size-7 items-center justify-center rounded-lg bg-slate-100 text-slate-700"><LayoutGrid className="size-3.5" /></span>
-                  <span>
-                    <span className="block text-sm font-medium leading-tight">Todas</span>
-                    <span className="block text-[11px] tabular-nums leading-tight text-slate-500">{formatUsd(allAvailable)}</span>
-                  </span>
-                </Link>
-                {accounts.map((account) => {
-                  const active = account.id === accountId;
-                  const accent = bankAccent(account.institution);
-                  return (
-                    <Link
-                      key={account.id}
-                      href={listHref({ cuenta: account.id })}
-                      aria-current={active ? "page" : undefined}
-                      className={`flex h-12 w-[188px] shrink-0 items-center gap-2 rounded-xl border bg-white px-2.5 ${active ? "border-slate-300 bg-slate-50" : "border-slate-200 hover:border-slate-300"}`}
-                    >
-                      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold text-white" style={{ backgroundColor: accent }}>{accountInitials(account.institution)}</span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium leading-tight">{account.institution}</span>
-                        <span className="block truncate text-[11px] leading-tight text-slate-500">····{account.mask} · {formatUsd(account.availableBalanceCents)}</span>
-                      </span>
-                    </Link>
-                  );
-                })}
-              </nav>
-              <Link href="/cuentas/conectar" data-testid="add-account" className="shrink-0 rounded-lg px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100">
-                <Plus className="mr-1 inline size-3.5" /> Agregar
-              </Link>
-            </div>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <Link href="/movimientos?vista=enfoque" className="rounded-full border border-border px-3 py-1.5 text-xs text-slate-600">Modo enfoque</Link>
-            <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-800">Vista detallada</span>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-1 px-4 py-3">
-          {filters.map(([key, label]) => (
-            <Link
-              key={key}
-              href={listHref({ filtro: key })}
-              className={filter === key ? "rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-900" : "rounded-lg px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"}
-            >
-              {label}
-              <span className="ml-1 text-slate-400">{countFor[key]}</span>
-            </Link>
-          ))}
-        </div>
-        <form className="px-4 pb-3" action="/movimientos">
-          <input type="hidden" name="filtro" value={filter} />
-          {accountId ? <input type="hidden" name="cuenta" value={accountId} /> : null}
-          {withChat ? <input type="hidden" name="con" value="chat" /> : null}
-          {withChat && flujo ? <input type="hidden" name="flujo" value={flujo} /> : null}
-          <Input name="q" defaultValue={q} placeholder="Buscar movimiento..." />
-        </form>
-        {notice === "factura" ? <p data-testid="invoice-reconciled" className="px-4 pb-3 text-sm text-emerald-800">La factura quedó conciliada con el movimiento del banco.</p> : null}
-        {notice === "lote" ? <p data-testid="batch-reconciled" className="px-4 pb-3 text-sm text-emerald-800">El lote quedó conciliado con los movimientos del banco.</p> : null}
-        {duplicate ? <DuplicatePanel decision={decision} /> : null}
-        {missing ? <MissingPanel ready={ready} /> : null}
-        {error && !detail && !receipt ? <div className="px-4 pb-3"><StateView variant="error" title={error} testId="server-error" /></div> : null}
-        {ordered.length === 0 ? (
-          <div className="px-4 pb-4">
-            <StateView variant="empty" title="No hay movimientos con este filtro." />
-          </div>
-        ) : (
-          <MovementsTable rows={ordered} categories={categories} canReview={canReview} filter={filter} q={q} companyId={companyId} accountId={accountId} showBank={!selectedAccount} marked={[...spotlight]} />
-        )}
-      </section>
+      <BankLedger
+        companyName={companyName}
+        companyId={companyId}
+        accounts={accounts}
+        accountId={accountId}
+        rows={rows}
+        categories={categories}
+        canReview={canReview}
+        filter={filter}
+        q={q}
+        found={found}
+        notice={notice}
+        duplicate={duplicate}
+        decision={decision}
+        missing={missing}
+        error={error && !detail && !receipt ? error : undefined}
+        withChat={withChat}
+        flujo={flujo}
+      />
       {receipt ? <ReceiptPanel receipt={receipt} filter={filter} q={q} error={error} /> : detail?.match ? (
         <MovementMatch
           detail={{ ...detail, match: detail.match }}
@@ -300,15 +165,6 @@ export function MovementsScreen({
       ) : detail ? <Drawer detail={detail} error={error} filter={filter} q={q} accountId={accountId} /> : null}
     </div>
   );
-}
-
-function periodOf(rows: { postedOn: string }[]) {
-  const day = rows.find((row) => row.postedOn)?.postedOn;
-  if (!day) return "";
-  const [year, month] = day.split("-").map(Number);
-  if (!year || !month) return "";
-  const label = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1, 12))).replace(" de ", " ");
-  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function stay(filter: string, q: string, accountId: string | undefined, extra = "") {
