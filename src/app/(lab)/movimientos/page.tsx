@@ -12,7 +12,7 @@ import { getHome, getMovement, getReceiptContext, listCategoryTree, listMovement
 export default async function MovementsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filtro?: string; q?: string; movimiento?: string; error?: string; fila?: string; recibo?: string; vista?: string; actual?: string; duplicado?: string; decision?: string }>;
+  searchParams: Promise<{ filtro?: string; q?: string; movimiento?: string; error?: string; fila?: string; recibo?: string; vista?: string; actual?: string; duplicado?: string; decision?: string; faltantes?: string }>;
 }) {
   const session = await pageContext();
   const params = await searchParams;
@@ -70,6 +70,7 @@ export default async function MovementsPage({
         categories={categories}
         duplicate={params.duplicado === "sunpass"}
         decision={params.decision}
+        missing={params.faltantes === "1"}
       />
     );
   } catch (error) {

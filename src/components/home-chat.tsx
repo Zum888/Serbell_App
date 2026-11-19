@@ -4,6 +4,7 @@ import { ArrowUp, Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { DuplicateFlow } from "@/components/duplicate-flow";
+import { MissingFlow } from "@/components/missing-flow";
 import { LoteFlow } from "@/components/lote-flow";
 import { InvoiceFlow } from "@/components/ticket-flow";
 import { GUIDE_REPLY, isTalk, talkReply, type Briefing } from "@/lib/briefing";
@@ -21,11 +22,17 @@ type Bubble = { id: string; role: "user" | "assistant"; body: string };
 export function HomeChat({ name, briefing, starts }: { name: string; briefing: Briefing; starts: HomeStart[] }) {
   const [messages, setMessages] = useState<Bubble[]>([]);
   const [text, setText] = useState("");
-  const [flow, setFlow] = useState<"factura" | "lote" | "duplicado" | null>(null);
+  const [flow, setFlow] = useState<"factura" | "lote" | "duplicado" | "faltantes" | null>(null);
 
   function ask(raw: string) {
     const value = raw.trim();
     if (!value) return;
+    if (/faltan comprobantes|comprobantes faltantes|pedir comprobantes/i.test(value)) {
+      setMessages([]);
+      setFlow("faltantes");
+      setText("");
+      return;
+    }
     if (/duplicad/i.test(value)) {
       setMessages([]);
       setFlow("duplicado");
@@ -78,6 +85,11 @@ export function HomeChat({ name, briefing, starts }: { name: string; briefing: B
             <h1 className="sr-only">Revisar duplicados</h1>
             <DuplicateFlow />
           </div>
+        ) : flow === "faltantes" ? (
+          <div className="mx-auto w-full max-w-2xl flex-1">
+            <h1 className="sr-only">Pedir comprobantes</h1>
+            <MissingFlow />
+          </div>
         ) : talking ? (
           <div className="mx-auto w-full max-w-2xl flex-1 space-y-6">
             <h1 className="sr-only">Buenos días, {greetingName(name)}.</h1>
@@ -126,6 +138,14 @@ export function HomeChat({ name, briefing, starts }: { name: string; briefing: B
                 className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:text-slate-950"
               >
                 Revisar duplicados
+              </button>
+              <button
+                type="button"
+                data-testid="flow-faltantes"
+                onClick={() => setFlow("faltantes")}
+                className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:text-slate-950"
+              >
+                Pedir comprobantes
               </button>
               {PROMPTS.map(([label, prompt]) => (
                 <button

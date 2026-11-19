@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { CategoryForm, pairsToGroups } from "@/components/category-form";
 import { DuplicatePanel } from "@/components/duplicate-panel";
+import { MissingPanel } from "@/components/missing-panel";
 import { MovementsTable } from "@/components/movements-table";
 import { ReceiptPanel } from "@/components/receipt-panel";
 import { DUPLICATE_IDS } from "@/lib/duplicates";
+import { MISSING_IDS } from "@/lib/missing-receipts";
 import { ACCOUNTING_LABEL, RECONCILIATION_LABEL } from "@/lib/labels";
 import { formatUsd } from "@/lib/money";
 import { StateView } from "@/components/state-view";
@@ -105,6 +107,7 @@ export function MovementsScreen({
   categories,
   duplicate = false,
   decision,
+  missing = false,
 }: {
   companyName: string;
   companyId: string;
@@ -120,6 +123,7 @@ export function MovementsScreen({
   categories: { id: string; name: string; children?: { id: string; name: string; children?: { id: string; name: string }[] }[] }[];
   duplicate?: boolean;
   decision?: string;
+  missing?: boolean;
 }) {
   const countFor: Record<string, number> = {
     todos: counts.todos,
@@ -130,9 +134,11 @@ export function MovementsScreen({
     aprobados: counts.aprobados,
   };
   const side = receipt || detail;
-  const ordered = duplicate
-    ? [...rows.filter((row) => (DUPLICATE_IDS as readonly string[]).includes(row.id)), ...rows.filter((row) => !(DUPLICATE_IDS as readonly string[]).includes(row.id))]
+  const spotlight = duplicate ? (DUPLICATE_IDS as readonly string[]) : missing ? MISSING_IDS : [];
+  const ordered = spotlight.length
+    ? [...rows.filter((row) => spotlight.includes(row.id)), ...rows.filter((row) => !spotlight.includes(row.id))]
     : rows;
+  const ready = rows.filter((row) => MISSING_IDS.includes(row.id) && row.documentState === "Linked").length;
   return (
     <div className={side ? "grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_400px]" : ""}>
       <section className="min-w-0 rounded-2xl border border-border bg-white">
@@ -167,13 +173,14 @@ export function MovementsScreen({
           <Input name="q" defaultValue={q} placeholder="Buscar movimiento..." />
         </form>
         {duplicate ? <DuplicatePanel decision={decision} /> : null}
+        {missing ? <MissingPanel ready={ready} /> : null}
         {error && !detail && !receipt ? <div className="px-4 pb-3"><StateView variant="error" title={error} testId="server-error" /></div> : null}
         {ordered.length === 0 ? (
           <div className="px-4 pb-4">
             <StateView variant="empty" title="No hay movimientos con este filtro." />
           </div>
         ) : (
-          <MovementsTable rows={ordered} categories={categories} canReview={canReview} filter={filter} q={q} companyId={companyId} marked={duplicate ? [...DUPLICATE_IDS] : []} />
+          <MovementsTable rows={ordered} categories={categories} canReview={canReview} filter={filter} q={q} companyId={companyId} marked={[...spotlight]} />
         )}
       </section>
       {receipt ? <ReceiptPanel receipt={receipt} filter={filter} q={q} error={error} /> : detail ? <Drawer detail={detail} error={error} filter={filter} q={q} /> : null}
