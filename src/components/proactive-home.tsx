@@ -32,11 +32,11 @@ export function ProactiveHome({
   return (
     <div className="mx-auto w-full max-w-3xl pb-4">
       <div className="flex items-start gap-3">
-        <Sparkles className="mt-1.5 size-6 shrink-0 text-violet-600" />
+        <Sparkles className="mt-1.5 size-6 shrink-0 text-stone-900" />
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-slate-900">Buenos días, {greetingName(name)}.</h1>
-          <p className="mt-3 text-[15px] leading-6 text-slate-500">Ya revisé las finanzas de {pulse.companyName}.</p>
-          <p className="text-[15px] leading-6 text-slate-500">{except}</p>
+          <p className="mt-3 text-[15px] leading-6 text-stone-500">Ya revisé las finanzas de {pulse.companyName}.</p>
+          <p className="text-[15px] leading-6 text-stone-500">{except}</p>
         </div>
       </div>
 
@@ -50,12 +50,12 @@ export function ProactiveHome({
         <section className="mt-8">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Necesito tu atención</h2>
-            <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700">{issues === 1 ? "1 asunto" : `${issues} asuntos`}</span>
+            <span className="rounded-full bg-[#efede8] px-2.5 py-1 text-xs font-medium text-stone-700">{issues === 1 ? "1 asunto" : `${issues} asuntos`}</span>
           </div>
           <ul className="mt-3 space-y-3">
             {pulse.attention.map((item) => (
-              <li key={item.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700">
+              <li key={item.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#e6e1d8] bg-white px-4 py-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#efede8] text-stone-800">
                   {item.flow === "cobro" ? <Clock className="size-4" /> : <FileText className="size-4" />}
                 </span>
                 <span className="min-w-0 flex-1">
@@ -66,7 +66,7 @@ export function ProactiveHome({
                   type="button"
                   data-testid={FLOW_TEST[item.flow]}
                   onClick={() => onFlow(item.flow)}
-                  className="inline-flex items-center gap-1 rounded-full border border-violet-200 px-3 py-1.5 text-sm font-medium text-violet-700 hover:bg-violet-50"
+                  className="inline-flex items-center gap-1 rounded-full border border-stone-900 px-3 py-1.5 text-sm font-medium text-stone-900 hover:bg-[#efede8]"
                 >
                   {item.action} <ArrowRight className="size-3.5" />
                 </button>
@@ -87,7 +87,7 @@ export function ProactiveHome({
                 onClick={() => onFlow(item.flow)}
                 className="flex w-full items-start gap-2 rounded-xl px-2 py-1.5 text-left text-sm text-slate-700 hover:bg-white"
               >
-                <Check className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                <Check className="mt-0.5 size-4 shrink-0 text-[#3f6b4e]" />
                 <span>{item.text}</span>
               </button>
             </li>
@@ -115,23 +115,23 @@ function Summary({
   note: string;
   testId?: string;
 }) {
-  const skin = {
-    emerald: "border-emerald-100 bg-emerald-50/80 text-emerald-700",
-    violet: "border-violet-100 bg-violet-50/80 text-violet-700",
-    rose: "border-rose-100 bg-rose-50/80 text-rose-700",
+  const titleTone = {
+    emerald: "text-[#3f6b4e]",
+    violet: "text-stone-700",
+    rose: "text-[#8c3a32]",
   }[tone];
   const chip = {
-    emerald: "bg-emerald-100 text-emerald-800",
-    violet: "bg-violet-100 text-violet-800",
-    rose: "bg-rose-100 text-rose-800",
+    emerald: "text-[#3f6b4e]",
+    violet: "text-stone-500",
+    rose: "text-[#8c3a32]",
   }[tone];
   return (
-    <Link href={href} className={`rounded-2xl border p-4 ${skin}`}>
-      <span className="flex items-center gap-2 text-sm font-medium">
+    <Link href={href} className="rounded-2xl border border-[#e6e1d8] bg-white p-4">
+      <span className={`flex items-center gap-2 text-sm font-medium ${titleTone}`}>
         {icon} {title}
       </span>
-      <span data-testid={testId} className="mt-3 block text-2xl font-semibold tracking-tight text-slate-900">{value}</span>
-      <span className={`mt-3 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${chip}`}>{note}</span>
+      <span data-testid={testId} className="mt-3 block text-2xl font-semibold tracking-tight text-stone-900">{value}</span>
+      <span className={`mt-3 inline-flex text-xs font-medium ${chip}`}>{note}</span>
     </Link>
   );
 }

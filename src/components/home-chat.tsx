@@ -182,13 +182,13 @@ function FlowChip({ label, testId, onClick }: { label: string; testId: string; o
 function Composer({ text, setText, onSubmit, wide = false }: { text: string; setText: (value: string) => void; onSubmit: () => void; wide?: boolean }) {
   return (
     <form
-      className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 shadow-sm"
+      className="flex items-center gap-2 rounded-full border border-[#e6e1d8] bg-white px-3 py-2 shadow-sm"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit();
       }}
     >
-      <Sparkles className="ml-1 size-4 shrink-0 text-violet-500" />
+      <Sparkles className="ml-1 size-4 shrink-0 text-stone-900" />
       <input
         value={text}
         onChange={(event) => setText(event.target.value)}
@@ -199,7 +199,7 @@ function Composer({ text, setText, onSubmit, wide = false }: { text: string; set
       <span className="grid size-8 place-items-center text-slate-400" aria-hidden>
         <Mic className="size-4" />
       </span>
-      <button type="submit" aria-label="Enviar" className="grid size-9 place-items-center rounded-full bg-violet-700 text-white">
+      <button type="submit" aria-label="Enviar" className="grid size-9 place-items-center rounded-full bg-stone-900 text-[#f7f6f4]">
         <ArrowUp className="size-4" />
       </button>
     </form>
