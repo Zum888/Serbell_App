@@ -1,8 +1,10 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { GUIDE_REPLY, isTalk, talkReply, type Briefing } from "@/lib/briefing";
+import type { HomeStart } from "@/lib/home-starts";
 import { UNSUPPORTED_REPLY, parseIntent } from "@/lib/intent";
 import { greetingName } from "@/lib/labels";
 import { formatTodayLabel } from "@/lib/dates";
@@ -17,7 +19,7 @@ const PROMPTS = [
 
 type Bubble = { id: string; role: "user" | "assistant"; body: string };
 
-export function HomeChat({ name, briefing }: { name: string; briefing: Briefing }) {
+export function HomeChat({ name, briefing, starts }: { name: string; briefing: Briefing; starts: HomeStart[] }) {
   const [messages, setMessages] = useState<Bubble[]>([]);
   const [text, setText] = useState("");
 
@@ -36,7 +38,7 @@ export function HomeChat({ name, briefing }: { name: string; briefing: Briefing 
   }
 
   return (
-    <section data-testid="home-chat" className="flex min-h-[520px] flex-col overflow-hidden rounded-3xl border border-border bg-white">
+    <section data-testid="home-chat" className="flex min-h-[520px] flex-col rounded-3xl border border-border bg-white">
       <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
         <div className="flex items-center gap-3">
           <span className="flex size-9 items-center justify-center rounded-full bg-slate-950 text-white">
@@ -65,7 +67,26 @@ export function HomeChat({ name, briefing }: { name: string; briefing: Briefing 
             <h1 className="mt-3 text-4xl font-semibold tracking-tight">
               Buenos días, <span className="text-primary">{greetingName(name)}.</span>
             </h1>
-            <p className="mt-2 max-w-md text-slate-500">Pregúntame por los gastos, los duplicados o quién te debe. La respuesta sale de lo que ya está guardado.</p>
+            <div className="mt-8 w-full max-w-lg text-left">
+              <p className="text-sm leading-6 text-slate-600">{openingLine(starts.length)}</p>
+              <ul className="mt-3 space-y-2">
+                {starts.map((start) => (
+                  <li key={start.id}>
+                    <Link
+                      href={start.href}
+                      data-testid={`home-start-${start.id}`}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-white px-4 py-3 transition hover:border-slate-300"
+                    >
+                      <span>
+                        <span className="block text-sm font-medium text-slate-900">{start.title}</span>
+                        <span className="mt-0.5 block text-xs leading-5 text-slate-500">{start.detail}</span>
+                      </span>
+                      <span className="shrink-0 text-xs font-medium text-primary">{start.action}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         ) : (
           <div className="flex flex-1 flex-col">
@@ -122,4 +143,9 @@ export function HomeChat({ name, briefing }: { name: string; briefing: Briefing 
       </div>
     </section>
   );
+}
+
+function openingLine(count: number) {
+  if (count <= 1) return "Esto es lo que conviene atender primero.";
+  return `Encontré ${count} pendientes. Elige con cuál empezar.`;
 }

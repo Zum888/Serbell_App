@@ -10,9 +10,11 @@ const briefing: Briefing = {
   net: 60_00,
   uncategorizedCount: 2,
   uncategorizedExpenseCents: 15_00,
+  missingReceipts: 1,
+  needsReview: 1,
   categories: [{ name: "Transporte", totalCents: 25_00 }],
   duplicates: [{ fileName: "copia.jpg", merchant: "FleetSmarts", amountCents: 203_94 }],
-  debtors: [{ name: "Andina", openCents: 50_00, invoiceCount: 1 }],
+  debtors: [{ partyId: "party_andina", name: "Andina", openCents: 50_00, invoiceCount: 1 }],
   movements: [{ merchant: "Shell", postedOn: "12 oct 2026", amountCents: -86_40, category: "Transporte" }],
 };
 
