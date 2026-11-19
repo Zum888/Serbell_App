@@ -19,9 +19,23 @@ function kindLabel(kind: string) {
   return kind === "card" ? "Crédito" : "Corriente";
 }
 
-function autoMatchFor(params: { factura?: string; lote?: string; actual?: string }, accountId: string, transactionId: string) {
+function autoMatchFor(
+  params: { factura?: string; lote?: string; actual?: string },
+  accountId: string,
+  transactionId: string,
+  movements: ScanMovement[],
+) {
+  const rows = searchRows(movements, transactionId);
+  const hit = movements.find((row) => row.id === transactionId);
+  if (!hit || rows.length === 0) return null;
+  const shared = {
+    amountLabel: formatUsd(Math.abs(hit.amountCents)),
+    dateLabel: hit.postedOn,
+    rows,
+  };
   if (params.factura === "1" && transactionId === "tx_qpl_fs_20394") {
     return {
+      ...shared,
       file: "Factura_FleetSmarts.pdf",
       nextHref: `/cuentas?cuenta=${accountId}&factura=lista`,
       note: "Lo concilio.",
@@ -32,13 +46,34 @@ function autoMatchFor(params: { factura?: string; lote?: string; actual?: string
     if (item && item.id === transactionId) {
       const index = LOTE.findIndex((row) => row.id === item.id) + 1;
       return {
+        ...shared,
         file: item.fileName,
         nextHref: loteNextHref(item.id),
-        note: index === 4 ? "Cierro el lote." : `Van ${index} de 4.`,
+        note: index === LOTE.length ? "Cierro el lote." : `Van ${index} de ${LOTE.length}.`,
       };
     }
   }
   return null;
+}
+
+type ScanMovement = { id: string; day: string; merchant: string; postedOn: string; amountCents: number };
+
+function searchRows(movements: ScanMovement[], hitId: string) {
+  const hit = movements.find((row) => row.id === hitId);
+  if (!hit) return [];
+  const hitTime = Date.parse(hit.day);
+  const decoys = movements
+    .filter((row) => row.id !== hitId)
+    .sort((a, b) => Math.abs(Date.parse(a.day) - hitTime) - Math.abs(Date.parse(b.day) - hitTime))
+    .slice(0, 3)
+    .sort((a, b) => a.day.localeCompare(b.day) || a.merchant.localeCompare(b.merchant));
+  return [...decoys, hit].map((row) => ({
+    id: row.id,
+    merchant: row.merchant,
+    postedOn: row.postedOn,
+    amountCents: row.amountCents,
+    hit: row.id === hitId,
+  }));
 }
 
 export default async function AccountsPage({
@@ -88,7 +123,7 @@ export default async function AccountsPage({
     return (
       <BankStep
         error={params.error}
-        autoMatch={autoMatchFor(params, selected.id, current.id)}
+        autoMatch={autoMatchFor(params, selected.id, current.id, selected.movements)}
         data={{
           accountHref: `/cuentas?cuenta=${selected.id}`,
           progress: `${selected.unreconciledCount} de ${selected.movements.length} sin conciliar`,
@@ -210,12 +245,14 @@ export default async function AccountsPage({
                 </tr>
               </thead>
               <tbody>
-                {selected.movements.map((movement) => (
-                  <tr key={movement.id} data-testid="account-movement" className="border-b border-border last:border-0">
-                    <td className="px-4 py-3">{movement.postedOn}</td>
+                {orderedMovements(selected.movements, foundIds(params)).map((movement) => {
+                  const found = foundIds(params).has(movement.id);
+                  return (
+                  <tr key={movement.id} data-testid="account-movement" className={`border-b border-border last:border-0 ${found ? "bg-emerald-50" : ""}`}>
+                    <td className={`px-4 py-3 ${found ? "font-medium text-emerald-900" : ""}`}>{movement.postedOn}</td>
                     <td className="px-4 py-3">
                       <p className="font-medium">{movement.merchant}</p>
-                      <p className="text-xs text-slate-500">{movement.description}</p>
+                      <p className="text-xs text-slate-500">{found ? "Mismo monto · fecha cercana" : movement.description}</p>
                     </td>
                     <td className={`px-4 py-3 text-right font-medium tabular-nums ${movement.amountCents < 0 ? "money-out" : "money-in"}`}>{formatUsd(movement.amountCents)}</td>
                     <td className="px-4 py-3" data-testid="bank-recon">{RECONCILIATION_LABEL[movement.reconciliationState] ?? movement.reconciliationState}</td>
@@ -235,7 +272,8 @@ export default async function AccountsPage({
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -296,6 +334,21 @@ export default async function AccountsPage({
       />
     </div>
   );
+}
+
+function foundIds(params: { factura?: string; lote?: string }) {
+  if (params.factura === "lista") return new Set(["tx_qpl_fs_20394"]);
+  if (params.lote === "lista") return new Set(LOTE.map((item) => item.id));
+  return new Set<string>();
+}
+
+function orderedMovements<T extends { id: string; day: string }>(movements: T[], found: Set<string>) {
+  if (found.size === 0) return movements;
+  return [...movements].sort((a, b) => {
+    const rank = Number(!found.has(a.id)) - Number(!found.has(b.id));
+    if (rank !== 0) return rank;
+    return b.day.localeCompare(a.day);
+  });
 }
 
 function previousMonth(period: string) {

@@ -1,10 +1,28 @@
 "use client";
 
+import { Loader2, Search } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ACCOUNTING_LABEL, DOCUMENT_LABEL, REVIEW_LABEL } from "@/lib/labels";
 import { formatUsd } from "@/lib/money";
+
+type ScanRow = {
+  id: string;
+  merchant: string;
+  postedOn: string;
+  amountCents: number;
+  hit: boolean;
+};
+
+type AutoMatch = {
+  file: string;
+  nextHref: string;
+  note: string;
+  amountLabel: string;
+  dateLabel: string;
+  rows: ScanRow[];
+};
 
 export type BankStepData = {
   accountHref: string;
@@ -34,9 +52,10 @@ export function BankStep({
 }: {
   data: BankStepData;
   error?: string;
-  autoMatch?: { file: string; nextHref: string; note: string } | null;
+  autoMatch?: AutoMatch | null;
 }) {
-  const [phase, setPhase] = useState<"search" | "match" | "idle">(autoMatch && !data.sealed ? "search" : "idle");
+  const scanning = Boolean(autoMatch && !data.sealed && autoMatch.rows.length > 0);
+  const [look, setLook] = useState(scanning ? -1 : 99);
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       const tag = (event.target as HTMLElement | null)?.tagName;
@@ -60,25 +79,30 @@ export function BankStep({
   }, [data]);
 
   useEffect(() => {
-    if (phase === "idle") return;
-    if (phase === "search") {
-      const timer = window.setTimeout(() => setPhase("match"), 1100);
-      return () => window.clearTimeout(timer);
-    }
+    if (!scanning || !autoMatch) return;
+    const row = look >= 0 ? autoMatch.rows[look] : null;
+    const delay = look < 0 ? 500 : row?.hit ? 1500 : 620;
     const timer = window.setTimeout(() => {
-      (document.getElementById("bank-reconcile-form") as HTMLFormElement | null)?.requestSubmit();
-    }, 900);
+      if (row?.hit) {
+        (document.getElementById("bank-reconcile-form") as HTMLFormElement | null)?.requestSubmit();
+        return;
+      }
+      setLook((current) => current + 1);
+    }, delay);
     return () => window.clearTimeout(timer);
-  }, [phase]);
+  }, [autoMatch, look, scanning]);
 
   return (
     <section data-testid="bank-step">
-      {phase !== "idle" ? (
-        <p className="mb-4 rounded-2xl bg-white px-4 py-3 text-sm text-slate-700 shadow-sm" data-testid="invoice-match">
-          {phase === "search"
-            ? `Busco en la cuenta el cargo que coincide con ${autoMatch?.file}.`
-            : `Coincide con ${data.merchant}, ${formatUsd(data.amountCents)}. ${autoMatch?.note ?? "Lo concilio."}`}
-        </p>
+      {scanning && autoMatch ? (
+        <MovementSearch
+          file={autoMatch.file}
+          note={autoMatch.note}
+          amountLabel={autoMatch.amountLabel}
+          dateLabel={autoMatch.dateLabel}
+          rows={autoMatch.rows}
+          look={look}
+        />
       ) : null}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -155,5 +179,74 @@ export function BankStep({
         </aside>
       </div>
     </section>
+  );
+}
+
+function MovementSearch({
+  file,
+  note,
+  amountLabel,
+  dateLabel,
+  rows,
+  look,
+}: {
+  file: string;
+  note: string;
+  amountLabel: string;
+  dateLabel: string;
+  rows: ScanRow[];
+  look: number;
+}) {
+  const found = look >= 0 && rows[look]?.hit;
+  return (
+    <div className="mb-4 overflow-hidden rounded-2xl bg-white shadow-sm" data-testid="movement-search">
+      <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-4 py-3">
+        <Search className="size-4 text-slate-400" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-slate-900">{amountLabel}</p>
+          <p className="text-xs text-slate-500">
+            {file} · fecha cercana a {dateLabel}
+            {note ? ` · ${note}` : ""}
+          </p>
+        </div>
+        <p className="text-sm text-slate-600" data-testid="invoice-match">
+          {found ? "Encontré el movimiento." : "Busco el mismo monto y una fecha cercana."}
+        </p>
+      </div>
+      <ul>
+        {rows.map((row, index) => {
+          const looking = index === look && !row.hit;
+          const passed = index < look && !row.hit;
+          const hit = row.hit && look >= index;
+          return (
+            <li
+              key={row.id}
+              data-testid={hit ? "movement-hit" : undefined}
+              className={`flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 ${hit ? "bg-emerald-50" : looking ? "bg-slate-50" : ""}`}
+            >
+              <span>
+                <span className={`block text-sm ${passed ? "text-slate-400" : "font-medium text-slate-900"}`}>{row.merchant}</span>
+                <span className={`block text-xs ${hit ? "font-medium text-emerald-800" : "text-slate-500"}`}>{row.postedOn}</span>
+              </span>
+              <span className={`text-sm tabular-nums ${hit ? "font-semibold text-emerald-800" : passed ? "text-slate-400" : "text-slate-800"}`}>
+                {formatUsd(row.amountCents)}
+              </span>
+              {hit ? (
+                <span className="flex gap-2">
+                  <span className="rounded-full bg-emerald-600 px-2 py-1 text-xs font-medium text-white">Mismo monto</span>
+                  <span className="rounded-full bg-emerald-600 px-2 py-1 text-xs font-medium text-white">Fecha cercana</span>
+                </span>
+              ) : looking ? (
+                <Loader2 className="size-4 animate-spin text-slate-400" />
+              ) : passed ? (
+                <span className="text-xs text-slate-400">Monto distinto</span>
+              ) : (
+                <span className="w-16" />
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
