@@ -240,6 +240,7 @@ export default async function AccountsPage({
                   <th className="px-4 py-3 font-medium">Fecha</th>
                   <th className="px-4 py-3 font-medium">Movimiento</th>
                   <th className="px-4 py-3 text-right font-medium">Importe</th>
+                  <th className="px-4 py-3 font-medium">Comprobante</th>
                   <th className="px-4 py-3 font-medium">Conciliación bancaria</th>
                   <th className="px-4 py-3 font-medium" />
                 </tr>
@@ -255,7 +256,20 @@ export default async function AccountsPage({
                       <p className="text-xs text-slate-500">{found ? "Mismo monto · fecha cercana" : movement.description}</p>
                     </td>
                     <td className={`px-4 py-3 text-right font-medium tabular-nums ${movement.amountCents < 0 ? "money-out" : "money-in"}`}>{formatUsd(movement.amountCents)}</td>
-                    <td className="px-4 py-3" data-testid="bank-recon">{RECONCILIATION_LABEL[movement.reconciliationState] ?? movement.reconciliationState}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {movement.documentName ? (
+                        <span className="font-medium text-slate-800">{proofKind(movement.documentName)} · {movement.documentName}</span>
+                      ) : (
+                        <span className="text-slate-400">Sin ticket ni factura</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3" data-testid="bank-recon">
+                      {movement.reconciliationState === "Reconciled" ? (
+                        <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Conciliado</span>
+                      ) : (
+                        RECONCILIATION_LABEL[movement.reconciliationState] ?? movement.reconciliationState
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       {movement.reconciliationState === "Reconciled" && !movement.sealed ? (
                         <form action={`/api/transactions/${movement.id}/bank`} method="post">
@@ -334,6 +348,10 @@ export default async function AccountsPage({
       />
     </div>
   );
+}
+
+function proofKind(name: string) {
+  return /factura|\.pdf$/i.test(name) ? "Factura" : "Ticket";
 }
 
 function foundIds(params: { factura?: string; lote?: string }) {

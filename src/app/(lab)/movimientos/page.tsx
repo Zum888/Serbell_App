@@ -20,12 +20,7 @@ export default async function MovementsPage({
   const filter = params.filtro || "todos";
   const q = params.q || "";
   try {
-    const tree = await listCategoryTree((await db()), session.actor, session.companyId);
-    const categories = tree.map((parent) => ({
-      id: parent.id,
-      name: parent.name,
-      children: parent.children.map((child) => ({ id: child.id, name: child.name })),
-    }));
+    const categories = await listCategoryTree((await db()), session.actor, session.companyId);
     if (params.vista === "enfoque") {
       const home = await getHome((await db()), session.actor, session.companyId);
       const focus = await focusQueue((await db()), session.actor, session.companyId, params.actual);

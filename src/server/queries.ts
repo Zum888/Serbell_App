@@ -101,6 +101,7 @@ export async function listMovements(db: Db, actor: Actor, companyId: string, fil
         include: { invoice: { select: { number: true } } },
         take: 1,
       },
+      messages: { where: { intent: "comment" }, orderBy: { createdAt: "desc" }, take: 1, select: { body: true } },
     },
     orderBy: [{ postedOn: "desc" }, { merchant: "asc" }],
   });
@@ -134,6 +135,7 @@ export async function listMovements(db: Db, actor: Actor, companyId: string, fil
       documentId: row.links[0]?.document.id ?? null,
       documentName: row.links[0]?.document.fileName ?? null,
       invoiceNumber: row.invoiceLinks[0]?.invoice.number ?? null,
+      comment: row.messages[0]?.body ?? null,
       suggested: row.classification?.state === "Proposed",
     }));
 }
@@ -892,12 +894,11 @@ export async function listCategoryTree(db: Db, actor: Actor, companyId: string) 
     throw new AppError("El servidor rechazó la solicitud: no tienes acceso a esta empresa.", 403, "COMPANY_FORBIDDEN");
   }
   const categories = await localProviders(db).accounting.listCategories(companyId);
-  return categories
-    .filter((category) => !category.parentId)
-    .map((parent) => ({
-      ...parent,
-      children: categories.filter((category) => category.parentId === parent.id),
-    }));
+  const nest = (parentId: string | null): { id: string; parentId: string | null; name: string; children: ReturnType<typeof nest> }[] =>
+    categories
+      .filter((category) => category.parentId === parentId)
+      .map((category) => ({ ...category, children: nest(category.id) }));
+  return nest(null);
 }
 
 function moneyLabel(cents: number | null | undefined): string {

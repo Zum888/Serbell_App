@@ -27,6 +27,7 @@ type Row = {
   documentId: string | null;
   documentName: string | null;
   invoiceNumber: string | null;
+  comment: string | null;
   suggested: boolean;
 };
 
@@ -112,7 +113,7 @@ export function MovementsScreen({
   detail: Detail | null;
   receipt: Receipt | null;
   canReview: boolean;
-  categories: { id: string; name: string; children: { id: string; name: string }[] }[];
+  categories: { id: string; name: string; children?: { id: string; name: string; children?: { id: string; name: string }[] }[] }[];
 }) {
   const countFor: Record<string, number> = {
     todos: counts.todos,

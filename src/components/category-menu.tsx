@@ -234,15 +234,21 @@ export function CategoryMenu({
                 <>
                   {column.nodes.length === 0 ? <p className="px-2 py-2 text-xs text-slate-500">Todavía no hay subcategorías.</p> : null}
                   {column.nodes.map((node) => {
-                    const branch = level === 0 || (node.children?.length ?? 0) > 0;
+                    const canDescend = level < 2;
                     const active = trail[level] === node.id;
                     return (
                       <button
                         key={node.id}
                         type="button"
                         role="menuitem"
-                        onMouseEnter={() => setTrail(branch ? [...trail.slice(0, level), node.id] : trail.slice(0, level))}
-                        onClick={() => (branch ? setTrail([...trail.slice(0, level), node.id]) : pick(node.id))}
+                        onMouseEnter={() => setTrail(canDescend ? [...trail.slice(0, level), node.id] : trail.slice(0, level))}
+                        onClick={() => {
+                          if (level === 0 || (canDescend && (node.children?.length ?? 0) > 0)) {
+                            setTrail([...trail.slice(0, level), node.id]);
+                            return;
+                          }
+                          pick(node.id);
+                        }}
                         className={`group flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs ${
                           active ? "bg-primary text-white" : "hover:bg-slate-100"
                         }`}
@@ -251,7 +257,7 @@ export function CategoryMenu({
                           <span className="w-3.5 shrink-0">{selectedIds.has(node.id) ? <Check className="size-3.5" /> : null}</span>
                           <span className="truncate">{node.name}</span>
                         </span>
-                        {branch ? <ChevronRight className={`size-3.5 shrink-0 ${active ? "" : "text-slate-400"}`} /> : null}
+                        {canDescend ? <ChevronRight className={`size-3.5 shrink-0 ${active ? "" : "text-slate-400"}`} /> : null}
                       </button>
                     );
                   })}

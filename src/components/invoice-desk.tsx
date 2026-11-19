@@ -158,7 +158,7 @@ export function InvoiceList({
             </div>
           </div>
           <p className="mt-2 text-xs text-slate-600">
-            {invoice.status === "matched" ? "Conciliada con el banco" : agingCaption(invoice.aging)}
+            {agingCaption(invoice.aging)}
             {invoice.followUpAt ? " · En seguimiento" : ""}
           </p>
           {invoice.movement ? (

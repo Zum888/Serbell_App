@@ -848,11 +848,12 @@ export async function changeClassification(
   assertCanMutate(actor, transaction.companyId, transaction.sealedAt);
   const subcategory = await db.accountingCategory.findUnique({
     where: { id: input.subcategoryId },
-    include: { parent: true },
+    include: { parent: { include: { parent: true } } },
   });
   if (!subcategory || !subcategory.parentId || subcategory.companyId !== transaction.companyId || !subcategory.parent) {
     throw new AppError("La subcategoría no pertenece a esta empresa o no depende de una categoría.", 400, "CATEGORY_INVALID");
   }
+  const root = subcategory.parent.parent ?? subcategory.parent;
   const before = {
     categoryId: transaction.classification?.categoryId ?? null,
     subcategoryId: transaction.classification?.subcategoryId ?? null,
@@ -860,9 +861,9 @@ export async function changeClassification(
     subcategoryName: transaction.classification?.subcategory?.name ?? null,
   };
   const after = {
-    categoryId: subcategory.parentId,
+    categoryId: root.id,
     subcategoryId: subcategory.id,
-    categoryName: subcategory.parent.name,
+    categoryName: root.name,
     subcategoryName: subcategory.name,
   };
   if (before.subcategoryId === after.subcategoryId) return;
@@ -954,11 +955,12 @@ export async function saveJournalEntry(
   }
   const subcategory = await db.accountingCategory.findUnique({
     where: { id: input.subcategoryId },
-    include: { parent: true },
+    include: { parent: { include: { parent: true } } },
   });
   if (!subcategory || !subcategory.parentId || subcategory.companyId !== transaction.companyId || !subcategory.parent) {
     throw new AppError("La subcategoría no pertenece a esta empresa o no depende de una categoría.", 400, "CATEGORY_INVALID");
   }
+  const root = subcategory.parent.parent ?? subcategory.parent;
   const catalog = await db.accountingCategory.findMany({
     where: { companyId: transaction.companyId },
     select: { name: true },
@@ -1011,9 +1013,9 @@ export async function saveJournalEntry(
     })),
   };
   const next = {
-    categoryId: subcategory.parentId,
+    categoryId: root.id,
     subcategoryId: subcategory.id,
-    categoryName: subcategory.parent.name,
+    categoryName: root.name,
     subcategoryName: subcategory.name,
     lines: lines.map((line) => ({
       accountName: line.accountName,
@@ -1251,6 +1253,23 @@ export async function requestClarification(db: Db, actor: Actor, transactionId: 
   });
 }
 
+export async function addMovementComment(db: Db, actor: Actor, transactionId: string, text: string) {
+  const transaction = await requireTransaction(db, transactionId);
+  assertCompanyAccess(actor, transaction.companyId);
+  const body = text.trim();
+  if (body.length < 2) throw new AppError("Escribe el comentario.", 400, "MESSAGE_REQUIRED");
+  const conversation = await conversationFor(db, transaction.companyId);
+  await localProviders(db).messaging.append({
+    conversationId: conversation.id,
+    authorId: actor.id,
+    transactionId,
+    role: "user",
+    body,
+    intent: "comment",
+  });
+  return { body };
+}
+
 async function activeLinkedTransaction(db: Db, companyId: string) {
   const conversation = await conversationFor(db, companyId);
   if (!conversation.activeDocumentId) return null;
@@ -1399,9 +1418,12 @@ export async function addCategory(
   const name = input.name.trim();
   if (name.length < 2) throw new AppError("El nombre de la categoría es demasiado corto.", 400, "NAME_REQUIRED");
   if (input.parentId) {
-    const parent = await db.accountingCategory.findUnique({ where: { id: input.parentId } });
-    if (!parent || parent.companyId !== input.companyId || parent.parentId) {
+    const parent = await db.accountingCategory.findUnique({ where: { id: input.parentId }, include: { parent: true } });
+    if (!parent || parent.companyId !== input.companyId) {
       throw new AppError("La subcategoría tiene que depender de una categoría de esta empresa.", 400, "CATEGORY_INVALID");
+    }
+    if (parent.parent?.parentId) {
+      throw new AppError("Solo hay tres niveles: categoría, subcategoría y detalle.", 400, "CATEGORY_INVALID");
     }
   }
   const created = await db.accountingCategory.create({

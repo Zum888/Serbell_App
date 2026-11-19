@@ -24,20 +24,18 @@ export type DeskRow = {
   followUpAt: string | null;
 };
 
-type DueState = "conciliada" | "vencida" | "por_vencer" | "al_dia";
+type DueState = "vencida" | "por_vencer" | "al_dia";
 type Tab = "facturas" | "partes" | "seguimiento";
 type DueFilter = "todas" | DueState;
 type Suggestion = { title: string; detail: string; href?: string; filter?: DueFilter | "seguimiento" };
 
 const DUE_LABEL: Record<DueState, string> = {
-  conciliada: "Conciliada",
   vencida: "Vencida",
   por_vencer: "Por vencer",
   al_dia: "Al día",
 };
 
 const DUE_TONE: Record<DueState, string> = {
-  conciliada: "bg-emerald-50 text-emerald-700",
   vencida: "bg-rose-50 text-rose-700",
   por_vencer: "bg-sky-50 text-sky-700",
   al_dia: "bg-emerald-50 text-emerald-700",
@@ -50,7 +48,6 @@ function dayDiff(from: string, to: string) {
 }
 
 function dueState(row: DeskRow, today: string): DueState {
-  if (row.matched) return "conciliada";
   const days = dayDiff(today, row.dueOn);
   if (days <= 0) return "vencida";
   if (days <= 14) return "por_vencer";
@@ -180,7 +177,6 @@ export function InvoiceBoard({
                   <option value="vencida">Vencidas</option>
                   <option value="por_vencer">Por vencer</option>
                   <option value="al_dia">Al día</option>
-                  <option value="conciliada">Conciliadas</option>
                 </select>
                 <select
                   value={thisMonth ? "mes" : "todos"}

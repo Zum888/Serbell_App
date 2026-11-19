@@ -8,8 +8,8 @@ import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
 import { listCategoryTree } from "@/server/queries";
 
-type Child = { id: string; name: string };
-type Parent = { id: string; name: string; children: Child[] };
+type Node = { id: string; name: string; children: Node[] };
+type Parent = Node;
 
 function isIncome(name: string) {
   return /ingreso/i.test(name);
@@ -159,13 +159,29 @@ function CategoryCard({
           <li className="px-4 py-3 text-xs text-slate-400">Sin subcategorías todavía.</li>
         ) : (
           parent.children.map((child) => (
-            <li key={child.id} className="flex items-center gap-2 px-4 py-2">
-              <form action={`/api/categories/${child.id}`} method="post" className="flex flex-1 items-center gap-2">
-                <span className="text-slate-300">—</span>
-                <Input name="name" defaultValue={child.name} aria-label={`Nombre de ${child.name}`} className="h-8 border-0 px-0 text-sm shadow-none focus-visible:ring-0" />
-                <button type="submit" className="text-xs text-slate-400 hover:text-primary">Renombrar</button>
-              </form>
-              <span className="text-xs tabular-nums text-slate-500">{formatUsd(amountOf(spent, child.id, income))}</span>
+            <li key={child.id} className="px-4 py-2">
+              <div className="flex items-center gap-2">
+                <form action={`/api/categories/${child.id}`} method="post" className="flex flex-1 items-center gap-2">
+                  <span className="text-slate-300">—</span>
+                  <Input name="name" defaultValue={child.name} aria-label={`Nombre de ${child.name}`} className="h-8 border-0 px-0 text-sm shadow-none focus-visible:ring-0" />
+                  <button type="submit" className="text-xs text-slate-400 hover:text-primary">Renombrar</button>
+                </form>
+                <span className="text-xs tabular-nums text-slate-500">{formatUsd(amountOf(spent, child.id, income))}</span>
+              </div>
+              {child.children.length > 0 ? (
+                <ul className="mt-1 space-y-1 pl-6">
+                  {child.children.map((detail) => (
+                    <li key={detail.id} className="flex items-center gap-2">
+                      <form action={`/api/categories/${detail.id}`} method="post" className="flex flex-1 items-center gap-2">
+                        <span className="text-slate-300">··</span>
+                        <Input name="name" defaultValue={detail.name} aria-label={`Nombre de ${detail.name}`} className="h-8 border-0 px-0 text-sm shadow-none focus-visible:ring-0" />
+                        <button type="submit" className="text-xs text-slate-400 hover:text-primary">Renombrar</button>
+                      </form>
+                      <span className="text-xs tabular-nums text-slate-500">{formatUsd(amountOf(spent, detail.id, income))}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </li>
           ))
         )}
