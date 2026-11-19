@@ -95,6 +95,15 @@ type Detail = {
   history: { id: string; action: string; actor: string; at: string; justification: string | null; note: string | null }[];
 };
 
+function bankAccent(institution: string) {
+  const name = institution.toLowerCase();
+  if (name.includes("amex") || name.includes("american express")) return "#016FD0";
+  if (name.includes("america")) return "#C41230";
+  if (name.includes("chase")) return "#0B5CAB";
+  if (name.includes("wells")) return "#D71E28";
+  return "#5B21B6";
+}
+
 const filters = [
   ["todos", "Todos"],
   ["sin-categoria", "Sin categorizar"],
@@ -157,6 +166,8 @@ export function MovementsScreen({
   const wide = Boolean(detail?.match);
   const spotlight = duplicate ? (DUPLICATE_IDS as readonly string[]) : missing ? MISSING_IDS : found;
   const selectedAccount = accounts.find((account) => account.id === accountId) ?? null;
+  const allAvailable = accounts.reduce((sum, account) => sum + account.availableBalanceCents, 0);
+  const availableCents = selectedAccount ? selectedAccount.availableBalanceCents : allAvailable;
   function listHref(overrides: { filtro?: string; cuenta?: string | null } = {}) {
     const params = new URLSearchParams();
     const filtro = overrides.filtro ?? filter;
@@ -181,40 +192,64 @@ export function MovementsScreen({
               <h1 className="text-2xl font-semibold">Bancos</h1>
               <p className="text-sm text-slate-500">{selectedAccount ? `${selectedAccount.institution} ····${selectedAccount.mask}` : periodOf(rows) || "Todos los bancos, por fecha"}</p>
             </div>
-            <div className="text-right" data-testid="bank-totals">
-              <p className="text-sm font-semibold tabular-nums text-emerald-600">Ingresos {formatUsd(counts.inflows)}</p>
-              <p className="text-sm font-semibold tabular-nums text-rose-600">Gastos {formatUsd(counts.outflows)}</p>
-              <p className="text-xs text-slate-500">{balanceLabel}</p>
-              {selectedAccount && rows.some((row) => row.reconciliationState !== "Reconciled") ? (
-                <Link href={`/cuentas?cuenta=${selectedAccount.id}&paso=conciliar`} className="text-sm font-medium text-primary">Conciliar con el banco</Link>
-              ) : null}
-            </div>
+            {selectedAccount && rows.some((row) => row.reconciliationState !== "Reconciled") ? (
+              <Link href={`/cuentas?cuenta=${selectedAccount.id}&paso=conciliar`} className="text-sm font-medium text-primary">Conciliar con el banco</Link>
+            ) : null}
           </div>
-          <nav aria-label="Cambiar de cuenta" data-testid="account-switcher" className="mt-3 flex gap-2 overflow-x-auto pb-1">
-            <Link href={listHref({ cuenta: null })} aria-current={selectedAccount ? undefined : "page"} className={`flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-sm ${selectedAccount ? "border-border bg-white text-slate-600 hover:border-slate-300" : "border-slate-900 bg-slate-900 text-white"}`}>
-              <LayoutGrid className="size-4" /> Todas
-            </Link>
-            {accounts.map((account) => {
-              const active = account.id === accountId;
-              return (
-                <Link
-                  key={account.id}
-                  href={listHref({ cuenta: account.id })}
-                  aria-current={active ? "page" : undefined}
-                  className={`flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-left transition ${active ? "border-slate-900 bg-slate-900 text-white" : "border-border bg-white hover:border-slate-300"}`}
-                >
-                  <span className={`flex size-7 items-center justify-center rounded-full text-[11px] font-semibold ${active ? "bg-white/15" : "bg-slate-100 text-slate-700"}`}>{accountInitials(account.institution)}</span>
+          <div className="mt-4 rounded-2xl bg-slate-50 p-3">
+            <div data-testid="bank-totals" className="grid grid-cols-3 gap-2">
+              <div className="rounded-xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-200">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Ingresos</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-emerald-600">{formatUsd(counts.inflows)}</p>
+              </div>
+              <div className="rounded-xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-200">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Gastos</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-rose-600">{formatUsd(counts.outflows)}</p>
+              </div>
+              <div className="rounded-xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-200" title={balanceLabel}>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Disponible</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-slate-900">{formatUsd(availableCents)}</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">{selectedAccount ? "Esta cuenta" : `Las ${accounts.length} cuentas`}</p>
+              </div>
+            </div>
+            <nav aria-label="Cambiar de cuenta" data-testid="account-switcher" className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-3">
+              <Link href={listHref({ cuenta: null })} aria-current={selectedAccount ? undefined : "page"} className={`flex min-h-[92px] flex-col justify-between rounded-2xl border bg-white px-3 py-3 text-left shadow-sm ${selectedAccount ? "border-slate-200 hover:border-slate-300" : "border-slate-900 ring-2 ring-slate-900"}`}>
+                <span className="flex items-center gap-2">
+                  <span className="flex size-9 items-center justify-center rounded-xl bg-slate-900 text-white"><LayoutGrid className="size-4" /></span>
                   <span>
-                    <span className="block text-sm font-medium leading-tight">{account.institution}</span>
-                    <span className={`block text-[11px] tabular-nums leading-tight ${active ? "text-white/70" : "text-slate-500"}`}>{formatUsd(account.availableBalanceCents)}</span>
+                    <span className="block text-sm font-semibold leading-tight">Todas</span>
+                    <span className="block text-[11px] text-slate-500">{accounts.length} cuentas</span>
                   </span>
-                </Link>
-              );
-            })}
-            <Link href="/cuentas/conectar" data-testid="add-account" className="flex shrink-0 items-center gap-1.5 rounded-xl border border-dashed border-border px-3 py-2 text-sm text-slate-600 hover:border-slate-300">
-              <Plus className="size-4" /> Agregar
-            </Link>
-          </nav>
+                </span>
+                <span className="mt-3 block text-base font-semibold tabular-nums text-slate-900">{formatUsd(allAvailable)}</span>
+              </Link>
+              {accounts.map((account) => {
+                const active = account.id === accountId;
+                const accent = bankAccent(account.institution);
+                return (
+                  <Link
+                    key={account.id}
+                    href={listHref({ cuenta: account.id })}
+                    aria-current={active ? "page" : undefined}
+                    className={`relative flex min-h-[92px] flex-col justify-between overflow-hidden rounded-2xl border bg-white px-3 py-3 text-left shadow-sm ${active ? "border-slate-900 ring-2 ring-slate-900" : "border-slate-200 hover:border-slate-300"}`}
+                  >
+                    <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: accent }} />
+                    <span className="flex items-center gap-2">
+                      <span className="flex size-9 items-center justify-center rounded-xl text-xs font-semibold text-white" style={{ backgroundColor: accent }}>{accountInitials(account.institution)}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold leading-tight">{account.institution}</span>
+                        <span className="block text-[11px] text-slate-500">····{account.mask}</span>
+                      </span>
+                    </span>
+                    <span className="mt-3 block text-base font-semibold tabular-nums text-slate-900">{formatUsd(account.availableBalanceCents)}</span>
+                  </Link>
+                );
+              })}
+              <Link href="/cuentas/conectar" data-testid="add-account" className="flex min-h-[92px] flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-slate-300 bg-white px-3 py-3 text-sm font-medium text-slate-600 hover:border-slate-400">
+                <Plus className="size-4" /> Agregar
+              </Link>
+            </nav>
+          </div>
           <div className="mt-3 flex gap-2">
             <Link href="/movimientos?vista=enfoque" className="rounded-full border border-border px-3 py-1.5 text-xs text-slate-600">Modo enfoque</Link>
             <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-800">Vista detallada</span>
