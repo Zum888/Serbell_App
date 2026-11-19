@@ -40,6 +40,7 @@ export function MovementsTable({
   filter,
   q,
   companyId,
+  marked = [],
 }: {
   rows: Row[];
   categories: CategoryNode[];
@@ -47,6 +48,7 @@ export function MovementsTable({
   filter: string;
   q: string;
   companyId: string;
+  marked?: string[];
 }) {
   const [done, setDone] = useState<Record<string, true>>({});
   const [selected, setSelected] = useState<Record<string, true>>({});
@@ -59,6 +61,13 @@ export function MovementsTable({
   const [closing, setClosing] = useState(false);
   const router = useRouter();
   const next = `/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}`;
+  const markedKey = marked.join(",");
+
+  useEffect(() => {
+    const first = marked[0];
+    if (!first) return;
+    document.querySelector(`[data-testid="movement-row-${first}"]`)?.scrollIntoView({ block: "center" });
+  }, [markedKey]);
 
   function reconciled(row: Row) {
     return row.reconciliationState === "Reconciled" || Boolean(done[row.id]);
@@ -203,12 +212,14 @@ export function MovementsTable({
               const reviewLabel = reviews[row.id]?.label || (REVIEW_LABEL[row.reviewState] ?? row.reviewState);
               const attention = needsCategory(row);
               const suggested = suggestions[row.id] ?? row.suggested;
+              const duplicate = marked.includes(row.id);
               return (
                 <tr
                   key={row.id}
                   data-testid={`movement-row-${row.id}`}
                   data-attention={attention ? "true" : "false"}
-                  className="cursor-pointer border-b border-slate-100 align-middle transition hover:bg-slate-50"
+                  data-duplicate={duplicate ? "true" : "false"}
+                  className={`cursor-pointer border-b border-slate-100 align-middle transition hover:bg-slate-50 ${duplicate ? "bg-amber-50" : ""}`}
                   onClick={(event) => {
                     const target = event.target as HTMLElement;
                     if (target.closest("a, button, input, select, textarea, label, form, [role=menu], summary, details")) return;

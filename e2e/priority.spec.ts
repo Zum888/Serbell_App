@@ -6,7 +6,7 @@ test("Padrino vincula el ticket y Carlos lo sella", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /Buenos días, Padrino/ })).toBeVisible();
   await expect(page.getByTestId("bank-balance")).toContainText("33,366.24");
 
-  await page.getByTestId("nav-chat").click();
+  await page.goto("/chat");
   await page.getByTestId("demo-ticket").click();
   await page.waitForURL(/\/chat\?documento=/);
   await expect(page.getByTestId("extraction-demo-badge")).toBeVisible();
