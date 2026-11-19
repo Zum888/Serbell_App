@@ -1,6 +1,6 @@
 import { safeNext } from "@/lib/utils";
 import { db } from "@/server/db";
-import { confirmLink } from "@/server/domain";
+import { changeClassification, confirmLink } from "@/server/domain";
 import { redirectError, redirectTo } from "@/server/http";
 import { requireActor } from "@/server/session";
 
@@ -10,7 +10,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const back = safeNext(String(form.get("next") ?? ""), `/chat?documento=${id}`);
   try {
     const { actor } = await requireActor();
-    await confirmLink((await db()), actor, id, String(form.get("transactionId") ?? ""));
+    const database = await db();
+    const transactionId = String(form.get("transactionId") ?? "");
+    const subcategoryId = String(form.get("subcategoryId") ?? "");
+    if (subcategoryId) {
+      await changeClassification(database, actor, transactionId, {
+        subcategoryId,
+        justification: "Clasificación al vincular el comprobante.",
+      });
+    }
+    await confirmLink(database, actor, id, transactionId);
     return redirectTo(request, back);
   } catch (error) {
     return redirectError(request, back, error);

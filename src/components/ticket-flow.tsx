@@ -11,11 +11,12 @@ const CHECKS = [
   { label: "Concepto", value: "Combustible" },
 ];
 
-const BANK = "/cuentas?cuenta=acct_qpl_boa&paso=conciliar&actual=tx_qpl_fs_20394&factura=1";
+const MOVEMENT = "/movimientos?cuenta=acct_qpl_boa&movimiento=tx_qpl_fs_20394";
 
 export function InvoiceFlow() {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (step >= 7) return;
@@ -26,8 +27,22 @@ export function InvoiceFlow() {
 
   useEffect(() => {
     if (step !== 7) return;
-    const timer = window.setTimeout(() => router.push(BANK), 700);
-    return () => window.clearTimeout(timer);
+    let cancel = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const response = await fetch("/api/documents/demo-match", { method: "POST" });
+        if (cancel) return;
+        if (!response.ok) {
+          setError("No pude preparar el ticket.");
+          return;
+        }
+        router.push(MOVEMENT);
+      })();
+    }, 700);
+    return () => {
+      cancel = true;
+      window.clearTimeout(timer);
+    };
   }, [router, step]);
 
   const done = step >= 6 ? 4 : step >= 2 ? step - 2 : 0;
@@ -69,7 +84,7 @@ export function InvoiceFlow() {
         </ul>
       ) : null}
 
-      {step >= 7 ? <p className="text-[15px] leading-7 text-slate-800">Te llevo a conciliarla con el movimiento del banco.</p> : null}
+      {step >= 7 ? <p className="text-[15px] leading-7 text-slate-800">{error ?? "El ticket cierra con el movimiento. Te muestro por qué coincidió."}</p> : null}
     </div>
   );
 }

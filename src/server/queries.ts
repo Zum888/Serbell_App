@@ -2,7 +2,8 @@ import { documentColumn, reviewColumn, type DocumentColumn, type ReviewColumn } 
 import { dayKey, formatDateTime, formatDay } from "@/lib/dates";
 import { AppError } from "@/lib/errors";
 import { AUDIT_LABEL } from "@/lib/labels";
-import { formatUsd } from "@/lib/money";
+import { normalizeMerchant } from "@/lib/matching";
+import { formatCentsPlain, formatUsd } from "@/lib/money";
 import { canReview, companyRole, type Actor, type MembershipRole } from "@/lib/permissions";
 import { localProviders } from "@/providers/local";
 import type { Db } from "@/server/db";
@@ -158,6 +159,53 @@ export async function movementCounts(db: Db, actor: Actor, companyId: string, ac
   };
 }
 
+function movementMatch(
+  transaction: {
+    merchant: string;
+    amountCents: number;
+    postedOn: Date;
+    account: { mask: string };
+    classification: { state: string } | null;
+    candidates: {
+      blocked: boolean;
+      decision: string;
+      document: { id: string; fileName: string; mimeType: string; extraction: { merchant: string | null; amountCents: number | null; occurredOn: Date | null } | null };
+    }[];
+  },
+  link: { document: { id: string; fileName: string; mimeType: string; extraction: { merchant: string | null; amountCents: number | null; occurredOn: Date | null } | null } } | null,
+) {
+  const reliable = transaction.candidates.filter((candidate) => candidate.decision === "reliable" && !candidate.blocked);
+  const suggested = !link && reliable.length === 1 ? reliable[0].document : null;
+  const document = link?.document ?? suggested;
+  const extraction = document?.extraction;
+  if (!document || !extraction) return null;
+  const postedDay = dayKey(transaction.postedOn) ?? "";
+  const documentDay = dayKey(extraction.occurredOn) ?? "";
+  const checks: { id: string; label: string }[] = [];
+  if (extraction.amountCents !== null && Math.abs(extraction.amountCents) === Math.abs(transaction.amountCents)) {
+    checks.push({ id: "amount", label: `Importe coincide ($${formatCentsPlain(transaction.amountCents)})` });
+  }
+  if (postedDay && documentDay && postedDay === documentDay) {
+    checks.push({ id: "date", label: `Fecha coincide (${formatDay(postedDay)})` });
+  }
+  if (extraction.merchant && normalizeMerchant(extraction.merchant) === normalizeMerchant(transaction.merchant)) {
+    checks.push({ id: "merchant", label: `Proveedor coincide (${transaction.merchant})` });
+  }
+  if (transaction.account.mask && checks.length >= 2) {
+    checks.push({ id: "card", label: `Tarjeta coincide (·· ${transaction.account.mask})` });
+  }
+  if (checks.length < 3) return null;
+  return {
+    linked: Boolean(link),
+    documentId: document.id,
+    fileName: document.fileName,
+    mimeType: document.mimeType,
+    postedDay,
+    checks,
+    suggested: transaction.classification?.state === "Proposed",
+  };
+}
+
 export async function getMovement(db: Db, actor: Actor, transactionId: string) {
   const transaction = await db.bankTransaction.findUnique({
     where: { id: transactionId },
@@ -166,7 +214,7 @@ export async function getMovement(db: Db, actor: Actor, transactionId: string) {
       company: true,
       classification: { include: { category: true, subcategory: true } },
       links: { where: { status: "confirmed" }, include: { document: { include: { extraction: true } } } },
-      candidates: { include: { document: true } },
+      candidates: { include: { document: { include: { extraction: true } } } },
       journalEntry: { include: { lines: true } },
       audits: { include: { actor: true }, orderBy: { createdAt: "desc" } },
       messages: { include: { author: true }, orderBy: { createdAt: "asc" } },
@@ -218,6 +266,7 @@ export async function getMovement(db: Db, actor: Actor, transactionId: string) {
     bankState: transaction.bankState,
     sealed: Boolean(transaction.sealedAt),
     sealedAt: transaction.sealedAt ? formatDateTime(transaction.sealedAt) : null,
+    categoryId: transaction.classification?.categoryId ?? "",
     subcategoryId: transaction.classification?.subcategoryId ?? "",
     categoryLabel: transaction.classification?.category && transaction.classification.subcategory
       ? `${transaction.classification.category.name} / ${transaction.classification.subcategory.name}`
@@ -250,6 +299,7 @@ export async function getMovement(db: Db, actor: Actor, transactionId: string) {
           isDemonstration: link.document.extraction?.isDemonstration ?? false,
         }
       : null,
+    match: movementMatch(transaction, link),
     messages: messages.map((message) => ({
       id: message.id,
       role: message.role,

@@ -250,6 +250,88 @@ export async function insertExtraDemo(db: Db) {
   }
 }
 
+const AUTO_MATCHED: {
+  tx: string;
+  doc: string;
+  fileName: string;
+  merchant: string;
+  amountCents: number;
+  day: string;
+  categoryId: string;
+  subcategoryId: string;
+  mask: string;
+}[] = [
+  { tx: "tx_qpl_demo_napa", doc: "doc_qpl_napa", fileName: "NAPA_1029.jpg", merchant: "NAPA Auto Parts", amountCents: 2750, day: "2026-10-29", categoryId: CAT.qpl.operacion, subcategoryId: CAT.qpl.equipo, mask: "2204" },
+  { tx: "tx_qpl_demo_sams", doc: "doc_qpl_sams", fileName: "SamsClub_1026.jpg", merchant: "Sam's Club", amountCents: 3890, day: "2026-10-26", categoryId: CAT.qpl.operacion, subcategoryId: CAT.qpl.mantenimiento, mask: "7741" },
+  { tx: "tx_qpl_x02", doc: "doc_qpl_officedepot", fileName: "OfficeDepot_1005.jpg", merchant: "Office Depot", amountCents: 8930, day: "2026-10-05", categoryId: CAT.qpl.operacion, subcategoryId: CAT.qpl.mantenimiento, mask: "3366" },
+];
+
+export async function insertAutoMatchedReceipts(db: Db) {
+  for (const item of AUTO_MATCHED) {
+    const file = store(COMPANY.qpl, `${item.doc}.jpg`, Buffer.from(`serbell-lab-${item.doc}`));
+    await db.bankTransaction.update({
+      where: { id: item.tx },
+      data: {
+        documentState: "Linked",
+        accountingState: "Proposed",
+        reviewState: "NeedsReview",
+        description: `CHECKCARD · Tarjeta ····${item.mask}`,
+      },
+    });
+    await db.document.create({
+      data: {
+        id: item.doc,
+        companyId: COMPANY.qpl,
+        uploadedById: USER.padrino,
+        fileName: item.fileName,
+        mimeType: "image/jpeg",
+        status: "linked",
+        ...file,
+        createdAt: noon(item.day),
+      },
+    });
+    await db.documentExtraction.create({
+      data: {
+        id: `ext_${item.doc}`,
+        documentId: item.doc,
+        merchant: item.merchant,
+        amountCents: item.amountCents,
+        currency: "USD",
+        occurredOn: noon(item.day),
+        categoryId: item.categoryId,
+        subcategoryId: item.subcategoryId,
+        source: "serbell",
+        isDemonstration: true,
+        notice: "Serbell encontró el comprobante y lo unió al movimiento.",
+        verifiedAt: noon(item.day),
+        verifiedById: USER.padrino,
+      },
+    });
+    await db.transactionDocumentLink.create({
+      data: {
+        id: `link_${item.doc}`,
+        transactionId: item.tx,
+        documentId: item.doc,
+        status: "confirmed",
+        confirmedById: USER.padrino,
+        confirmedAt: noon(item.day),
+      },
+    });
+    await db.transactionClassification.upsert({
+      where: { transactionId: item.tx },
+      update: { categoryId: item.categoryId, subcategoryId: item.subcategoryId, source: "serbell", state: "Proposed" },
+      create: {
+        id: `class_${item.tx}`,
+        transactionId: item.tx,
+        categoryId: item.categoryId,
+        subcategoryId: item.subcategoryId,
+        source: "serbell",
+        state: "Proposed",
+      },
+    });
+  }
+}
+
 export async function seedDatabase(db: Db) {
   await db.accountingFirm.create({
     data: { id: FIRM_ID, name: "Despacho Contable" },
@@ -541,6 +623,7 @@ export async function seedDatabase(db: Db) {
   });
   await insertQplDemonstrationAccounts(db);
   await insertExtraDemo(db);
+  await insertAutoMatchedReceipts(db);
   await stampReliableMatcherLinks(db);
   await db.accountingReview.create({
     data: {

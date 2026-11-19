@@ -129,6 +129,7 @@ export function MovementsTable({
   }
 
   function receiptHref(row: Row) {
+    if (row.documentState === "Linked" || row.documentState === "Suggested") return detailHref(row);
     const params = new URLSearchParams();
     if (filter && filter !== "todos") params.set("filtro", filter);
     if (q) params.set("q", q);
@@ -184,7 +185,7 @@ export function MovementsTable({
       </div>
       {error ? <p className="px-4 pb-3 text-sm text-red-700" data-testid="reconcile-error">{error}</p> : null}
       <div className="overflow-x-auto">
-        <table className="w-full table-fixed text-left text-sm">
+        <table className="w-full min-w-[1100px] table-fixed text-left text-sm">
           <thead className="text-xs text-slate-500">
             <tr className="border-y border-slate-200">
               <th className="w-10 px-3 py-2 font-medium">
@@ -203,7 +204,7 @@ export function MovementsTable({
                 />
               </th>
               <th className="w-16 px-3 py-2 font-medium">Fecha</th>
-              <th className="px-3 py-2 font-medium">Movimiento</th>
+              <th className="w-44 px-3 py-2 font-medium">Movimiento</th>
               {showBank ? <th className="w-36 px-2 py-2 font-medium">Banco</th> : null}
               <th className={`${showBank ? "w-[180px]" : "w-[220px]"} px-3 py-2 font-medium`}>Categoría</th>
               <th className="w-10 px-2 py-2 font-medium"><span className="sr-only">Comentario</span></th>
@@ -259,7 +260,7 @@ export function MovementsTable({
                     ) : null}
                   </td>
                   <td className="px-3 py-2.5 whitespace-nowrap text-slate-600">{shortDay(row.postedOn)}</td>
-                  <td className="px-3 py-2.5">
+                  <td className="w-44 px-3 py-2.5">
                     <Link href={detailHref(row)} className="font-medium text-slate-900 hover:underline">{row.merchant}</Link>
                     <p className="text-xs text-slate-500">{row.description}</p>
                   </td>
