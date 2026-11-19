@@ -2,6 +2,7 @@ import { Check, FileText, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { GUIDE_REPLY } from "@/lib/briefing";
 import { formatUsd } from "@/lib/money";
+import { DemoTicketGrab } from "@/components/demo-ticket-grab";
 import { StateView } from "@/components/state-view";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,16 +76,7 @@ export function ChatScreen({
               <p className="mt-1 whitespace-pre-wrap">{message.body}</p>
             </article>
           ))}
-          <div className={uploadHint ? "rounded-2xl border border-blue-200 bg-blue-50 p-3" : "rounded-2xl border border-dashed border-border p-3"}>
-            <p className="text-sm font-medium">Comprobantes de demostración</p>
-            <p className="mt-1 text-sm text-slate-500">No se pueden adjuntar ni descargar archivos. El ticket ya está en el laboratorio.</p>
-            <form action="/api/documents/use-demo" method="post" className="mt-3">
-              <input type="hidden" name="companyId" value={companyId} />
-              <button type="submit" data-testid="demo-ticket" className="inline-flex h-10 items-center rounded-full border border-border bg-white px-4 text-sm">
-                Abrir ticket de demostración FleetSmarts
-              </button>
-            </form>
-          </div>
+          <DemoTicketGrab companyId={companyId} highlighted={uploadHint} />
         </div>
         <div className="flex flex-wrap gap-2 border-t border-border px-3 pt-3">
           {[

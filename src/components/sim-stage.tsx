@@ -7,12 +7,14 @@ export function SimStage({
   scene,
   compose,
   mark,
+  dragging,
   onChoice,
   onField,
 }: {
   scene: Scene;
   compose: string;
   mark: string | null;
+  dragging: boolean;
   onChoice: (id: string) => void;
   onField: (key: keyof Scene["fields"], value: string) => void;
 }) {
@@ -43,11 +45,18 @@ export function SimStage({
         </div>
       </header>
       {scene.banner ? <p className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{scene.banner}</p> : null}
-      {scene.route === "inicio" ? <Home scene={scene} compose={compose} mark={mark} onChoice={onChoice} onField={onField} /> : null}
-      {scene.route === "comprobantes" ? <Vault scene={scene} mark={mark} /> : null}
-      {scene.route === "movimientos" ? <Moves scene={scene} mark={mark} onChoice={onChoice} /> : null}
-      {scene.route === "conciliacion" ? <Match scene={scene} mark={mark} /> : null}
-      {scene.route === "firma" ? <Firm scene={scene} mark={mark} /> : null}
+      {scene.route === "inicio" ? <Home scene={scene} compose={compose} mark={mark} onChoice={onChoice} onField={onField} dragging={dragging} /> : null}
+      {scene.route === "comprobantes" || scene.route === "movimientos" || scene.route === "conciliacion" || scene.route === "firma" ? (
+        <div className="grid items-start gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
+          <Thread scene={scene} compose="" mark={mark} onChoice={onChoice} onField={onField} compact />
+          <div>
+            {scene.route === "comprobantes" ? <Vault scene={scene} mark={mark} /> : null}
+            {scene.route === "movimientos" ? <Moves scene={scene} mark={mark} onChoice={onChoice} /> : null}
+            {scene.route === "conciliacion" ? <Match scene={scene} mark={mark} /> : null}
+            {scene.route === "firma" ? <Firm scene={scene} mark={mark} /> : null}
+          </div>
+        </div>
+      ) : null}
       {scene.route === "cobrar" ? <Invoices title="Cuentas por cobrar" rows={scene.ar} mark={mark} onChoice={onChoice} card={scene.card} /> : null}
       {scene.route === "pagar" ? <Pay scene={scene} mark={mark} onChoice={onChoice} /> : null}
       {scene.route === "reportes" ? <Bridge scene={scene} mark={mark} /> : null}
@@ -61,17 +70,44 @@ function Home({
   scene,
   compose,
   mark,
+  dragging,
   onChoice,
   onField,
 }: {
   scene: Scene;
   compose: string;
   mark: string | null;
+  dragging: boolean;
   onChoice: (id: string) => void;
   onField: (key: keyof Scene["fields"], value: string) => void;
 }) {
   return (
-    <section className="mx-auto flex min-h-[560px] max-w-3xl flex-col rounded-3xl border border-border bg-white">
+    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <Thread scene={scene} compose={compose} mark={mark} onChoice={onChoice} onField={onField} dragging={dragging} />
+      <FlowRail scene={scene} />
+    </div>
+  );
+}
+
+function Thread({
+  scene,
+  compose,
+  mark,
+  onChoice,
+  onField,
+  dragging = false,
+  compact = false,
+}: {
+  scene: Scene;
+  compose: string;
+  mark: string | null;
+  onChoice: (id: string) => void;
+  onField: (key: keyof Scene["fields"], value: string) => void;
+  dragging?: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <section className={`relative flex flex-col rounded-3xl border border-border bg-white ${compact ? "max-h-[640px]" : "min-h-[560px]"}`}>
       <header className="flex items-center gap-3 border-b border-border px-5 py-4">
         <span className="grid size-9 place-items-center rounded-full bg-slate-950 text-white"><Sparkles className="size-4" /></span>
         <div>
@@ -79,11 +115,11 @@ function Home({
           <p className="text-xs text-slate-500">Rivera Construction</p>
         </div>
       </header>
-      <div className="flex-1 space-y-3 px-5 py-6">
+      <div className="flex-1 space-y-3 overflow-auto px-5 py-6">
         {scene.messages.length === 0 && !scene.preview ? (
-          <div className="py-10 text-center">
+          <div className="py-8 text-center">
             <h2 className="text-3xl font-semibold tracking-tight">Buenos días, <span className="text-primary">Luis.</span></h2>
-            <p className="mt-2 text-sm text-slate-500">Esta escena no toca los datos guardados de la empresa.</p>
+            <p className="mt-2 text-sm text-slate-500">Suelta el comprobante en el chat. El recorrido sigue en esta conversación.</p>
           </div>
         ) : null}
         {scene.messages.map((message) => (
@@ -93,19 +129,59 @@ function Home({
         ))}
         {scene.processing ? <p className="text-sm text-slate-500">{scene.processing}</p> : null}
         {scene.preview || scene.card || scene.editing ? <Receipt scene={scene} mark={mark} onChoice={onChoice} onField={onField} /> : null}
-        {scene.fileReady ? (
-          <div data-sim="file-chip" className={`inline-flex items-center gap-2 rounded-2xl border border-border bg-white px-3 py-2 text-sm shadow-sm ${ring(mark === "file-chip")}`}>
-            <FileText className="size-4 text-primary" /> {scene.fileLabel}
+      </div>
+      {compact ? null : (
+        <div
+          data-sim="chat-drop"
+          className={`m-4 rounded-2xl border border-dashed px-4 py-4 ${scene.dragOver || mark === "chat-drop" ? "border-primary bg-violet-50" : "border-slate-300"} ${ring(mark === "chat-drop")}`}
+        >
+          <p className="mb-2 text-center text-xs text-slate-500">{scene.dragOver ? "Soltando el comprobante…" : "Arrastra el comprobante aquí"}</p>
+          <div className="flex items-center gap-2 rounded-full border border-border bg-white px-3 py-2">
+            <Sparkles className="size-4 text-primary" />
+            <input data-sim="composer" value={compose} readOnly placeholder="O escríbele a Serbell..." aria-label="Mensaje para Serbell" className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none" />
           </div>
-        ) : null}
-      </div>
-      <div data-sim="chat-drop" className={`border-t border-border px-4 py-4 ${scene.dragOver || mark === "chat-drop" ? "bg-violet-50" : ""} ${ring(mark === "chat-drop")}`}>
-        <div className="flex items-center gap-2 rounded-full border border-border px-3 py-2">
-          <Sparkles className="size-4 text-primary" />
-          <input data-sim="composer" value={compose} readOnly placeholder="Pregúntame sobre tu empresa..." aria-label="Mensaje para Serbell" className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none" />
         </div>
-      </div>
+      )}
+      {scene.fileReady ? (
+        <div data-sim="file-chip" className={`absolute right-6 top-[34%] z-10 w-44 rotate-3 rounded-xl border border-border bg-white p-3 text-[11px] leading-5 text-slate-500 shadow-xl ${dragging ? "opacity-0" : ""} ${ring(mark === "file-chip")}`}>
+          <FileText className="mb-2 size-4 text-primary" />
+          <p className="font-semibold text-slate-800">{scene.fileLabel.includes("HomeDepot") ? "HOME DEPOT" : scene.fileLabel}</p>
+          {scene.fileLabel.includes("HomeDepot") ? (
+            <>
+              <p>18 nov 2026</p>
+              <p className="mt-2">Materiales</p>
+              <p className="font-semibold text-slate-800">USD {scene.fields.total}</p>
+            </>
+          ) : (
+            <p className="mt-2">Tómalo y suéltalo en el chat.</p>
+          )}
+        </div>
+      ) : null}
     </section>
+  );
+}
+
+function FlowRail({ scene }: { scene: Scene }) {
+  const reviewed = scene.documents.some((doc) => doc.status === "Revisado") || scene.movements.some((move) => move.review === "Revisado");
+  const steps = [
+    ["Toma el comprobante", scene.fileReady || scene.preview || scene.documents.length > 0],
+    ["Suéltalo en el chat", scene.preview || scene.documents.length > 0],
+    ["Confirma los datos", scene.documents.length > 0],
+    ["Vincúlalo con el banco", scene.linked],
+    ["El contador lo revisa", reviewed],
+  ] as const;
+  return (
+    <aside className="rounded-3xl border border-border bg-white p-4">
+      <p className="text-sm font-semibold">El comprobante sigue este camino</p>
+      <ol className="mt-4 space-y-3">
+        {steps.map(([label, done], index) => (
+          <li key={label} className="flex items-center gap-2 text-sm">
+            <span className={done ? "grid size-6 place-items-center rounded-full bg-slate-950 text-[11px] text-white" : "grid size-6 place-items-center rounded-full bg-slate-100 text-[11px] text-slate-500"}>{index + 1}</span>
+            <span className={done ? "text-slate-800" : "text-slate-400"}>{label}</span>
+          </li>
+        ))}
+      </ol>
+    </aside>
   );
 }
 

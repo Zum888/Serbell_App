@@ -20,6 +20,7 @@ export default async function AccessPage({
 
   const configured = accessConfigured();
   const failed = params.error === "1";
+  const locked = params.error === "2";
 
   return (
     <main className="flex min-h-full items-center justify-center bg-neutral-50 p-6">
@@ -49,7 +50,10 @@ export default async function AccessPage({
                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10"
               />
             </div>
-            {failed ? (
+            {locked ? (
+              <p className="text-sm text-red-600">Demasiados intentos. Espera quince minutos.</p>
+            ) : null}
+            {failed && !locked ? (
               <p className="text-sm text-red-600">Contraseña incorrecta. Intenta de nuevo.</p>
             ) : null}
             <button

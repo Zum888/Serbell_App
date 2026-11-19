@@ -60,11 +60,11 @@ const ticket: Flow = {
   opening: () => ({ ...emptyScene(), movements: bankMoves() }),
   steps: [
     { id: "inicio", label: "Inicio", ms: 700, cursor: "chat-drop", run: (scene) => ({ ...scene, route: "inicio", person: "luis" }) },
-    { id: "archivo", label: "Aparece el ticket", ms: 800, cursor: "file-chip", run: (scene) => ({ ...scene, fileReady: true }) },
+    { id: "archivo", label: "Aparece el ticket", ms: 1600, cursor: "file-chip", run: (scene) => ({ ...scene, fileReady: true }) },
     {
       id: "arrastre",
       label: "Arrastrar el ticket",
-      ms: 1100,
+      ms: 2000,
       drag: true,
       cursor: "chat-drop",
       run: (scene) => ({ ...scene, dragOver: true, preview: true, fileReady: false }),
@@ -320,10 +320,11 @@ const faltantes: Flow = {
   steps: [
     { id: "aviso", label: "Notificación", ms: 900, cursor: "bell", run: (scene) => scene },
     { id: "abrir", label: "Abrir el aviso", ms: 900, cursor: "bell", click: true, run: (scene) => ({ ...scene, noticeOpen: true, route: "movimientos" }) },
+    { id: "traer", label: "Tomar los tres tickets", ms: 900, cursor: "file-chip", run: (scene) => ({ ...scene, route: "inicio", fileReady: true, fileLabel: "Shell, Ace y Lima" }) },
     {
       id: "adjuntar",
       label: "Adjuntar tickets",
-      ms: 1200,
+      ms: 2000,
       drag: true,
       cursor: "chat-drop",
       run: (scene) => ({
@@ -441,8 +442,8 @@ const pagar: Flow = {
   description: "Una factura de proveedor entra por el chat y queda como pago pendiente.",
   opening: () => emptyScene(),
   steps: [
-    { id: "archivo", label: "Factura del proveedor", ms: 700, run: (scene) => ({ ...scene, fileReady: true, fileLabel: "CementosDelValle.pdf" }) },
-    { id: "arrastre", label: "Arrastrarla al chat", ms: 1100, drag: true, cursor: "chat-drop", run: (scene) => ({ ...scene, preview: true, fileReady: false, dragOver: true }) },
+    { id: "archivo", label: "Factura del proveedor", ms: 1600, cursor: "file-chip", run: (scene) => ({ ...scene, fileReady: true, fileLabel: "CementosDelValle.pdf" }) },
+    { id: "arrastre", label: "Arrastrarla al chat", ms: 2000, drag: true, cursor: "chat-drop", run: (scene) => ({ ...scene, preview: true, fileReady: false, dragOver: true }) },
     { id: "leyendo", label: "Leyendo la factura", ms: 700, run: (scene) => ({ ...scene, processing: "Leyendo la factura." }) },
     {
       id: "datos",
