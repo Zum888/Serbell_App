@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { accessConfigured, gateEnforced, hasAccess } from "@/server/access";
+import { accessConfigured, accessSecretTooWeak, gateEnforced, hasAccess } from "@/server/access";
 import { safeNext } from "@/lib/utils";
 
 export const metadata = {
@@ -33,7 +33,11 @@ export default async function AccessPage({
           <p className="mt-1 text-sm text-neutral-500">Escribe la contraseña para entrar.</p>
         </div>
 
-        {configured ? (
+        {accessSecretTooWeak() ? (
+          <p className="rounded-lg bg-amber-50 px-3 py-3 text-center text-sm text-amber-800">
+            La contraseña configurada es demasiado fácil. Usa al menos 12 caracteres variados.
+          </p>
+        ) : configured ? (
           <form method="POST" action="/api/acceso" className="space-y-4">
             <input type="hidden" name="next" value={next} />
             <div>

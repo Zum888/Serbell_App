@@ -5,16 +5,32 @@ import { getIdentity } from "../../cursor/identity";
 const ACCESS_COOKIE = "sb_access";
 const ACCESS_PURPOSE = "serbell-access-v1";
 const VISITOR_ID = /^[a-f0-9]{32}$/;
+const MIN_PASSWORD_LENGTH = 12;
+
+/**
+ * A public lab cannot rest on a short or repetitive secret. Anything weaker
+ * is treated as unset, so the gate stays closed.
+ */
+export function passwordAccepted(value: string): boolean {
+  if (value.length < MIN_PASSWORD_LENGTH) return false;
+  return new Set(value).size >= 4;
+}
+
+function rawPassword(): string {
+  const value = process.env.SERBELL_ACCESS_PASSWORD;
+  return typeof value === "string" ? value.trim() : "";
+}
 
 /**
  * The shared password that protects the published lab. It is read from the
  * environment and is never written into the files the app ships (a hardcoded
  * password would be a security finding). Set it in the app's secret settings
- * in Cursor as SERBELL_ACCESS_PASSWORD. When it is unset the gate fails closed.
+ * in Cursor as SERBELL_ACCESS_PASSWORD. When it is unset or too weak the gate
+ * fails closed.
  */
 function configuredPassword(): string | null {
-  const value = process.env.SERBELL_ACCESS_PASSWORD;
-  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+  const value = rawPassword();
+  return passwordAccepted(value) ? value : null;
 }
 
 /**
@@ -60,9 +76,15 @@ export function accessGateActive(): boolean {
   return gateEnforced();
 }
 
-/** Whether the app owner has configured the access password yet. */
+/** Whether the app owner has configured an acceptable access password yet. */
 export function accessConfigured(): boolean {
   return configuredPassword() !== null;
+}
+
+/** True when a secret is present but too easy to guess, so the gate stays shut. */
+export function accessSecretTooWeak(): boolean {
+  const value = rawPassword();
+  return value.length > 0 && !passwordAccepted(value);
 }
 
 /** True when the current request may use the lab. */

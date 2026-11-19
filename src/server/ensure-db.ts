@@ -1,15 +1,14 @@
 import { execFileSync } from "node:child_process";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
-import { AppError } from "@/lib/errors";
 import { gateEnforced } from "@/server/access";
 import { dataRoot } from "@/server/paths";
 import { seedDatabase } from "@/server/seed";
 
 const copying = new Map<string, Promise<string>>();
 let templateJob: Promise<string> | null = null;
-const MAX_VISITOR_DATABASES = 80;
+const SHARED_DATABASE = "shared.db";
 
 /**
  * The SQLite file for local design work. Production does not use this: each
@@ -106,33 +105,29 @@ export function ensureTemplate(): Promise<string> {
 }
 
 /**
- * A private copy of the demo for one visitor. `key` is 32 hex characters.
- * Two visitors never share this file.
+ * One shared demo file for every visitor. `key` is still checked so a bad id
+ * cannot choose a path, but it does not create another database.
  */
 export function visitorDatabaseFile(key: string): Promise<string> {
   if (!/^[a-f0-9]{32}$/.test(key)) {
     throw new Error("La clave del visitante no es válida.");
   }
-  const existing = copying.get(key);
+  const existing = copying.get(SHARED_DATABASE);
   if (existing) return existing;
   const job = (async () => {
     const directory = path.join(dataRoot(), "visitors");
-    const file = path.join(directory, `${key}.db`);
+    const file = path.join(directory, SHARED_DATABASE);
     if (!existsSync(/*turbopackIgnore: true*/ file)) {
       mkdirSync(directory, { recursive: true });
-      const taken = readdirSync(directory).filter((name) => name.endsWith(".db")).length;
-      if (taken >= MAX_VISITOR_DATABASES) {
-        throw new AppError("El laboratorio está lleno. Intenta más tarde.", 429, "LAB_FULL");
-      }
       const template = await ensureTemplate();
       copyFileSync(template, file);
       chmodSync(file, 0o600);
     }
     return file;
   })().finally(() => {
-    copying.delete(key);
+    copying.delete(SHARED_DATABASE);
   });
-  copying.set(key, job);
+  copying.set(SHARED_DATABASE, job);
   return job;
 }
 
