@@ -1,4 +1,5 @@
 import { dayKey, isDay } from "@/lib/dates";
+import { MISSING_RECEIPTS } from "@/lib/missing-receipts";
 import { AppError } from "@/lib/errors";
 import { isTalk, talkReply } from "@/lib/briefing";
 import { NOTE_REPLY, UNSUPPORTED_REPLY, parseIntent } from "@/lib/intent";
@@ -526,6 +527,46 @@ export async function confirmLink(db: Db, actor: Actor, documentId: string, tran
       },
     });
   }
+}
+
+export async function attachMissingReceipts(db: Db, actor: Actor) {
+  let linked = 0;
+  for (const pair of MISSING_RECEIPTS) {
+    const transaction = await requireTransaction(db, pair.id);
+    assertCanMutate(actor, transaction.companyId, transaction.sealedAt);
+    const document = await db.document.findUnique({ where: { id: pair.documentId } });
+    if (!document || document.companyId !== transaction.companyId) {
+      throw new AppError("No está el ticket de demostración para ese movimiento.", 404, "NOT_FOUND");
+    }
+    const already = transaction.links.find((link) => link.status === "confirmed" && link.documentId === pair.documentId);
+    if (already) continue;
+    if (transaction.links.some((link) => link.status === "confirmed")) continue;
+    await db.transactionDocumentLink.create({
+      data: {
+        id: nid("link"),
+        transactionId: transaction.id,
+        documentId: document.id,
+        status: "confirmed",
+        confirmedById: actor.id,
+        confirmedAt: new Date(),
+      },
+    });
+    await db.bankTransaction.update({
+      where: { id: transaction.id },
+      data: { documentState: "Linked", reviewState: transaction.reviewState === "Approved" ? "Approved" : "NeedsReview" },
+    });
+    await db.document.update({ where: { id: document.id }, data: { status: "linked" } });
+    await audit(db, {
+      companyId: transaction.companyId,
+      actorId: actor.id,
+      transactionId: transaction.id,
+      documentId: document.id,
+      action: "link_confirmed",
+      next: { documentState: "Linked", reviewState: "NeedsReview" },
+    });
+    linked += 1;
+  }
+  return { linked, total: MISSING_RECEIPTS.length };
 }
 
 export async function setBankReconciliation(
