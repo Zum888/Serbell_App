@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { requestIsSameOrigin } from "@/server/same-origin";
@@ -21,6 +22,15 @@ export function proxy(request: NextRequest) {
   }
   const response = NextResponse.next();
   response.headers.set("cache-control", "private, no-store");
+  if (!request.cookies.get("sb_gate")?.value) {
+    response.cookies.set("sb_gate", randomBytes(16).toString("hex"), {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: request.nextUrl.protocol === "https:",
+      maxAge: 60 * 60 * 12,
+    });
+  }
   return response;
 }
 

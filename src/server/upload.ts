@@ -1,7 +1,7 @@
 import { AppError } from "@/lib/errors";
 
-export const MAX_UPLOAD_BYTES = 8_000_000;
-export const MAX_UPLOADS_PER_COMPANY = 40;
+export const MAX_UPLOAD_BYTES = 32_000;
+export const MAX_UPLOADS_PER_COMPANY = 4;
 const FORM_OVERHEAD = 256_000;
 
 export const ALLOWED_UPLOAD_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
@@ -33,10 +33,10 @@ export function uploadMime(file: File): string {
 
 export async function readUploadFile(file: File): Promise<{ mimeType: string; bytes: Buffer }> {
   if (file.size <= 0) throw new AppError("El archivo está vacío.", 400, "EMPTY_FILE");
-  if (file.size > MAX_UPLOAD_BYTES) throw new AppError("El archivo supera 8 MB.", 400, "FILE_TOO_LARGE");
+  if (file.size > MAX_UPLOAD_BYTES) throw new AppError("El archivo supera el tamaño de la demostración.", 400, "FILE_TOO_LARGE");
   const mimeType = uploadMime(file);
   const bytes = Buffer.from(await file.arrayBuffer());
-  if (bytes.byteLength > MAX_UPLOAD_BYTES) throw new AppError("El archivo supera 8 MB.", 400, "FILE_TOO_LARGE");
+  if (bytes.byteLength > MAX_UPLOAD_BYTES) throw new AppError("El archivo supera el tamaño de la demostración.", 400, "FILE_TOO_LARGE");
   return { mimeType, bytes };
 }
 
@@ -47,7 +47,7 @@ export async function readCappedForm(request: Request): Promise<FormData> {
   if (declared !== null) {
     const length = Number(declared);
     if (!Number.isFinite(length) || length < 0 || length > limit) {
-      throw new AppError("El archivo supera 8 MB.", 400, "FILE_TOO_LARGE");
+      throw new AppError("El archivo supera el tamaño de la demostración.", 400, "FILE_TOO_LARGE");
     }
   }
   if (!request.body) return request.formData();
@@ -61,7 +61,7 @@ export async function readCappedForm(request: Request): Promise<FormData> {
     total += value.byteLength;
     if (total > limit) {
       await reader.cancel();
-      throw new AppError("El archivo supera 8 MB.", 400, "FILE_TOO_LARGE");
+      throw new AppError("El archivo supera el tamaño de la demostración.", 400, "FILE_TOO_LARGE");
     }
     chunks.push(value);
   }

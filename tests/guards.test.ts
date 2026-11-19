@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { accessConfigured, passwordMatches } from "@/server/access";
-import { clearLoginFailures, loginAllowed, noteLoginFailure, resetLoginLimits } from "@/server/login-limit";
+import { clearLoginFailures, clientAddress, loginAllowed, loginBucketKey, noteLoginFailure, resetLoginLimits } from "@/server/login-limit";
 import { requestIsSameOrigin } from "@/server/same-origin";
 import { originOf } from "@/server/http";
 
@@ -53,4 +53,13 @@ it("no abre el laboratorio con una contraseña corta", () => {
   expect(passwordMatches("clave-de-prueba")).toBe(true);
   if (previous === undefined) delete process.env.SERBELL_ACCESS_PASSWORD;
   else process.env.SERBELL_ACCESS_PASSWORD = previous;
+});
+
+it("no junta a todos los visitantes en un mismo límite cuando falta la dirección", () => {
+  const bare = new Request("http://127.0.0.1/api/acceso");
+  const one = new Request("http://127.0.0.1/api/acceso", { headers: { cookie: "sb_gate=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } });
+  const two = new Request("http://127.0.0.1/api/acceso", { headers: { cookie: "sb_gate=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } });
+  expect(clientAddress(bare)).toBeNull();
+  expect(loginBucketKey(bare)).toBeNull();
+  expect(loginBucketKey(one)).not.toBe(loginBucketKey(two));
 });

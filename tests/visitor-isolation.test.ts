@@ -38,31 +38,31 @@ it("la cookie firma un id distinto por navegador y rechaza la llave compartida",
   expect(readSignedVisitor(grantCookie(first?.value)?.value)).toBe(left);
 });
 
-it("todos los visitantes usan una sola base", async () => {
+it("dos visitantes no comparten la base", async () => {
   const leftKey = readSignedVisitor(grantCookie()?.value);
   const rightKey = readSignedVisitor(grantCookie()?.value);
   expect(leftKey).toBeTruthy();
   expect(rightKey).toBeTruthy();
   const leftPath = await visitorDatabaseFile(leftKey!);
   const rightPath = await visitorDatabaseFile(rightKey!);
-  expect(leftPath).toBe(rightPath);
-  expect(leftPath.endsWith("shared.db")).toBe(true);
+  expect(leftPath).not.toBe(rightPath);
   const left = new PrismaClient({ datasources: { db: { url: `file:${leftPath}` } } });
   const right = new PrismaClient({ datasources: { db: { url: `file:${rightPath}` } } });
   try {
     await left.document.create({
       data: {
-        id: "doc_shared_probe",
+        id: "doc_isolation_probe",
         companyId: "co_qpl",
         uploadedById: "usr_padrino",
-        fileName: "compartido.jpg",
+        fileName: "privado.jpg",
         mimeType: "image/jpeg",
         sizeBytes: 4,
-        storagePath: "storage/visitors/shared/compartido.jpg",
+        storagePath: "demo/doc_isolation_probe",
         status: "received",
       },
     });
-    expect(await right.document.findUnique({ where: { id: "doc_shared_probe" } })).not.toBeNull();
+    expect(await left.document.findUnique({ where: { id: "doc_isolation_probe" } })).not.toBeNull();
+    expect(await right.document.findUnique({ where: { id: "doc_isolation_probe" } })).toBeNull();
   } finally {
     await left.$disconnect();
     await right.$disconnect();
