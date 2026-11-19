@@ -32,6 +32,8 @@ export function CategoryMenu({
   value,
   disabled,
   attention,
+  leaf,
+  placeholder = "Elegir categoría",
   testId,
   onPick,
   onAdd,
@@ -40,6 +42,8 @@ export function CategoryMenu({
   value: string;
   disabled?: boolean;
   attention?: boolean;
+  leaf?: boolean;
+  placeholder?: string;
   testId?: string;
   onPick: (id: string) => void;
   onAdd: (parentId: string | null, name: string) => Promise<CategoryNode | null>;
@@ -58,7 +62,9 @@ export function CategoryMenu({
 
   const selectedPath = useMemo(() => pathOf(tree, value), [tree, value]);
   const selectedIds = new Set(selectedPath.map((node) => node.id));
-  const label = selectedPath.length > 1 ? selectedPath.map((node) => node.name).join(" › ") : null;
+  const label = selectedPath.length > 1
+    ? (leaf ? selectedPath[selectedPath.length - 1]?.name ?? null : selectedPath.map((node) => node.name).join(" › "))
+    : null;
 
   const columns = useMemo(() => {
     const result: { parentId: string | null; parentName: string | null; nodes: CategoryNode[] }[] = [{ parentId: null, parentName: null, nodes: tree }];
@@ -176,7 +182,7 @@ export function CategoryMenu({
               : "border-border bg-white text-slate-500 hover:border-slate-300"
         } ${open ? "ring-2 ring-primary/30" : ""}`}
       >
-        <span className="truncate">{label ?? "Elegir categoría"}</span>
+        <span className="truncate">{label ?? placeholder}</span>
         <ChevronDown className="size-3.5 shrink-0 opacity-60" />
       </button>
       {open && anchor ? createPortal(

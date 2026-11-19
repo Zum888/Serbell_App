@@ -26,6 +26,8 @@ type Row = {
   mask: string;
   documentId: string | null;
   documentName: string | null;
+  invoiceNumber: string | null;
+  suggested: boolean;
 };
 
 type Receipt = {
@@ -78,8 +80,9 @@ type Detail = {
 
 const filters = [
   ["todos", "Todos"],
-  ["sin-categoria", "Sin categoría"],
-  ["sin-comprobante", "Sin comprobante"],
+  ["sin-categoria", "Sin categorizar"],
+  ["sin-comprobante", "Sin comprobantes"],
+  ["por-conciliar", "Por conciliar"],
   ["por-revisar", "Por revisar"],
   ["aprobados", "Aprobados"],
 ] as const;
@@ -102,7 +105,7 @@ export function MovementsScreen({
   companyId: string;
   balanceLabel: string;
   rows: Row[];
-  counts: { todos: number; sinCategoria: number; sinComprobante: number; porRevisar: number; aprobados: number };
+  counts: { todos: number; sinCategoria: number; sinComprobante: number; porConciliar: number; porRevisar: number; aprobados: number };
   filter: string;
   q: string;
   error?: string;
@@ -115,6 +118,7 @@ export function MovementsScreen({
     todos: counts.todos,
     "sin-categoria": counts.sinCategoria,
     "sin-comprobante": counts.sinComprobante,
+    "por-conciliar": counts.porConciliar,
     "por-revisar": counts.porRevisar,
     aprobados: counts.aprobados,
   };
@@ -125,33 +129,32 @@ export function MovementsScreen({
         <div className="border-b border-border px-4 py-4">
           <p className="text-xs text-slate-500">{companyName}</p>
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <h1 className="text-2xl font-semibold">Movimientos</h1>
+            <div>
+              <h1 className="text-2xl font-semibold">Movimientos</h1>
+              <p className="text-sm text-slate-500">{periodOf(rows) || balanceLabel}</p>
+            </div>
             <p className="text-sm text-slate-500">{balanceLabel}</p>
           </div>
           <div className="mt-3 flex gap-2">
             <Link href="/movimientos?vista=enfoque" className="rounded-full border border-border px-3 py-1.5 text-xs text-slate-600">Modo enfoque</Link>
-            <span className="rounded-full bg-slate-900 px-3 py-1.5 text-xs text-white">Vista detallada</span>
+            <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-800">Vista detallada</span>
           </div>
-          <p className="mt-1 text-sm text-slate-500">
-            {canReview
-              ? "En Por revisar apruebas o pides una aclaración. El círculo verde marca la conciliación bancaria. El comprobante sugiere uno y deja el resto en la búsqueda."
-              : "Si la fila dice «Con tu contador», ya está en su cola. El círculo verde marca la conciliación bancaria."}
-          </p>
         </div>
-        <div className="flex flex-wrap gap-2 px-4 py-3">
+        <div className="flex flex-wrap gap-1 px-4 py-3">
           {filters.map(([key, label]) => (
             <Link
               key={key}
               href={`/movimientos?filtro=${key}`}
-              className={filter === key ? "rounded-full bg-slate-900 px-3 py-1.5 text-xs text-white" : "rounded-full border border-border px-3 py-1.5 text-xs text-slate-600"}
+              className={filter === key ? "rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-900" : "rounded-lg px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"}
             >
-              {label} ({countFor[key]})
+              {label}
+              <span className="ml-1 text-slate-400">{countFor[key]}</span>
             </Link>
           ))}
         </div>
         <form className="px-4 pb-3" action="/movimientos">
           <input type="hidden" name="filtro" value={filter} />
-          <Input name="q" defaultValue={q} placeholder="Buscar movimiento, comercio o importe..." />
+          <Input name="q" defaultValue={q} placeholder="Buscar movimiento..." />
         </form>
         {error && !detail && !receipt ? <div className="px-4 pb-3"><StateView variant="error" title={error} testId="server-error" /></div> : null}
         {rows.length === 0 ? (
@@ -161,11 +164,19 @@ export function MovementsScreen({
         ) : (
           <MovementsTable rows={rows} categories={categories} canReview={canReview} filter={filter} q={q} companyId={companyId} />
         )}
-        <p className="px-4 py-3 text-xs text-slate-500">{rows.length} movimientos en esta vista</p>
       </section>
       {receipt ? <ReceiptPanel receipt={receipt} filter={filter} q={q} error={error} /> : detail ? <Drawer detail={detail} error={error} filter={filter} q={q} /> : null}
     </div>
   );
+}
+
+function periodOf(rows: { postedOn: string }[]) {
+  const day = rows.find((row) => row.postedOn)?.postedOn;
+  if (!day) return "";
+  const [year, month] = day.split("-").map(Number);
+  if (!year || !month) return "";
+  const label = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1, 12))).replace(" de ", " ");
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function Drawer({ detail, error, filter, q }: { detail: Detail; error?: string; filter: string; q: string }) {
