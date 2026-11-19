@@ -1,5 +1,3 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { dayKey, isDay } from "@/lib/dates";
 import { AppError } from "@/lib/errors";
 import { isTalk, talkReply } from "@/lib/briefing";
@@ -18,9 +16,7 @@ import { safeFileName } from "@/lib/utils";
 import { localProviders } from "@/providers/local";
 import type { Db } from "@/server/db";
 import { nid, sha256 } from "@/server/ids";
-import { dataRoot } from "@/server/paths";
 import { loadBriefing } from "@/server/assistant";
-import { resolveViewer } from "@/server/viewer";
 import { ALLOWED_UPLOAD_TYPES, MAX_UPLOAD_BYTES, MAX_UPLOADS_PER_COMPANY } from "@/server/upload";
 
 async function conversationFor(db: Db, companyId: string) {
@@ -205,15 +201,6 @@ function describeMatch(result: MatchResult): string {
   return result.reasonsAgainst.join(" ") || "No hay un movimiento compatible.";
 }
 
-/** Local uploads stay where the seed expects them. A published visitor writes only inside their own folder. */
-async function uploadFolder(companyId: string): Promise<string> {
-  if (process.env.NODE_ENV !== "production") return path.join("storage", "uploads", companyId);
-  const viewer = await resolveViewer();
-  if (!viewer) throw new AppError("Escribe la contraseña para entrar al laboratorio.", 401, "NO_ACCESS");
-  const safe = viewer.sub.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 80);
-  return path.join("storage", "visitors", safe, companyId);
-}
-
 export async function saveUploadedDocument(
   db: Db,
   actor: Actor,
@@ -221,7 +208,7 @@ export async function saveUploadedDocument(
 ) {
   assertCompanyAccess(actor, input.companyId);
   if (!input.bytes.byteLength) throw new AppError("El archivo está vacío.", 400, "EMPTY_FILE");
-  if (input.bytes.byteLength > MAX_UPLOAD_BYTES) throw new AppError("El archivo supera 8 MB.", 400, "FILE_TOO_LARGE");
+  if (input.bytes.byteLength > MAX_UPLOAD_BYTES) throw new AppError("El archivo supera el tamaño de la demostración.", 400, "FILE_TOO_LARGE");
   if (!ALLOWED_UPLOAD_TYPES.has(input.mimeType)) {
     throw new AppError("Solo se aceptan JPG, PNG, WEBP o PDF.", 400, "FILE_TYPE");
   }
@@ -229,7 +216,7 @@ export async function saveUploadedDocument(
     where: { companyId: input.companyId },
     select: { storagePath: true },
   });
-  const uploaded = stored.filter((row) => /\/doc_[0-9a-f]{12}-/.test(row.storagePath)).length;
+  const uploaded = stored.filter((row) => row.storagePath.startsWith("demo/") || /\/doc_[0-9a-f]{12}-/.test(row.storagePath)).length;
   if (uploaded >= MAX_UPLOADS_PER_COMPANY) {
     throw new AppError(`Llegaste al límite de ${MAX_UPLOADS_PER_COMPANY} comprobantes subidos.`, 429, "UPLOAD_LIMIT");
   }
@@ -241,11 +228,7 @@ export async function saveUploadedDocument(
   });
   const id = nid("doc");
   const fileName = safeFileName(input.fileName);
-  const folder = await uploadFolder(input.companyId);
-  const storagePath = path.join(folder, `${id}-${fileName}`);
-  const absolute = path.join(dataRoot(), storagePath);
-  await mkdir(path.dirname(absolute), { recursive: true });
-  await writeFile(absolute, input.bytes);
+  const storagePath = `demo/${id}`;
 
   let categoryId: string | null = null;
   let subcategoryId: string | null = null;

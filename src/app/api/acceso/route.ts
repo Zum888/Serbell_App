@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { grantCookie, passwordMatches } from "@/server/access";
 import { originOf } from "@/server/http";
-import { clearLoginFailures, clientAddress, loginAllowed, noteLoginFailure } from "@/server/login-limit";
+import { clearLoginFailures, globalLoginAllowed, loginAllowed, loginBucketKey, noteLoginFailure } from "@/server/login-limit";
 import { safeNext } from "@/lib/utils";
 
 export async function POST(request: Request) {
@@ -10,9 +10,9 @@ export async function POST(request: Request) {
   const password = String(form.get("password") ?? "");
   const next = safeNext(String(form.get("next") ?? ""), "/");
   const origin = originOf(request);
-  const address = clientAddress(request);
+  const address = loginBucketKey(request);
 
-  if (!loginAllowed(address)) {
+  if (!address || !globalLoginAllowed() || !loginAllowed(address)) {
     const back = new URL("/acceso", `${origin}/`);
     back.searchParams.set("next", next);
     back.searchParams.set("error", "2");

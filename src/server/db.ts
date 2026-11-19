@@ -30,8 +30,8 @@ function clientFor(file: string): PrismaClient {
 
 /**
  * The database for this request. Local design work uses the single dev file.
- * A published app never does: every visitor shares one demo file, so a new
- * cookie cannot create another database.
+ * A published app never does: each visitor gets a private copy, and only a
+ * few of those copies are kept.
  */
 export async function db(): Promise<PrismaClient> {
   if (!gateEnforced()) {

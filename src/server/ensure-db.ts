@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { gateEnforced } from "@/server/access";
@@ -8,7 +8,8 @@ import { seedDatabase } from "@/server/seed";
 
 const copying = new Map<string, Promise<string>>();
 let templateJob: Promise<string> | null = null;
-const SHARED_DATABASE = "shared.db";
+const MAX_VISITOR_DATABASES = 8;
+const VISITOR_FILE = /^[a-f0-9]{32}\.db$/;
 
 /**
  * The SQLite file for local design work. Production does not use this: each
@@ -104,30 +105,48 @@ export function ensureTemplate(): Promise<string> {
   return templateJob;
 }
 
+function dropOldestVisitorDatabases(directory: string) {
+  const names = readdirSync(directory).filter((name) => VISITOR_FILE.test(name));
+  if (names.length < MAX_VISITOR_DATABASES) return;
+  const ranked = names
+    .map((name) => ({ name, mtime: statSync(path.join(directory, name)).mtimeMs }))
+    .sort((left, right) => left.mtime - right.mtime);
+  while (ranked.length >= MAX_VISITOR_DATABASES) {
+    const oldest = ranked.shift();
+    if (!oldest) break;
+    rmSync(path.join(directory, oldest.name), { force: true });
+  }
+}
+
 /**
- * One shared demo file for every visitor. `key` is still checked so a bad id
- * cannot choose a path, but it does not create another database.
+ * A private copy for one visitor. `key` is 32 hex characters and becomes the
+ * file name, so one visitor cannot open another's database. The folder keeps
+ * at most a handful of copies; the oldest is removed before a new one is made.
  */
 export function visitorDatabaseFile(key: string): Promise<string> {
   if (!/^[a-f0-9]{32}$/.test(key)) {
     throw new Error("La clave del visitante no es válida.");
   }
-  const existing = copying.get(SHARED_DATABASE);
+  const existing = copying.get(key);
   if (existing) return existing;
   const job = (async () => {
     const directory = path.join(dataRoot(), "visitors");
-    const file = path.join(directory, SHARED_DATABASE);
+    const file = path.join(directory, `${key}.db`);
+    mkdirSync(directory, { recursive: true });
     if (!existsSync(/*turbopackIgnore: true*/ file)) {
-      mkdirSync(directory, { recursive: true });
+      dropOldestVisitorDatabases(directory);
       const template = await ensureTemplate();
       copyFileSync(template, file);
       chmodSync(file, 0o600);
+    } else {
+      const now = new Date();
+      utimesSync(file, now, now);
     }
     return file;
   })().finally(() => {
-    copying.delete(SHARED_DATABASE);
+    copying.delete(key);
   });
-  copying.set(SHARED_DATABASE, job);
+  copying.set(key, job);
   return job;
 }
 
