@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ACCOUNTING_LABEL, DOCUMENT_LABEL, REVIEW_LABEL } from "@/lib/labels";
 import { formatUsd } from "@/lib/money";
@@ -27,7 +27,8 @@ export type BankStepData = {
   nextSkip: string | null;
 };
 
-export function BankStep({ data, error }: { data: BankStepData; error?: string }) {
+export function BankStep({ data, error, fromInvoice }: { data: BankStepData; error?: string; fromInvoice?: boolean }) {
+  const [phase, setPhase] = useState<"search" | "match" | "idle">(fromInvoice && !data.sealed ? "search" : "idle");
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       const tag = (event.target as HTMLElement | null)?.tagName;
@@ -50,8 +51,27 @@ export function BankStep({ data, error }: { data: BankStepData; error?: string }
     return () => window.removeEventListener("keydown", onKey);
   }, [data]);
 
+  useEffect(() => {
+    if (phase === "idle") return;
+    if (phase === "search") {
+      const timer = window.setTimeout(() => setPhase("match"), 1100);
+      return () => window.clearTimeout(timer);
+    }
+    const timer = window.setTimeout(() => {
+      (document.getElementById("bank-reconcile-form") as HTMLFormElement | null)?.requestSubmit();
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [phase]);
+
   return (
     <section data-testid="bank-step">
+      {phase !== "idle" ? (
+        <p className="mb-4 rounded-2xl bg-white px-4 py-3 text-sm text-slate-700 shadow-sm" data-testid="invoice-match">
+          {phase === "search"
+            ? "Busco en la cuenta el cargo que coincide con Factura_FleetSmarts.pdf."
+            : `Coincide con ${data.merchant}, ${formatUsd(data.amountCents)}. Lo concilio.`}
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Link href={data.accountHref} className="text-sm text-primary">Volver a la cuenta</Link>
@@ -88,7 +108,8 @@ export function BankStep({ data, error }: { data: BankStepData; error?: string }
           ) : (
             <form id="bank-reconcile-form" action={`/api/transactions/${data.transactionId}/bank`} method="post" className="mt-4">
               <input type="hidden" name="action" value="reconcile" />
-              <input type="hidden" name="next" value={data.accountHref} />
+              <input type="hidden" name="stay" value={fromInvoice ? "1" : ""} />
+              <input type="hidden" name="next" value={fromInvoice ? `${data.accountHref}&factura=lista` : data.accountHref} />
               <Button type="submit" data-testid="bank-reconcile">Conciliar con el banco</Button>
             </form>
           )}

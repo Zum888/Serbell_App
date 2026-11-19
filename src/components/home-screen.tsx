@@ -35,7 +35,8 @@ export function HomeScreen({
 }) {
   const accountLine = accounts.map((account) => `${account.institution} ····${account.mask}`).join(" · ");
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
+      <HomeChat name={name} briefing={briefing} starts={starts} />
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           icon={<Wallet className="size-4" />}
@@ -78,8 +79,6 @@ export function HomeScreen({
           </article>
         </Link>
       </section>
-
-      <HomeChat name={name} briefing={briefing} starts={starts} />
     </div>
   );
 }
