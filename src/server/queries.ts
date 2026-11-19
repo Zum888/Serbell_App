@@ -894,10 +894,11 @@ export async function listCategoryTree(db: Db, actor: Actor, companyId: string) 
     throw new AppError("El servidor rechazó la solicitud: no tienes acceso a esta empresa.", 403, "COMPANY_FORBIDDEN");
   }
   const categories = await localProviders(db).accounting.listCategories(companyId);
-  const nest = (parentId: string | null): { id: string; parentId: string | null; name: string; children: ReturnType<typeof nest> }[] =>
+  type CategoryNode = { id: string; parentId: string | null; name: string; children: CategoryNode[] };
+  const nest = (parentId: string | null): CategoryNode[] =>
     categories
       .filter((category) => category.parentId === parentId)
-      .map((category) => ({ ...category, children: nest(category.id) }));
+      .map((category) => ({ id: category.id, parentId: category.parentId, name: category.name, children: nest(category.id) }));
   return nest(null);
 }
 
