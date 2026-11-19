@@ -5,7 +5,6 @@ import {
   BarChart3,
   CircleHelp,
   FileText,
-  House,
   Landmark,
   MessageSquare,
   Receipt,
@@ -18,8 +17,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const items = [
-  { href: "/", firmHref: "/firma", label: "Inicio", icon: House, testId: "nav-inicio" },
-  { href: "/chat", label: "Chat con Serbell", icon: MessageSquare, testId: "nav-chat" },
+  { href: "/", firmHref: "/firma", label: "Chat nuevo", icon: MessageSquare, testId: "nav-inicio" },
   { href: "/movimientos", label: "Movimientos", icon: ArrowLeftRight, testId: "nav-movimientos" },
   { href: "/cuentas", label: "Cuentas bancarias", icon: Landmark, testId: "nav-cuentas" },
   { href: "/comprobantes", label: "Comprobantes", icon: FileText, testId: "nav-comprobantes" },

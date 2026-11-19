@@ -3,6 +3,7 @@
 import { ArrowUp, Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { DuplicateFlow } from "@/components/duplicate-flow";
 import { LoteFlow } from "@/components/lote-flow";
 import { InvoiceFlow } from "@/components/ticket-flow";
 import { GUIDE_REPLY, isTalk, talkReply, type Briefing } from "@/lib/briefing";
@@ -12,7 +13,6 @@ import { greetingName } from "@/lib/labels";
 
 const PROMPTS = [
   ["Analizar mis gastos", "Analiza mis gastos"],
-  ["Revisar duplicados", "Revisar duplicados"],
   ["¿Cuánto gané?", "¿Cuánto gané?"],
 ] as const;
 
@@ -21,11 +21,17 @@ type Bubble = { id: string; role: "user" | "assistant"; body: string };
 export function HomeChat({ name, briefing, starts }: { name: string; briefing: Briefing; starts: HomeStart[] }) {
   const [messages, setMessages] = useState<Bubble[]>([]);
   const [text, setText] = useState("");
-  const [flow, setFlow] = useState<"factura" | "lote" | null>(null);
+  const [flow, setFlow] = useState<"factura" | "lote" | "duplicado" | null>(null);
 
   function ask(raw: string) {
     const value = raw.trim();
     if (!value) return;
+    if (/duplicad/i.test(value)) {
+      setMessages([]);
+      setFlow("duplicado");
+      setText("");
+      return;
+    }
     const intent = parseIntent(value);
     const body = isTalk(intent.type) ? talkReply(intent.type, briefing) : intent.type === "unsupported" ? UNSUPPORTED_REPLY : GUIDE_REPLY;
     const stamp = `${Date.now()}-${messages.length}`;
@@ -67,6 +73,11 @@ export function HomeChat({ name, briefing, starts }: { name: string; briefing: B
             <h1 className="sr-only">Conciliar un lote</h1>
             <LoteFlow />
           </div>
+        ) : flow === "duplicado" ? (
+          <div className="mx-auto w-full max-w-2xl flex-1">
+            <h1 className="sr-only">Revisar duplicados</h1>
+            <DuplicateFlow />
+          </div>
         ) : talking ? (
           <div className="mx-auto w-full max-w-2xl flex-1 space-y-6">
             <h1 className="sr-only">Buenos días, {greetingName(name)}.</h1>
@@ -107,6 +118,14 @@ export function HomeChat({ name, briefing, starts }: { name: string; briefing: B
                 className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:text-slate-950"
               >
                 Conciliar un lote
+              </button>
+              <button
+                type="button"
+                data-testid="flow-duplicado"
+                onClick={() => setFlow("duplicado")}
+                className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:text-slate-950"
+              >
+                Revisar duplicados
               </button>
               {PROMPTS.map(([label, prompt]) => (
                 <button

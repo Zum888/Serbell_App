@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { CategoryForm, pairsToGroups } from "@/components/category-form";
+import { DuplicatePanel } from "@/components/duplicate-panel";
 import { MovementsTable } from "@/components/movements-table";
 import { ReceiptPanel } from "@/components/receipt-panel";
+import { DUPLICATE_IDS } from "@/lib/duplicates";
 import { ACCOUNTING_LABEL, RECONCILIATION_LABEL } from "@/lib/labels";
 import { formatUsd } from "@/lib/money";
 import { StateView } from "@/components/state-view";
@@ -101,6 +103,8 @@ export function MovementsScreen({
   receipt,
   canReview,
   categories,
+  duplicate = false,
+  decision,
 }: {
   companyName: string;
   companyId: string;
@@ -114,6 +118,8 @@ export function MovementsScreen({
   receipt: Receipt | null;
   canReview: boolean;
   categories: { id: string; name: string; children?: { id: string; name: string; children?: { id: string; name: string }[] }[] }[];
+  duplicate?: boolean;
+  decision?: string;
 }) {
   const countFor: Record<string, number> = {
     todos: counts.todos,
@@ -124,6 +130,9 @@ export function MovementsScreen({
     aprobados: counts.aprobados,
   };
   const side = receipt || detail;
+  const ordered = duplicate
+    ? [...rows.filter((row) => (DUPLICATE_IDS as readonly string[]).includes(row.id)), ...rows.filter((row) => !(DUPLICATE_IDS as readonly string[]).includes(row.id))]
+    : rows;
   return (
     <div className={side ? "grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_400px]" : ""}>
       <section className="min-w-0 rounded-2xl border border-border bg-white">
@@ -157,13 +166,14 @@ export function MovementsScreen({
           <input type="hidden" name="filtro" value={filter} />
           <Input name="q" defaultValue={q} placeholder="Buscar movimiento..." />
         </form>
+        {duplicate ? <DuplicatePanel decision={decision} /> : null}
         {error && !detail && !receipt ? <div className="px-4 pb-3"><StateView variant="error" title={error} testId="server-error" /></div> : null}
-        {rows.length === 0 ? (
+        {ordered.length === 0 ? (
           <div className="px-4 pb-4">
             <StateView variant="empty" title="No hay movimientos con este filtro." />
           </div>
         ) : (
-          <MovementsTable rows={rows} categories={categories} canReview={canReview} filter={filter} q={q} companyId={companyId} />
+          <MovementsTable rows={ordered} categories={categories} canReview={canReview} filter={filter} q={q} companyId={companyId} marked={duplicate ? [...DUPLICATE_IDS] : []} />
         )}
       </section>
       {receipt ? <ReceiptPanel receipt={receipt} filter={filter} q={q} error={error} /> : detail ? <Drawer detail={detail} error={error} filter={filter} q={q} /> : null}
