@@ -24,10 +24,14 @@ export async function loadBriefing(db: Db, actor: Actor, companyId: string): Pro
   let outflows = 0;
   let uncategorizedCount = 0;
   let uncategorizedExpenseCents = 0;
+  let missingReceipts = 0;
+  let needsReview = 0;
   const byCategory = new Map<string, number>();
   for (const row of transactions) {
     if (row.amountCents > 0) inflows += row.amountCents;
     else if (row.amountCents < 0) outflows += Math.abs(row.amountCents);
+    if (row.documentState === "Missing") missingReceipts += 1;
+    if (row.reviewState === "NeedsReview") needsReview += 1;
     const uncategorized = row.accountingState === "Uncategorized" || !row.classification;
     if (uncategorized) {
       uncategorizedCount += 1;
@@ -46,6 +50,8 @@ export async function loadBriefing(db: Db, actor: Actor, companyId: string): Pro
     net: inflows - outflows,
     uncategorizedCount,
     uncategorizedExpenseCents,
+    missingReceipts,
+    needsReview,
     categories: [...byCategory.entries()]
       .map(([name, totalCents]) => ({ name, totalCents }))
       .sort((a, b) => b.totalCents - a.totalCents || a.name.localeCompare(b.name, "es")),
@@ -55,7 +61,7 @@ export async function loadBriefing(db: Db, actor: Actor, companyId: string): Pro
       amountCents: row.extraction?.amountCents ?? null,
     })),
     debtors: desk.folders
-      .map((folder) => ({ name: folder.name, openCents: folder.openCents, invoiceCount: folder.invoiceCount }))
+      .map((folder) => ({ partyId: folder.partyId, name: folder.name, openCents: folder.openCents, invoiceCount: folder.invoiceCount }))
       .sort((a, b) => b.openCents - a.openCents || a.name.localeCompare(b.name, "es")),
     movements: transactions.slice(0, 4).map((row) => ({
       merchant: row.merchant,

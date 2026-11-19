@@ -7,9 +7,11 @@ export type Briefing = {
   net: number;
   uncategorizedCount: number;
   uncategorizedExpenseCents: number;
+  missingReceipts: number;
+  needsReview: number;
   categories: { name: string; totalCents: number }[];
   duplicates: { fileName: string; merchant: string | null; amountCents: number | null }[];
-  debtors: { name: string; openCents: number; invoiceCount: number }[];
+  debtors: { partyId: string; name: string; openCents: number; invoiceCount: number }[];
   movements: { merchant: string; postedOn: string; amountCents: number; category: string }[];
 };
 
