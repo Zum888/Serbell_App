@@ -1170,6 +1170,23 @@ export async function sealTransaction(db: Db, actor: Actor, transactionId: strin
   });
 }
 
+export async function sealTransactions(db: Db, actor: Actor, ids: string[]) {
+  const sealed: string[] = [];
+  const skipped: { id: string; error: string }[] = [];
+  for (const id of ids) {
+    try {
+      await sealTransaction(db, actor, id);
+      sealed.push(id);
+    } catch (error) {
+      skipped.push({ id, error: error instanceof AppError ? error.message : "No se pudo sellar." });
+    }
+  }
+  if (sealed.length === 0) {
+    throw new AppError(skipped[0]?.error ?? "No hay movimientos para cerrar.", 400, "SEAL_FAILED");
+  }
+  return { sealed, skipped };
+}
+
 export async function reopenTransaction(db: Db, actor: Actor, transactionId: string, justification: string) {
   const transaction = await requireTransaction(db, transactionId);
   assertCanReopen(actor, transaction.companyId);

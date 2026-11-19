@@ -76,6 +76,7 @@ export async function getHome(db: Db, actor: Actor, companyId: string) {
 function movementWhere(filter: string) {
   if (filter === "sin-categoria") return { accountingState: "Uncategorized" };
   if (filter === "sin-comprobante") return { documentState: "Missing" };
+  if (filter === "por-conciliar") return { reconciliationState: "Unreconciled" };
   if (filter === "por-revisar") return { reviewState: "NeedsReview" };
   if (filter === "aprobados") return { reviewState: "Approved" };
   return {};
@@ -94,6 +95,11 @@ export async function listMovements(db: Db, actor: Actor, companyId: string, fil
       links: {
         where: { status: "confirmed" },
         include: { document: { select: { id: true, fileName: true } } },
+      },
+      invoiceLinks: {
+        where: { status: "confirmed" },
+        include: { invoice: { select: { number: true } } },
+        take: 1,
       },
     },
     orderBy: [{ postedOn: "desc" }, { merchant: "asc" }],
@@ -127,6 +133,8 @@ export async function listMovements(db: Db, actor: Actor, companyId: string, fil
       mask: row.account.mask,
       documentId: row.links[0]?.document.id ?? null,
       documentName: row.links[0]?.document.fileName ?? null,
+      invoiceNumber: row.invoiceLinks[0]?.invoice.number ?? null,
+      suggested: row.classification?.state === "Proposed",
     }));
 }
 
@@ -136,12 +144,13 @@ export async function movementCounts(db: Db, actor: Actor, companyId: string) {
   }
   const rows = await db.bankTransaction.findMany({
     where: { companyId },
-    select: { accountingState: true, documentState: true, reviewState: true },
+    select: { accountingState: true, documentState: true, reviewState: true, reconciliationState: true },
   });
   return {
     todos: rows.length,
     sinCategoria: rows.filter((row) => row.accountingState === "Uncategorized").length,
     sinComprobante: rows.filter((row) => row.documentState === "Missing").length,
+    porConciliar: rows.filter((row) => row.reconciliationState !== "Reconciled").length,
     porRevisar: rows.filter((row) => row.reviewState === "NeedsReview").length,
     aprobados: rows.filter((row) => row.reviewState === "Approved").length,
   };
