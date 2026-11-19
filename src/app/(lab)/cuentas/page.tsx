@@ -1,15 +1,16 @@
-import { CreditCard, Landmark, LayoutGrid, Plus } from "lucide-react";
+import { LayoutGrid, Plus } from "lucide-react";
 import Link from "next/link";
+import { AccountsBoard } from "@/components/accounts-board";
 import { BankStep } from "@/components/bank-step";
-import { InsightStrip } from "@/components/insight-strip";
 import { MoneyToggle } from "@/components/money-toggle";
 import { StateView } from "@/components/state-view";
 import { accountInitials, movementRunningCents } from "@/lib/accounts";
+import { change } from "@/lib/insights";
 import { RECONCILIATION_LABEL } from "@/lib/labels";
-import { accountReading } from "@/lib/reading";
 import { formatUsd } from "@/lib/money";
 import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
+import { monthHistory } from "@/server/planning";
 import { accountBreakdowns, companyReport } from "@/server/queries";
 
 function kindLabel(kind: string) {
@@ -24,9 +25,11 @@ export default async function AccountsPage({
   const session = await pageContext();
   const params = await searchParams;
   if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para ver sus cuentas." />;
-  const [accounts, report] = await Promise.all([
-    accountBreakdowns((await db()), session.actor, session.companyId),
-    companyReport((await db()), session.actor, session.companyId),
+  const database = await db();
+  const [accounts, report, history] = await Promise.all([
+    accountBreakdowns(database, session.actor, session.companyId),
+    companyReport(database, session.actor, session.companyId),
+    monthHistory(database, session.actor, session.companyId),
   ]);
   const selected = accounts.find((account) => account.id === params.cuenta) ?? null;
   if (params.cuenta && !selected) {
@@ -198,60 +201,79 @@ export default async function AccountsPage({
       </section>
     );
   }
+  const monthKey = (report.lastDay ?? "").slice(0, 7);
+  const prevKey = previousMonth(monthKey);
+  let monthInflows = 0;
+  let monthOutflows = 0;
+  let prevInflows = 0;
+  let prevOutflows = 0;
+  for (const account of accounts) {
+    for (const movement of account.movements) {
+      const key = movement.day.slice(0, 7);
+      if (key === monthKey) {
+        if (movement.amountCents > 0) monthInflows += movement.amountCents;
+        else monthOutflows += Math.abs(movement.amountCents);
+      } else if (key === prevKey) {
+        if (movement.amountCents > 0) prevInflows += movement.amountCents;
+        else prevOutflows += Math.abs(movement.amountCents);
+      }
+    }
+  }
+  const snapshot = history.filter((row) => row.month < monthKey).at(-1) ?? null;
+  const incomeBase = prevInflows > 0 ? prevInflows : snapshot?.inflows;
+  const expenseBase = prevOutflows > 0 ? prevOutflows : snapshot?.outflows;
+  const monthNet = monthInflows - monthOutflows;
+  const insight = monthNet >= 0
+    ? `El neto del mes es ${formatUsd(monthNet)}. El flujo se mantiene positivo.`
+    : `El neto del mes es ${formatUsd(monthNet)}. Salieron más de lo que entró.`;
   return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Cuentas bancarias</h1>
-          <p className="mt-1 text-sm text-slate-500">Elige una cuenta para ver su saldo y sus movimientos. El saldo es el guardado en la base.</p>
-        </div>
-        <Link href="/cuentas/conectar" data-testid="add-account" className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
-          <Plus className="size-4" /> Agregar cuenta
-        </Link>
-      </div>
-      <InsightStrip
-        lines={accountReading({
-          storedBalanceCents: report.storedBalanceCents,
-          net: report.net,
-          demonstrationAccountCount: report.demonstrationAccountCount,
-          accountCount: accounts.length,
-        })}
-        testId="cuentas-reading"
-      />
+    <div className="space-y-3">
       {params.error ? <p className="text-sm text-red-700" data-testid="server-error">{params.error}</p> : null}
-      {accounts.length === 0 ? <StateView variant="empty" title="Esta empresa no tiene cuentas bancarias." /> : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {accounts.map((account) => (
-            <Link
-              key={account.id}
-              href={`/cuentas?cuenta=${account.id}`}
-              data-testid={`account-${account.id}`}
-              className="rounded-2xl border border-border bg-white p-4 hover:border-slate-300"
-            >
-              <div className="flex items-start gap-3">
-                <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700">
-                  {account.kind === "card" ? <CreditCard className="size-4" /> : <Landmark className="size-4" />}
-                  <span className="text-[10px] font-semibold leading-none">{accountInitials(account.institution)}</span>
-                </span>
-                <div>
-                  <p className="text-xs text-slate-500">{account.institution}</p>
-                  <h2 className="font-semibold">{account.productName}</h2>
-                </div>
-              </div>
-              <p className="mt-3 text-sm text-slate-600">{kindLabel(account.kind)} · ····{account.mask}</p>
-              <p data-testid="account-balance" className="mt-2 text-2xl font-semibold tracking-tight">{formatUsd(account.availableBalanceCents)}</p>
-              <p className="mt-1 text-xs text-slate-500">{account.reconciledCount} de {account.movements.length} conciliados con el banco</p>
-              {account.origin === "plaid_demo" ? (
-                <p className="mt-2 text-xs text-emerald-700">Conectada con Plaid (demostración)</p>
-              ) : account.origin === "manual" ? (
-                <p className="mt-2 text-xs text-amber-700">Manual. No está conectada a un banco.</p>
-              ) : account.isDemonstration ? (
-                <p className="mt-2 text-xs text-amber-700">Demostración</p>
-              ) : null}
-            </Link>
-          ))}
-        </div>
-      )}
-    </section>
+      <AccountsBoard
+        totalCents={report.storedBalanceCents}
+        monthInflows={monthInflows}
+        monthOutflows={monthOutflows}
+        incomeDelta={change(monthInflows, incomeBase)}
+        expenseDelta={change(monthOutflows, expenseBase)}
+        insight={insight}
+        cards={accounts.map((account) => {
+          const month = accountMonth(account.movements, monthKey);
+          return {
+            id: account.id,
+            institution: account.institution,
+            mask: account.mask,
+            kind: account.kind,
+            availableBalanceCents: account.availableBalanceCents,
+            net: month.monthNet,
+            series: account.series,
+            origin: account.origin,
+            isDemonstration: account.isDemonstration,
+            delta: month.delta,
+          };
+        })}
+      />
+    </div>
   );
+}
+
+function previousMonth(period: string) {
+  const [year, month] = period.split("-").map(Number);
+  if (!year || !month) return "";
+  return new Date(Date.UTC(year, month - 2, 1)).toISOString().slice(0, 7);
+}
+
+function accountMonth(movements: { day: string; amountCents: number }[], monthKey: string) {
+  const prevKey = previousMonth(monthKey);
+  let current = 0;
+  let previous = 0;
+  let seenPrevious = false;
+  for (const row of movements) {
+    const key = row.day.slice(0, 7);
+    if (key === monthKey) current += row.amountCents;
+    if (key === prevKey) {
+      previous += row.amountCents;
+      seenPrevious = true;
+    }
+  }
+  return { monthNet: current, delta: seenPrevious ? change(current, previous) : null };
 }
