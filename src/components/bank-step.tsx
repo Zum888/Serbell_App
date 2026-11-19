@@ -27,8 +27,16 @@ export type BankStepData = {
   nextSkip: string | null;
 };
 
-export function BankStep({ data, error, fromInvoice }: { data: BankStepData; error?: string; fromInvoice?: boolean }) {
-  const [phase, setPhase] = useState<"search" | "match" | "idle">(fromInvoice && !data.sealed ? "search" : "idle");
+export function BankStep({
+  data,
+  error,
+  autoMatch,
+}: {
+  data: BankStepData;
+  error?: string;
+  autoMatch?: { file: string; nextHref: string; note: string } | null;
+}) {
+  const [phase, setPhase] = useState<"search" | "match" | "idle">(autoMatch && !data.sealed ? "search" : "idle");
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       const tag = (event.target as HTMLElement | null)?.tagName;
@@ -68,8 +76,8 @@ export function BankStep({ data, error, fromInvoice }: { data: BankStepData; err
       {phase !== "idle" ? (
         <p className="mb-4 rounded-2xl bg-white px-4 py-3 text-sm text-slate-700 shadow-sm" data-testid="invoice-match">
           {phase === "search"
-            ? "Busco en la cuenta el cargo que coincide con Factura_FleetSmarts.pdf."
-            : `Coincide con ${data.merchant}, ${formatUsd(data.amountCents)}. Lo concilio.`}
+            ? `Busco en la cuenta el cargo que coincide con ${autoMatch?.file}.`
+            : `Coincide con ${data.merchant}, ${formatUsd(data.amountCents)}. ${autoMatch?.note ?? "Lo concilio."}`}
         </p>
       ) : null}
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -108,8 +116,8 @@ export function BankStep({ data, error, fromInvoice }: { data: BankStepData; err
           ) : (
             <form id="bank-reconcile-form" action={`/api/transactions/${data.transactionId}/bank`} method="post" className="mt-4">
               <input type="hidden" name="action" value="reconcile" />
-              <input type="hidden" name="stay" value={fromInvoice ? "1" : ""} />
-              <input type="hidden" name="next" value={fromInvoice ? `${data.accountHref}&factura=lista` : data.accountHref} />
+              <input type="hidden" name="stay" value={autoMatch ? "1" : ""} />
+              <input type="hidden" name="next" value={autoMatch ? autoMatch.nextHref : data.accountHref} />
               <Button type="submit" data-testid="bank-reconcile">Conciliar con el banco</Button>
             </form>
           )}
