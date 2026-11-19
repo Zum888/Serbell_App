@@ -104,7 +104,7 @@ export async function focusQueue(db: Db, actor: Actor, companyId: string, actual
     linkable: boolean;
     note: string;
   } | null = null;
-  let choices: { id: string; fileName: string }[] = [];
+  let choices: { id: string; fileName: string; merchant: string | null; amountCents: number | null }[] = [];
   let merchantPending = 0;
   if (current) {
     const candidates = await db.matchCandidate.findMany({
@@ -153,13 +153,21 @@ export async function focusQueue(db: Db, actor: Actor, companyId: string, actual
     };
     const documents = await db.document.findMany({
       where: { companyId },
-      include: { links: { where: { status: "confirmed" }, select: { transactionId: true } } },
+      include: {
+        extraction: true,
+        links: { where: { status: "confirmed" }, select: { transactionId: true } },
+      },
       orderBy: { fileName: "asc" },
     });
     choices = documents
       .filter((document) => document.id !== shown?.id)
       .filter((document) => !document.links.some((link) => link.transactionId !== current.id))
-      .map((document) => ({ id: document.id, fileName: document.fileName }));
+      .map((document) => ({
+        id: document.id,
+        fileName: document.fileName,
+        merchant: document.extraction?.merchant ?? null,
+        amountCents: document.extraction?.amountCents ?? null,
+      }));
     const merchant = normalizeMerchant(current.merchant);
     merchantPending = pending.filter((row) => normalizeMerchant(row.merchant) === merchant).length;
   }

@@ -56,13 +56,39 @@ function progress(folder: InvoiceFolder) {
 export function InvoiceFolders({
   folders,
   base,
+  pins = [],
 }: {
   folders: InvoiceFolder[];
   base: string;
+  pins?: { id: string; name: string; totalCents: number; detail: string; href: string }[];
 }) {
+  const cards = [
+    ...pins.map((pin) => ({ kind: "pin" as const, ...pin })),
+    ...folders.map((folder) => ({ kind: "folder" as const, folder })),
+  ].sort((a, b) => (a.kind === "pin" ? a.name : a.folder.name).localeCompare(b.kind === "pin" ? b.name : b.folder.name, "es"));
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-      {folders.map((folder) => (
+      {cards.map((card) =>
+        card.kind === "pin" ? (
+          <Link key={card.id} href={card.href} data-testid="invoice-folder" className="rounded-2xl border border-border bg-white p-4 hover:border-slate-300">
+            <div className="flex items-center gap-2">
+              <Folder className="size-4 text-primary" />
+              <h2 className="font-semibold" data-testid="folder-name">{card.name}</h2>
+            </div>
+            <p className="mt-3 text-xs text-slate-500">Total del mes</p>
+            <p className="text-xl font-semibold tracking-tight" data-testid="folder-total">{formatUsd(card.totalCents)}</p>
+            <p className="mt-2 text-sm text-slate-600">{card.detail}</p>
+          </Link>
+        ) : (
+          <FolderCard key={card.folder.partyId} folder={card.folder} base={base} />
+        ),
+      )}
+    </div>
+  );
+}
+
+function FolderCard({ folder, base }: { folder: InvoiceFolder; base: string }) {
+  return (
         <Link
           key={folder.partyId}
           href={`${base}?parte=${folder.partyId}`}
@@ -96,8 +122,6 @@ export function InvoiceFolders({
             </p>
           </div>
         </Link>
-      ))}
-    </div>
   );
 }
 
@@ -146,6 +170,117 @@ export function InvoiceList({
           )}
         </Link>
       ))}
+    </div>
+  );
+}
+
+export function PartyReport({
+  title,
+  name,
+  totalCents,
+  openCents,
+  matchedCount,
+  invoiceCount,
+  movements,
+}: {
+  title: string;
+  name: string;
+  totalCents: number;
+  openCents: number;
+  matchedCount: number;
+  invoiceCount: number;
+  movements: { id: string; merchant: string; postedOn: string; amountCents: number }[];
+}) {
+  const seen = new Set<string>();
+  const unique = movements.filter((movement) => {
+    if (seen.has(movement.id)) return false;
+    seen.add(movement.id);
+    return true;
+  });
+  return (
+    <section data-testid="party-report" className="rounded-2xl border border-border bg-white p-4">
+      <p className="text-xs uppercase tracking-wide text-slate-400">{title}</p>
+      <h2 className="mt-1 text-xl font-semibold tracking-tight">{name}</h2>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div>
+          <p className="text-xs text-slate-500">Facturado</p>
+          <p className="text-lg font-semibold tabular-nums">{formatUsd(totalCents)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500">Abierto</p>
+          <p className="text-lg font-semibold tabular-nums">{formatUsd(openCents)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500">Con el banco</p>
+          <p className="text-lg font-semibold tabular-nums">{matchedCount} de {invoiceCount}</p>
+        </div>
+      </div>
+      <div className="mt-4">
+        <p className="text-xs font-medium text-slate-500">Movimientos ligados</p>
+        {unique.length === 0 ? (
+          <p className="mt-2 text-sm text-slate-500">Todavía no hay un movimiento del banco ligado a estas facturas.</p>
+        ) : (
+          <ul className="mt-2 divide-y divide-border">
+            {unique.map((movement) => (
+              <li key={movement.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                <span>
+                  <span className="font-medium">{movement.merchant}</span>
+                  <span className="ml-2 text-xs text-slate-500">{formatDay(movement.postedOn)}</span>
+                </span>
+                <span className="tabular-nums">{formatUsd(movement.amountCents)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
+
+export function InvoiceTable({
+  rows,
+  base,
+  pin,
+}: {
+  rows: (InvoiceCard & { partyId: string; partyName: string })[];
+  base: string;
+  pin?: { name: string; href: string; detail: string; amountCents: number };
+}) {
+  const lines = [
+    ...(pin ? [{ key: "pin", name: pin.name, href: pin.href, detail: pin.detail, amount: formatUsd(pin.amountCents), status: "Carpeta" }] : []),
+    ...rows.map((row) => ({
+      key: row.id,
+      name: row.partyName,
+      href: `${base}?parte=${row.partyId}&factura=${row.id}&vista=lista`,
+      detail: `${row.number} · vence ${formatDay(row.dueOn)}`,
+      amount: formatUsd(row.amountCents),
+      status: row.status === "matched" ? "Conciliada" : APPROVAL_LABEL[row.approval],
+    })),
+  ].sort((a, b) => a.name.localeCompare(b.name, "es") || a.detail.localeCompare(b.detail, "es"));
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border bg-white">
+      <table className="w-full text-left text-sm">
+        <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+          <tr>
+            <th className="px-4 py-2 font-medium">Quién</th>
+            <th className="px-4 py-2 font-medium">Detalle</th>
+            <th className="px-4 py-2 font-medium">Estado</th>
+            <th className="px-4 py-2 text-right font-medium">Importe</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map((line) => (
+            <tr key={line.key} className="border-t border-slate-100">
+              <td className="px-4 py-3 font-medium">
+                <Link href={line.href} className="hover:text-primary">{line.name}</Link>
+              </td>
+              <td className="px-4 py-3 text-slate-600">{line.detail}</td>
+              <td className="px-4 py-3 text-slate-600">{line.status}</td>
+              <td className="px-4 py-3 text-right tabular-nums">{line.amount}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

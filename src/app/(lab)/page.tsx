@@ -5,6 +5,7 @@ import { formatUsd } from "@/lib/money";
 import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
 import { reportReading } from "@/lib/reading";
+import { loadBriefing } from "@/server/assistant";
 import { companyReport, detectedDuplicates, getHome } from "@/server/queries";
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
@@ -14,10 +15,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     return <StateView variant="empty" title="Selecciona una empresa en la barra superior." />;
   }
   const { error } = await searchParams;
-  const [home, duplicates, report] = await Promise.all([
-    getHome((await db()), session.actor, session.companyId),
-    detectedDuplicates((await db()), session.actor, session.companyId),
-    companyReport((await db()), session.actor, session.companyId),
+  const database = await db();
+  const [home, duplicates, report, briefing] = await Promise.all([
+    getHome(database, session.actor, session.companyId),
+    detectedDuplicates(database, session.actor, session.companyId),
+    companyReport(database, session.actor, session.companyId),
+    loadBriefing(database, session.actor, session.companyId),
   ]);
   const reading = reportReading({ ...report, accountCount: report.accounts.length }).slice(0, 3);
   const periodLabel = report.firstDay && report.lastDay ? `${report.firstDay} a ${report.lastDay}` : null;
@@ -26,7 +29,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       {error ? <StateView variant="error" title={error} testId="server-error" /> : null}
       <HomeScreen
         name={session.actor.name}
-        companyId={home.company.id}
         balanceCents={home.balanceCents}
         accountCount={home.accountCount}
         accounts={home.accounts.map((account) => ({ institution: account.institution, mask: account.mask }))}
@@ -38,6 +40,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         uncategorizedCount={report.uncategorizedCount}
         uncategorizedExpenseCents={report.uncategorizedExpenseCents}
         periodLabel={periodLabel}
+        briefing={briefing}
       />
       <p className="sr-only">Saldo disponible {formatUsd(home.balanceCents)}</p>
     </div>

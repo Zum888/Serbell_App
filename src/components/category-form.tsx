@@ -31,12 +31,10 @@ export function CategoryForm({
   testId: string;
   compact?: boolean;
 }) {
-  if (sealed) {
-    return <p className="mt-1 text-xs text-slate-500">Sellado. El servidor rechaza el cambio.</p>;
-  }
   return (
     <form action={`/api/transactions/${id}/classification`} method="post" className={compact ? "mt-1 space-y-1" : "mt-3 space-y-2 rounded-xl border border-border p-3"}>
       <input type="hidden" name="next" value={next} />
+      {sealed ? <p className="text-xs text-slate-500">Sellado. El servidor rechaza el cambio.</p> : null}
       {compact ? null : <h3 className="text-sm font-medium">Cambiar categoría y subcategoría</h3>}
       <label className="block text-xs text-slate-500">
         {compact ? null : "Categoría y subcategoría"}

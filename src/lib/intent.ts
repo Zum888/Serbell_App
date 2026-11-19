@@ -6,6 +6,11 @@ export type Intent =
   | { type: "reject_link" }
   | { type: "change_category"; category: string; subcategory: string }
   | { type: "answer_request"; body: string }
+  | { type: "analyze_spending" }
+  | { type: "review_duplicates" }
+  | { type: "who_owes" }
+  | { type: "track_movement" }
+  | { type: "earnings" }
   | { type: "unsupported" }
   | { type: "note" };
 
@@ -43,6 +48,11 @@ export function parseIntent(text: string): Intent {
   if (value === "estado" || /(estado de operaciones|como vamos|estado de la operacion)/.test(value)) {
     return { type: "operation_status" };
   }
+  if (/(analiza|analizar|analisis).{0,24}(gasto|gastos)|mis gastos/.test(value)) return { type: "analyze_spending" };
+  if (/duplicad/.test(value)) return { type: "review_duplicates" };
+  if (/(quien|quienes|clientes).{0,24}(debe|deben)|por cobrar/.test(value)) return { type: "who_owes" };
+  if (/rastre/.test(value)) return { type: "track_movement" };
+  if (/(cuanto gane|cuanto ingrese|cuanto entre|mis ingresos|cuanto vendi)/.test(value)) return { type: "earnings" };
   if (
     /(plaid|whatsapp|cerrar el mes|cierre de periodo|cierre del mes|conciliar el extracto|conectar banco|nominas|correr nomina)/.test(
       value,

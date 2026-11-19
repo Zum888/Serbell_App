@@ -271,7 +271,10 @@ export async function getReceiptContext(db: Db, actor: Actor, transactionId: str
   }
   const documents = await db.document.findMany({
     where: { companyId: transaction.companyId },
-    include: { links: { where: { status: "confirmed" }, select: { transactionId: true } } },
+    include: {
+      extraction: true,
+      links: { where: { status: "confirmed" }, select: { transactionId: true } },
+    },
     orderBy: { fileName: "asc" },
   });
   const link = transaction.links[0] ?? null;
@@ -279,6 +282,7 @@ export async function getReceiptContext(db: Db, actor: Actor, transactionId: str
   return {
     transactionId: transaction.id,
     merchant: transaction.merchant,
+    amountCents: transaction.amountCents,
     sealed: Boolean(transaction.sealedAt),
     document: link
       ? { id: link.document.id, fileName: link.document.fileName, mimeType: link.document.mimeType }
@@ -286,7 +290,12 @@ export async function getReceiptContext(db: Db, actor: Actor, transactionId: str
     choices: documents
       .filter((document) => document.id !== link?.documentId)
       .filter((document) => !document.links.some((item) => item.transactionId !== transaction.id))
-      .map((document) => ({ id: document.id, fileName: document.fileName })),
+      .map((document) => ({
+        id: document.id,
+        fileName: document.fileName,
+        merchant: document.extraction?.merchant ?? null,
+        amountCents: document.extraction?.amountCents ?? null,
+      })),
     auditNote: audit ? documentChangeNote(audit.action, audit.previousJson, audit.nextJson) : null,
   };
 }
@@ -1058,10 +1067,18 @@ export async function getBoardReceipt(
   const choices = transaction
     ? (await db.document.findMany({
         where: { companyId },
-        include: { links: { where: { status: "confirmed" }, select: { transactionId: true } } },
+        include: {
+          extraction: true,
+          links: { where: { status: "confirmed" }, select: { transactionId: true } },
+        },
         orderBy: { fileName: "asc" },
       })).filter((item) => item.id !== document?.id && !item.links.some((link) => link.transactionId !== transaction?.id))
-        .map((item) => ({ id: item.id, fileName: item.fileName }))
+        .map((item) => ({
+          id: item.id,
+          fileName: item.fileName,
+          merchant: item.extraction?.merchant ?? null,
+          amountCents: item.extraction?.amountCents ?? null,
+        }))
     : [];
   const audit = transaction && "audits" in transaction ? transaction.audits[0] : null;
   const merchant = transaction?.merchant || document?.extraction?.merchant || document?.fileName || "Sin datos";
@@ -1082,6 +1099,7 @@ export async function getBoardReceipt(
       ? {
           id: transaction.id,
           merchant: transaction.merchant,
+          amountCents: transaction.amountCents,
           amountLabel: moneyLabel(transaction.amountCents),
           dateLabel: formatDay(dayKey(transaction.postedOn)),
           sealed: Boolean(transaction.sealedAt),

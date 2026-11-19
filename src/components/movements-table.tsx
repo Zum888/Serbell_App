@@ -120,11 +120,11 @@ export function MovementsTable({
   return (
     <div>
       {missing > 0 ? (
-        <div data-testid="category-guide" className="mx-4 mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm text-amber-900">
-          <Sparkles className="mt-0.5 size-4 shrink-0 text-amber-600" />
+        <div data-testid="category-guide" className="mx-4 mb-3 flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          <Sparkles className="mt-0.5 size-4 shrink-0 text-slate-400" />
           <p>
-            <span className="font-semibold">{missing === 1 ? "1 movimiento necesita" : `${missing} movimientos necesitan`} tu atención.</span>{" "}
-            Están marcados en ámbar: toca <span className="font-medium">Elegir categoría</span> y se guarda al seleccionar.
+            <span className="font-semibold text-slate-800">{missing === 1 ? "1 movimiento no tiene categoría." : `${missing} movimientos no tienen categoría.`}</span>{" "}
+            Toca Elegir categoría y se guarda al seleccionar.
           </p>
         </div>
       ) : (
@@ -150,8 +150,8 @@ export function MovementsTable({
       {error ? <p className="px-4 pb-3 text-sm text-red-700" data-testid="reconcile-error">{error}</p> : null}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1040px] text-left text-sm">
-          <thead className="text-xs text-slate-500">
-            <tr className="border-y border-border">
+          <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+            <tr className="border-y border-slate-200">
               <th className="px-3 py-2 font-medium">
                 <input
                   type="checkbox"
@@ -173,7 +173,7 @@ export function MovementsTable({
               <th className="px-3 py-2 font-medium">Ingresos</th>
               <th className="px-3 py-2 font-medium">Gastos</th>
               <th className="px-3 py-2 font-medium">Comprobante</th>
-              <th className="px-3 py-2 font-medium">Revisión</th>
+              <th className="px-3 py-2 font-medium">Contador</th>
               <th className="px-3 py-2 font-medium">Conciliación bancaria</th>
               <th className="px-3 py-2 font-medium">Sello</th>
               <th className="px-3 py-2 font-medium">Acciones</th>
@@ -186,21 +186,20 @@ export function MovementsTable({
               const reviewState = reviews[row.id]?.state || row.reviewState;
               const reviewLabel = reviews[row.id]?.label || (REVIEW_LABEL[row.reviewState] ?? row.reviewState);
               const attention = needsCategory(row);
-              const marker = attention ? "shadow-[inset_3px_0_0_0_#f59e0b]" : reviewState === "NeedsReview" && !row.sealed ? "shadow-[inset_3px_0_0_0_#93c5fd]" : "";
               return (
                 <tr
                   key={row.id}
                   data-testid={`movement-row-${row.id}`}
                   data-attention={attention ? "true" : "false"}
-                  className={`border-b border-border align-top ${attention ? "bg-amber-50/30" : ""}`}
+                  className="border-b border-slate-100 align-middle transition hover:bg-slate-50"
                   onClick={(event) => {
                     const target = event.target as HTMLElement;
-                    if (target.closest("a, button, input, select, textarea, label, form, [role=menu]")) return;
+                    if (target.closest("a, button, input, select, textarea, label, form, [role=menu], summary, details")) return;
                     if (!selectable(row)) return;
                     void reconcile([row.id]);
                   }}
                 >
-                  <td className={`px-3 py-3 ${marker}`}>
+                  <td className="px-3 py-2.5">
                     {selectable(row) ? (
                       <input
                         type="checkbox"
@@ -218,15 +217,12 @@ export function MovementsTable({
                       />
                     ) : null}
                   </td>
-                  <td className="px-3 py-3 whitespace-nowrap">{formatDay(row.postedOn)}</td>
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-2.5 whitespace-nowrap text-slate-600">{formatDay(row.postedOn)}</td>
+                  <td className="px-3 py-2.5">
                     <p className="font-medium">{row.merchant}</p>
                     <p className="text-xs text-slate-500">{row.description}</p>
                   </td>
-                  <td className="px-3 py-3 min-w-[240px]">
-                    {attention ? (
-                      <span className="mb-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Necesita categoría</span>
-                    ) : null}
+                  <td className="min-w-[240px] px-3 py-2.5">
                     <p data-testid={`category-label-${row.id}`} className="sr-only">{label}</p>
                     <ClassifyInline
                       id={row.id}
@@ -244,23 +240,24 @@ export function MovementsTable({
                       }}
                     />
                   </td>
-                  <td className="money-in px-3 py-3 whitespace-nowrap font-medium tabular-nums">{row.amountCents > 0 ? formatCentsPlain(row.amountCents) : ""}</td>
-                  <td className="money-out px-3 py-3 whitespace-nowrap font-medium tabular-nums">{row.amountCents < 0 ? formatCentsPlain(row.amountCents) : ""}</td>
-                  <td className="px-3 py-3" data-testid="doc-state">
+                  <td className="money-in px-3 py-2.5 whitespace-nowrap font-medium tabular-nums">{row.amountCents > 0 ? formatCentsPlain(row.amountCents) : ""}</td>
+                  <td className="money-out px-3 py-2.5 whitespace-nowrap font-medium tabular-nums">{row.amountCents < 0 ? formatCentsPlain(row.amountCents) : ""}</td>
+                  <td className="px-3 py-2.5">
                     <Link href={receiptHref(row)} data-testid={`receipt-${row.id}`} className="font-medium text-primary">
                       {row.documentName ?? "Sin comprobante"}
                     </Link>
-                    <p className="text-xs text-slate-500">{DOCUMENT_LABEL[row.documentState] ?? row.documentState}</p>
+                    <p data-testid="doc-state" className="text-xs text-slate-500">{DOCUMENT_LABEL[row.documentState] ?? row.documentState}</p>
                   </td>
-                  <td className="px-3 py-3" data-testid="review-state">
-                    <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${REVIEW_TONE[reviewState] ?? "bg-slate-100 text-slate-600"}`}>
-                      {reviewLabel}
-                    </span>
+                  <td className="px-3 py-2.5" data-testid="review-state">
+                    <ReviewCell row={row} reviewState={reviewState} reviewLabel={reviewLabel} canReview={canReview} next={next} />
                   </td>
-                  <td className="px-3 py-3" data-testid="bank-recon">
+                  <td className="px-3 py-2.5" data-testid="bank-recon">
                     <p className="text-xs text-slate-500">{row.institution} ····{row.mask}</p>
                     {isReconciled ? (
-                      <p className="mt-0.5">Conciliado</p>
+                      <p className="mt-0.5 inline-flex items-center gap-1.5 font-medium text-emerald-700">
+                        <span className="size-2.5 rounded-full bg-emerald-500" aria-hidden />
+                        Completo
+                      </p>
                     ) : row.sealed ? (
                       <p className="mt-0.5">{RECONCILIATION_LABEL[row.reconciliationState] ?? "Sin conciliar"}</p>
                     ) : (
@@ -275,13 +272,13 @@ export function MovementsTable({
                     )}
                     {row.serbellConciled ? <p data-testid="serbell-mark" className="text-xs font-medium text-primary">Serbell concilió</p> : null}
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-2.5">
                     <span data-testid="seal-lock" data-locked={row.sealed ? "true" : "false"} className="inline-flex items-center gap-1 text-xs">
                       {row.sealed ? <Lock className="size-3.5" /> : <LockOpen className="size-3.5 text-slate-400" />}
                       {row.sealed ? <span data-testid="sealed-label">Autorizado y bloqueado</span> : "Abierto"}
                     </span>
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-2.5">
                     <Link className="font-medium text-primary" href={`${next}&movimiento=${row.id}`}>
                       Ver
                     </Link>
@@ -293,6 +290,63 @@ export function MovementsTable({
         </table>
       </div>
     </div>
+  );
+}
+
+function ReviewCell({
+  row,
+  reviewState,
+  reviewLabel,
+  canReview,
+  next,
+}: {
+  row: Row;
+  reviewState: string;
+  reviewLabel: string;
+  canReview: boolean;
+  next: string;
+}) {
+  if (reviewState === "Approved") {
+    return <span className="text-xs font-medium text-emerald-700">Aprobado</span>;
+  }
+  if (canReview && !row.sealed && (reviewState === "NeedsReview" || reviewState === "Reopened")) {
+    return (
+      <div className="space-y-1">
+        <form action={`/api/transactions/${row.id}/seal`} method="post">
+          <input type="hidden" name="next" value={next} />
+          <button type="submit" className="rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white">
+            Aprobar
+          </button>
+        </form>
+        <details>
+          <summary className="cursor-pointer text-xs text-slate-500">Pedir aclaración</summary>
+          <form action={`/api/transactions/${row.id}/clarification`} method="post" className="mt-1 space-y-1">
+            <input type="hidden" name="next" value={next} />
+            <input
+              name="message"
+              required
+              minLength={8}
+              placeholder="Qué debe aclarar el cliente"
+              aria-label="Aclaración para el cliente"
+              className="h-8 w-44 rounded-md border border-border px-2 text-xs"
+            />
+            <button type="submit" className="block text-xs font-medium text-primary">Enviar</button>
+          </form>
+        </details>
+      </div>
+    );
+  }
+  if (reviewState === "NeedsClient") {
+    return (
+      <Link href={`${next}&movimiento=${row.id}`} className="text-xs font-medium text-slate-700">
+        {canReview ? "Esperando al cliente" : "Te pidieron una aclaración"}
+      </Link>
+    );
+  }
+  return (
+    <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${REVIEW_TONE[reviewState] ?? "bg-slate-100 text-slate-600"}`}>
+      {canReview ? reviewLabel : "Con tu contador"}
+    </span>
   );
 }
 

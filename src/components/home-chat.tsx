@@ -1,0 +1,125 @@
+"use client";
+
+import { Sparkles } from "lucide-react";
+import { useState } from "react";
+import { GUIDE_REPLY, isTalk, talkReply, type Briefing } from "@/lib/briefing";
+import { UNSUPPORTED_REPLY, parseIntent } from "@/lib/intent";
+import { greetingName } from "@/lib/labels";
+import { formatTodayLabel } from "@/lib/dates";
+
+const PROMPTS = [
+  ["Analizar mis gastos", "Analiza mis gastos"],
+  ["Revisar duplicados", "Revisar duplicados"],
+  ["Clientes que deben", "Clientes que deben"],
+  ["Rastrear un movimiento", "Rastréame un movimiento"],
+  ["¿Cuánto gané?", "¿Cuánto gané?"],
+] as const;
+
+type Bubble = { id: string; role: "user" | "assistant"; body: string };
+
+export function HomeChat({ name, briefing }: { name: string; briefing: Briefing }) {
+  const [messages, setMessages] = useState<Bubble[]>([]);
+  const [text, setText] = useState("");
+
+  function ask(raw: string) {
+    const value = raw.trim();
+    if (!value) return;
+    const intent = parseIntent(value);
+    const body = isTalk(intent.type) ? talkReply(intent.type, briefing) : intent.type === "unsupported" ? UNSUPPORTED_REPLY : GUIDE_REPLY;
+    const stamp = `${Date.now()}-${messages.length}`;
+    setMessages((current) => [
+      ...current,
+      { id: `u-${stamp}`, role: "user", body: value },
+      { id: `a-${stamp}`, role: "assistant", body },
+    ]);
+    setText("");
+  }
+
+  return (
+    <section data-testid="home-chat" className="flex min-h-[520px] flex-col overflow-hidden rounded-3xl border border-border bg-white">
+      <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+        <div className="flex items-center gap-3">
+          <span className="flex size-9 items-center justify-center rounded-full bg-slate-950 text-white">
+            <Sparkles className="size-4" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold">Serbell</p>
+            <p className="text-xs text-slate-500">{briefing.companyName}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setMessages([]);
+            setText("");
+          }}
+          className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-300"
+        >
+          Nuevo chat
+        </button>
+      </header>
+      <div className="flex flex-1 flex-col px-5 py-6">
+        {messages.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center text-center">
+            <p className="text-sm text-slate-500">{formatTodayLabel()}</p>
+            <h1 className="mt-3 text-4xl font-semibold tracking-tight">
+              Buenos días, <span className="text-primary">{greetingName(name)}.</span>
+            </h1>
+            <p className="mt-2 max-w-md text-slate-500">Pregúntame por los gastos, los duplicados o quién te debe. La respuesta sale de lo que ya está guardado.</p>
+          </div>
+        ) : (
+          <div className="flex flex-1 flex-col">
+            <h1 className="sr-only">Buenos días, {greetingName(name)}.</h1>
+            <div className="space-y-3">
+              {messages.map((message) => (
+                <article
+                  key={message.id}
+                  className={
+                    message.role === "user"
+                      ? "ml-auto max-w-[85%] rounded-2xl bg-slate-950 px-4 py-3 text-sm text-white"
+                      : "max-w-[85%] rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700"
+                  }
+                >
+                  <p className="whitespace-pre-wrap">{message.body}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="border-t border-border px-4 py-4">
+        <div className="mb-3 flex flex-wrap gap-2">
+          {PROMPTS.map(([label, prompt]) => (
+            <button
+              key={prompt}
+              type="button"
+              onClick={() => ask(prompt)}
+              className="rounded-full border border-border bg-white px-3 py-1.5 text-xs text-slate-600 hover:border-slate-300"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <form
+          className="flex items-center gap-2 rounded-full border border-border bg-white px-3 py-2 shadow-sm"
+          onSubmit={(event) => {
+            event.preventDefault();
+            ask(text);
+          }}
+        >
+          <Sparkles className="size-4 text-primary" />
+          <input
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            placeholder="Pregúntame sobre tu empresa..."
+            aria-label="Mensaje para Serbell"
+            className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none"
+          />
+          <button type="submit" className="rounded-full bg-slate-950 px-4 py-2 text-xs font-medium text-white">
+            Enviar
+          </button>
+        </form>
+      </div>
+    </section>
+  );
+}
