@@ -1,10 +1,9 @@
 import { AppError } from "@/lib/errors";
 import { safeNext } from "@/lib/utils";
 import { db } from "@/server/db";
-import { replaceTransactionDocument, uploadReplacementDocument } from "@/server/domain";
+import { replaceTransactionDocument } from "@/server/domain";
 import { redirectError, redirectTo } from "@/server/http";
 import { requireActor, requireViewer } from "@/server/session";
-import { readCappedForm, readUploadFile } from "@/server/upload";
 
 function movementPath(id: string, form: FormData, documentId?: string) {
   const requested = safeNext(String(form.get("next") ?? ""), "");
@@ -30,23 +29,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   let back = `/movimientos?fila=${id}`;
   try {
     await requireViewer();
-    const form = await readCappedForm(request);
+    const form = await request.formData();
     back = movementPath(id, form);
     const { actor } = await requireActor();
     const file = form.get("file");
-    let documentId = String(form.get("documentId") ?? "");
     if (file instanceof File && file.size > 0) {
-      const upload = await readUploadFile(file);
-      documentId = await uploadReplacementDocument((await db()), actor, id, {
-        fileName: file.name || "comprobante",
-        mimeType: upload.mimeType,
-        bytes: upload.bytes,
-      });
-    } else if (!documentId) {
-      throw new AppError("Elige un comprobante guardado o sube un archivo.", 400, "DOCUMENT_REQUIRED");
-    } else {
-      await replaceTransactionDocument((await db()), actor, id, documentId);
+      throw new AppError("Este laboratorio no recibe archivos. Elige un comprobante de demostración.", 400, "SIMULATED");
     }
+    const documentId = String(form.get("documentId") ?? "");
+    if (!documentId) {
+      throw new AppError("Elige un comprobante de demostración.", 400, "DOCUMENT_REQUIRED");
+    }
+    await replaceTransactionDocument((await db()), actor, id, documentId);
     return redirectTo(request, movementPath(id, form, documentId));
   } catch (error) {
     return redirectError(request, back, error);

@@ -7,8 +7,7 @@ test("Padrino vincula el ticket y Carlos lo sella", async ({ page }) => {
   await expect(page.getByTestId("bank-balance")).toContainText("33,366.24");
 
   await page.getByTestId("nav-chat").click();
-  await page.getByTestId("chat-file-input").setInputFiles("fixtures/FleetSmarts_ticket.jpg");
-  await page.getByTestId("upload-submit").click();
+  await page.getByTestId("demo-ticket").click();
   await page.waitForURL(/\/chat\?documento=/);
   await expect(page.getByTestId("extraction-demo-badge")).toBeVisible();
   await expect(page.getByTestId("extraction-merchant")).toContainText("FleetSmarts");

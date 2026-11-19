@@ -208,7 +208,7 @@ export function DocumentGallery({ cards }: { cards: GalleryCard[] }) {
               {isSelected ? <CheckSquare className="size-3.5" /> : null}
             </span>
             <img
-              src={`/api/documents/${card.id}/file`}
+              src="/demo/comprobante.svg"
               alt={card.fileName}
               loading="lazy"
               className="h-28 w-full rounded-lg border border-border bg-slate-50 object-cover object-top"
@@ -279,7 +279,7 @@ export function DocumentGallery({ cards }: { cards: GalleryCard[] }) {
                 </td>
                 <td className="px-3 py-1.5">
                   <span className="flex items-center gap-2">
-                    <img src={`/api/documents/${card.id}/file`} alt="" loading="lazy" className="size-6 rounded border border-border bg-slate-50 object-cover" />
+                    <img src="/demo/comprobante.svg" alt="" loading="lazy" className="size-6 rounded border border-border bg-slate-50 object-cover" />
                     <span className="truncate">{card.fileName}</span>
                   </span>
                 </td>
@@ -437,7 +437,7 @@ export function DocumentGallery({ cards }: { cards: GalleryCard[] }) {
             <p className="text-sm text-slate-500">{current.amountLabel} · {current.dateLabel}</p>
             <button type="button" onClick={() => setQuickLook(true)} className="mt-3 block w-full" title="Vista rápida (espacio)">
               <img
-                src={`/api/documents/${current.id}/file`}
+                src="/demo/comprobante.svg"
                 alt={current.fileName}
                 className="max-h-80 w-full rounded-xl border border-border bg-slate-50 object-contain"
               />
@@ -477,7 +477,7 @@ export function DocumentGallery({ cards }: { cards: GalleryCard[] }) {
               </div>
             </div>
             <div className="bg-slate-100 p-4">
-              <img src={`/api/documents/${current.id}/file`} alt={current.fileName} className="mx-auto max-h-[65vh] rounded-lg bg-white object-contain shadow" />
+              <img src="/demo/comprobante.svg" alt={current.fileName} className="mx-auto max-h-[65vh] rounded-lg bg-white object-contain shadow" />
             </div>
             <div className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs text-slate-500">
               <span>Espacio o Esc para cerrar · ← → para moverte</span>

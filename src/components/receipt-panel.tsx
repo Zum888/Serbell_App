@@ -32,7 +32,7 @@ export function ReceiptPanel({
       {error ? <p className="mt-2 text-sm text-red-700" data-testid="server-error">{error}</p> : null}
       {receipt.document ? (
         <ReceiptFrame
-          src={`/api/documents/${receipt.document.id}/file`}
+          src="/demo/comprobante.svg"
           mime={receipt.document.mimeType}
           fileName={receipt.document.fileName}
           closeHref={closeHref}
@@ -63,24 +63,7 @@ export function ReceiptPanel({
             </label>
             <Button type="submit" variant="outline" data-testid="receipt-use">Usar este</Button>
           </form>
-          <form action={`/api/transactions/${receipt.transactionId}/document`} method="post" encType="multipart/form-data" className="space-y-2">
-            <input type="hidden" name="filtro" value={filter === "todos" ? "" : filter} />
-            <input type="hidden" name="q" value={q} />
-            <input type="hidden" name="recibo" value={receipt.document?.id ?? ""} />
-            <p className="text-xs text-slate-500">{receipt.document ? "Subir un reemplazo" : "Subir comprobante"}</p>
-            <label className="inline-flex cursor-pointer items-center rounded-full border border-border px-3 py-1.5 text-xs font-medium text-slate-700">
-              Elegir archivo
-              <input
-                name="file"
-                type="file"
-                required
-                accept="image/jpeg,image/png,image/webp,application/pdf"
-                data-testid="receipt-upload"
-                className="sr-only"
-              />
-            </label>
-            <Button type="submit" data-testid="receipt-upload-submit">{receipt.document ? "Reemplazar" : "Subir"}</Button>
-          </form>
+          <p className="text-xs text-slate-500">Los comprobantes son de demostración. No se pueden subir ni descargar.</p>
         </div>
       )}
     </aside>

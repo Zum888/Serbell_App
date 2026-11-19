@@ -71,22 +71,16 @@ export function ChatScreen({
               <p className="mt-1 whitespace-pre-wrap">{message.body}</p>
             </article>
           ))}
-          <form action="/api/documents" method="post" encType="multipart/form-data" className={uploadHint ? "rounded-2xl border border-blue-200 bg-blue-50 p-3" : "rounded-2xl border border-dashed border-border p-3"}>
-            <input type="hidden" name="companyId" value={companyId} />
-            <label className="block text-sm font-medium" htmlFor="comprobante">
-              Adjuntar comprobante
-            </label>
-            <input id="comprobante" data-testid="chat-file-input" name="file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required className="mt-2 block w-full text-sm" />
-            <div className="mt-3">
-              <Button type="submit" data-testid="upload-submit">Adjuntar</Button>
-            </div>
-          </form>
-          <form action="/api/documents/use-demo" method="post">
-            <input type="hidden" name="companyId" value={companyId} />
-            <button type="submit" data-testid="demo-ticket" className="inline-flex h-10 items-center rounded-full border border-border bg-white px-4 text-sm">
-              Adjuntar ticket de demostración FleetSmarts
-            </button>
-          </form>
+          <div className={uploadHint ? "rounded-2xl border border-blue-200 bg-blue-50 p-3" : "rounded-2xl border border-dashed border-border p-3"}>
+            <p className="text-sm font-medium">Comprobantes de demostración</p>
+            <p className="mt-1 text-sm text-slate-500">No se pueden adjuntar ni descargar archivos. El ticket ya está en el laboratorio.</p>
+            <form action="/api/documents/use-demo" method="post" className="mt-3">
+              <input type="hidden" name="companyId" value={companyId} />
+              <button type="submit" data-testid="demo-ticket" className="inline-flex h-10 items-center rounded-full border border-border bg-white px-4 text-sm">
+                Abrir ticket de demostración FleetSmarts
+              </button>
+            </form>
+          </div>
         </div>
         <form action="/api/chat" method="post" className="flex gap-2 border-t border-border p-3">
           <input type="hidden" name="companyId" value={companyId} />
@@ -96,7 +90,7 @@ export function ChatScreen({
       </section>
       <aside className="rounded-2xl border border-border bg-white p-4">
         <h2 className="text-base font-semibold">Conciliación del comprobante</h2>
-        {!document ? <div className="mt-4"><StateView variant="empty" title="Adjunta un comprobante para ver la conciliación." /></div> : <DocumentPanel document={document} />}
+        {!document ? <div className="mt-4"><StateView variant="empty" title="Abre el ticket de demostración para ver la conciliación." /></div> : <DocumentPanel document={document} />}
       </aside>
     </div>
   );
@@ -134,7 +128,7 @@ function DocumentPanel({ document }: { document: ChatDocument }) {
             <p>TOTAL USD 203.94</p>
           </div>
         ) : document.mimeType.startsWith("image/") ? (
-          <img src={`/api/documents/${document.id}/file`} alt={document.fileName} className="mt-3 max-h-40 rounded-lg border border-border" />
+          <img src="/demo/comprobante.svg" alt={document.fileName} className="mt-3 max-h-40 rounded-lg border border-border" />
         ) : null}
         <p className="mt-3 text-slate-600">{document.notice}</p>
         {document.isDemonstration ? (

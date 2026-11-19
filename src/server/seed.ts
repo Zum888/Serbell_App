@@ -1,6 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { dataRoot } from "@/server/paths";
 import { ACCOUNT, CAT, COMPANY, FIRM_ID, TX, USER } from "@/lib/ids";
 import type { Db } from "@/server/db";
 import { sha256 } from "@/server/ids";
@@ -10,12 +8,12 @@ import { seedPlanning } from "@/server/planning-seed";
 
 const noon = (day: string) => new Date(`${day}T12:00:00.000Z`);
 
-async function store(companyId: string, name: string, bytes: Buffer) {
-  const storagePath = path.join("storage", "uploads", companyId, name);
-  const absolute = path.join(dataRoot(), storagePath);
-  await mkdir(path.dirname(absolute), { recursive: true });
-  await writeFile(absolute, bytes);
-  return { storagePath, fileHash: sha256(bytes), sizeBytes: bytes.byteLength };
+function store(companyId: string, name: string, bytes: Buffer) {
+  return {
+    storagePath: path.join("storage", "demo", companyId, name),
+    fileHash: sha256(bytes),
+    sizeBytes: bytes.byteLength,
+  };
 }
 
 async function categories(
@@ -232,7 +230,7 @@ export async function insertExtraDemo(db: Db) {
   }
   for (const [id, companyId, merchant, fileName, amountCents] of EXTRA_TICKETS) {
     const uploader = companyId === COMPANY.qpl ? USER.padrino : USER.luis;
-    const file = await store(companyId, `${id}.jpg`, Buffer.from(`serbell-lab-${id}`));
+    const file = store(companyId, `${id}.jpg`, Buffer.from(`serbell-lab-${id}`));
     await db.document.create({
       data: { id, companyId, uploadedById: uploader, fileName, mimeType: "image/jpeg", status: "pending", ...file },
     });
@@ -394,14 +392,14 @@ export async function seedDatabase(db: Db) {
   const receiptShell = Buffer.from("serbell-lab-receipt-shell");
   const receiptAce = Buffer.from("serbell-lab-receipt-ace");
   const receiptAceConflict = Buffer.from("serbell-lab-receipt-ace-conflict");
-  const file21148 = await store(COMPANY.qpl, "doc_qpl_fs_21148.jpg", receipt21148);
-  const fileDup = await store(COMPANY.qpl, "doc_qpl_dup_21148.jpg", receipt21148);
-  const file15012 = await store(COMPANY.qpl, "doc_qpl_fs_15012.jpg", receipt15012);
-  const fileSun = await store(COMPANY.qpl, "doc_qpl_sunpass.jpg", receiptSun);
-  const fileHarbor = await store(COMPANY.qpl, "doc_qpl_harbor.jpg", receiptHarbor);
-  const fileShell = await store(COMPANY.rivera, "doc_riv_shell.jpg", receiptShell);
-  const fileAce = await store(COMPANY.rivera, "doc_riv_ace.jpg", receiptAce);
-  const fileAceBad = await store(COMPANY.rivera, "doc_riv_ace_conflict.jpg", receiptAceConflict);
+  const file21148 = store(COMPANY.qpl, "doc_qpl_fs_21148.jpg", receipt21148);
+  const fileDup = store(COMPANY.qpl, "doc_qpl_dup_21148.jpg", receipt21148);
+  const file15012 = store(COMPANY.qpl, "doc_qpl_fs_15012.jpg", receipt15012);
+  const fileSun = store(COMPANY.qpl, "doc_qpl_sunpass.jpg", receiptSun);
+  const fileHarbor = store(COMPANY.qpl, "doc_qpl_harbor.jpg", receiptHarbor);
+  const fileShell = store(COMPANY.rivera, "doc_riv_shell.jpg", receiptShell);
+  const fileAce = store(COMPANY.rivera, "doc_riv_ace.jpg", receiptAce);
+  const fileAceBad = store(COMPANY.rivera, "doc_riv_ace_conflict.jpg", receiptAceConflict);
 
   await db.document.createMany({
     data: [

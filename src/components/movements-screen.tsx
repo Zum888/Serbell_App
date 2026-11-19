@@ -205,7 +205,7 @@ function Drawer({ detail, error, filter, q }: { detail: Detail; error?: string; 
             {detail.document.isDemonstration ? <p className="mt-1 text-xs text-amber-700">Dato de demostración</p> : null}
             <p className="mt-1 text-slate-500">{detail.document.notice}</p>
             {detail.document.mimeType.startsWith("image/") ? (
-              <img src={`/api/documents/${detail.document.id}/file`} alt="" className="mt-2 max-h-36 rounded-lg border border-border" />
+              <img src="/demo/comprobante.svg" alt="" className="mt-2 max-h-36 rounded-lg border border-border" />
             ) : null}
           </>
         ) : (

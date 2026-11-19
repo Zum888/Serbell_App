@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, X, ZoomIn, ZoomOut } from "lucide-react";
+import { X, ZoomIn, ZoomOut } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -40,14 +40,6 @@ export function ReceiptFrame({
         >
           <ZoomIn className="size-4" />
         </button>
-        <a
-          href={`${src}?descarga=1`}
-          data-testid="receipt-download"
-          className="ml-1 inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-primary"
-        >
-          <Download className="size-4" />
-          Descargar
-        </a>
         <Link href={closeHref} data-testid="receipt-close" className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-slate-500">
           <X className="size-4" />
           Cerrar
@@ -55,7 +47,7 @@ export function ReceiptFrame({
       </div>
       <div className="max-h-[46vh] overflow-auto bg-slate-50">
         {failed ? (
-          <p className="p-4 text-sm text-slate-500">No se puede previsualizar este archivo. Puedes descargarlo.</p>
+          <p className="p-4 text-sm text-slate-500">Esta ilustración de demostración no se puede ampliar.</p>
         ) : pdf ? (
           <div style={{ width: `${zoom * 100}%`, height: `${680 * zoom}px` }}>
             <iframe

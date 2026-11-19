@@ -15,7 +15,7 @@ export function TicketThumb({ id, alt }: { id: string; alt: string }) {
   return (
     <img
       ref={ref}
-      src={`/api/documents/${id}/file`}
+      src="/demo/comprobante.svg"
       alt={alt}
       className="h-24 w-full rounded-lg border border-border bg-slate-50 object-cover object-top"
       onError={() => setFailed(true)}

@@ -187,7 +187,7 @@ export function FocusMode({ data }: { data: FocusData }) {
             <h2 className="text-lg font-semibold">{data.ticket.document?.fileName ?? "Sin ticket"}</h2>
             {data.ticket.document ? (
               <ReceiptFrame
-                src={`/api/documents/${data.ticket.document.id}/file`}
+                src="/demo/comprobante.svg"
                 mime={data.ticket.document.mimeType}
                 fileName={data.ticket.document.fileName}
                 closeHref={here}
@@ -210,14 +210,7 @@ export function FocusMode({ data }: { data: FocusData }) {
                 </label>
                 <Button type="submit" variant="outline" data-testid="receipt-use">Usar este</Button>
               </form>
-              <form action={`/api/transactions/${current.id}/document`} method="post" encType="multipart/form-data" className="space-y-2">
-                <input type="hidden" name="next" value={here} />
-                <label className="inline-flex cursor-pointer items-center rounded-full border border-border px-3 py-1.5 text-xs font-medium text-slate-700">
-                  Elegir archivo
-                  <input name="file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" data-testid="receipt-upload" className="sr-only" />
-                </label>
-                <Button type="submit" data-testid="receipt-upload-submit">{data.ticket.document ? "Reemplazar" : "Subir"}</Button>
-              </form>
+              <p className="text-xs text-slate-500">Los comprobantes son de demostración. No se pueden subir ni descargar.</p>
             </div>
           </aside>
         </div>

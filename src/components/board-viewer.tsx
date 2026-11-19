@@ -36,7 +36,7 @@ export function BoardViewer({ viewer, error }: { viewer: BoardViewerData; error?
       {viewer.conflict ? <p className="mt-2 text-xs text-red-700" data-testid="conflict-mark">Conflicto. El movimiento ya tiene otro comprobante.</p> : null}
       {viewer.document ? (
         <ReceiptFrame
-          src={`/api/documents/${viewer.document.id}/file`}
+          src="/demo/comprobante.svg"
           mime={viewer.document.mimeType}
           fileName={viewer.document.fileName}
           closeHref={viewer.closeHref}
@@ -87,15 +87,7 @@ export function BoardViewer({ viewer, error }: { viewer: BoardViewerData; error?
             </label>
             <Button type="submit" variant="outline" data-testid="receipt-use">Usar este</Button>
           </form>
-          <form action={`/api/transactions/${viewer.movement.id}/document`} method="post" encType="multipart/form-data" className="space-y-2">
-            <input type="hidden" name="next" value={viewer.next} />
-            <p className="text-xs text-slate-500">Subir un reemplazo</p>
-            <label className="inline-flex cursor-pointer items-center rounded-full border border-border px-3 py-1.5 text-xs font-medium text-slate-700">
-              Elegir archivo
-              <input name="file" type="file" required accept="image/jpeg,image/png,image/webp,application/pdf" data-testid="receipt-upload" className="sr-only" />
-            </label>
-            <Button type="submit" data-testid="receipt-upload-submit">Reemplazar</Button>
-          </form>
+          <p className="text-xs text-slate-500">Los comprobantes son de demostración. No se pueden subir ni descargar.</p>
         </div>
       ) : null}
       {viewer.canReview && viewer.movement && !sealed ? (

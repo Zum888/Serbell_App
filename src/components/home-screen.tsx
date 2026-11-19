@@ -93,7 +93,7 @@ export function HomeScreen({
               <Sparkles className="size-4 text-primary" />
               <input type="hidden" name="companyId" value={companyId} />
               <Input name="text" required placeholder="Pregúntame sobre tu empresa..." className="h-9 border-0 shadow-none focus:border-0" />
-              <Link href="/chat?subir=1" aria-label="Adjuntar comprobante" className="text-slate-500">
+              <Link href="/comprobantes" aria-label="Ver comprobantes de demostración" className="text-slate-500">
                 <Paperclip className="size-4" />
               </Link>
               <button className="flex size-9 items-center justify-center rounded-full bg-primary text-white" type="submit" aria-label="Enviar">
@@ -104,8 +104,8 @@ export function HomeScreen({
               <Link href="/gastos" className="rounded-full border border-border bg-white px-3 py-2 text-sm text-slate-600">
                 Analizar mis gastos
               </Link>
-              <Link href="/chat?subir=1" className="rounded-full border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-medium text-primary">
-                Subir comprobantes
+              <Link href="/comprobantes" className="rounded-full border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-medium text-primary">
+                Ver comprobantes
               </Link>
               <Link href="/por-cobrar" className="rounded-full border border-border bg-white px-3 py-2 text-sm text-slate-600">
                 Revisar mis cobros
