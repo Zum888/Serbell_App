@@ -3,6 +3,7 @@
 import { ArrowUp, Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { LoteFlow } from "@/components/lote-flow";
 import { InvoiceFlow } from "@/components/ticket-flow";
 import { GUIDE_REPLY, isTalk, talkReply, type Briefing } from "@/lib/briefing";
 import type { HomeStart } from "@/lib/home-starts";
@@ -20,7 +21,7 @@ type Bubble = { id: string; role: "user" | "assistant"; body: string };
 export function HomeChat({ name, briefing, starts }: { name: string; briefing: Briefing; starts: HomeStart[] }) {
   const [messages, setMessages] = useState<Bubble[]>([]);
   const [text, setText] = useState("");
-  const [flow, setFlow] = useState(false);
+  const [flow, setFlow] = useState<"factura" | "lote" | null>(null);
 
   function ask(raw: string) {
     const value = raw.trim();
@@ -28,7 +29,7 @@ export function HomeChat({ name, briefing, starts }: { name: string; briefing: B
     const intent = parseIntent(value);
     const body = isTalk(intent.type) ? talkReply(intent.type, briefing) : intent.type === "unsupported" ? UNSUPPORTED_REPLY : GUIDE_REPLY;
     const stamp = `${Date.now()}-${messages.length}`;
-    setFlow(false);
+    setFlow(null);
     setMessages((current) => [
       ...current,
       { id: `u-${stamp}`, role: "user", body: value },
@@ -40,13 +41,13 @@ export function HomeChat({ name, briefing, starts }: { name: string; briefing: B
   function reset() {
     setMessages([]);
     setText("");
-    setFlow(false);
+    setFlow(null);
   }
 
   const talking = flow || messages.length > 0;
 
   return (
-    <section data-testid="home-chat" className="flex min-h-[calc(100vh-7.5rem)] flex-col">
+    <section data-testid="home-chat" className="flex h-[calc(100vh-7.5rem)] flex-col">
       {talking ? (
         <div className="mb-2 flex justify-end">
           <button type="button" onClick={reset} className="text-xs text-slate-500 hover:text-slate-800">
@@ -55,11 +56,16 @@ export function HomeChat({ name, briefing, starts }: { name: string; briefing: B
         </div>
       ) : null}
 
-      <div className={`flex flex-1 flex-col ${talking ? "" : "items-center justify-center"}`}>
-        {flow ? (
+      <div className={`flex min-h-0 flex-1 flex-col overflow-y-auto ${talking ? "" : "items-center justify-center"}`}>
+        {flow === "factura" ? (
           <div className="mx-auto w-full max-w-2xl flex-1">
             <h1 className="sr-only">Conciliar una factura</h1>
             <InvoiceFlow />
+          </div>
+        ) : flow === "lote" ? (
+          <div className="mx-auto w-full max-w-2xl flex-1">
+            <h1 className="sr-only">Conciliar un lote</h1>
+            <LoteFlow />
           </div>
         ) : talking ? (
           <div className="mx-auto w-full max-w-2xl flex-1 space-y-6">
@@ -89,10 +95,18 @@ export function HomeChat({ name, briefing, starts }: { name: string; briefing: B
               <button
                 type="button"
                 data-testid="flow-factura"
-                onClick={() => setFlow(true)}
+                onClick={() => setFlow("factura")}
                 className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:text-slate-950"
               >
                 Conciliar una factura
+              </button>
+              <button
+                type="button"
+                data-testid="flow-lote"
+                onClick={() => setFlow("lote")}
+                className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:text-slate-950"
+              >
+                Conciliar un lote
               </button>
               {PROMPTS.map(([label, prompt]) => (
                 <button

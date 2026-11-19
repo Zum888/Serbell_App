@@ -1,5 +1,6 @@
 import { LayoutGrid, Plus } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AccountsBoard } from "@/components/accounts-board";
 import { BankStep } from "@/components/bank-step";
 import { MoneyToggle } from "@/components/money-toggle";
@@ -7,6 +8,7 @@ import { StateView } from "@/components/state-view";
 import { accountInitials, movementRunningCents } from "@/lib/accounts";
 import { change } from "@/lib/insights";
 import { RECONCILIATION_LABEL } from "@/lib/labels";
+import { LOTE, LOTE_ACCOUNT, loteItem, loteNextHref } from "@/lib/lote";
 import { formatUsd } from "@/lib/money";
 import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
@@ -17,10 +19,32 @@ function kindLabel(kind: string) {
   return kind === "card" ? "Crédito" : "Corriente";
 }
 
+function autoMatchFor(params: { factura?: string; lote?: string; actual?: string }, accountId: string, transactionId: string) {
+  if (params.factura === "1" && transactionId === "tx_qpl_fs_20394") {
+    return {
+      file: "Factura_FleetSmarts.pdf",
+      nextHref: `/cuentas?cuenta=${accountId}&factura=lista`,
+      note: "Lo concilio.",
+    };
+  }
+  if (params.lote === "1" && accountId === LOTE_ACCOUNT) {
+    const item = loteItem(params.actual);
+    if (item && item.id === transactionId) {
+      const index = LOTE.findIndex((row) => row.id === item.id) + 1;
+      return {
+        file: item.fileName,
+        nextHref: loteNextHref(item.id),
+        note: index === 4 ? "Cierro el lote." : `Van ${index} de 4.`,
+      };
+    }
+  }
+  return null;
+}
+
 export default async function AccountsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cuenta?: string; paso?: string; actual?: string; error?: string; factura?: string }>;
+  searchParams: Promise<{ cuenta?: string; paso?: string; actual?: string; error?: string; factura?: string; lote?: string }>;
 }) {
   const session = await pageContext();
   const params = await searchParams;
@@ -36,6 +60,13 @@ export default async function AccountsPage({
     return <StateView variant="error" title="Esa cuenta no está en esta empresa." testId="server-error" />;
   }
   if (selected && params.paso === "conciliar") {
+    if (params.lote === "1" && selected.id === LOTE_ACCOUNT) {
+      const item = loteItem(params.actual);
+      const movement = item ? selected.movements.find((row) => row.id === item.id) : null;
+      if (item && (!movement || movement.reconciliationState === "Reconciled" || movement.sealed)) {
+        redirect(loteNextHref(item.id));
+      }
+    }
     const open = [...selected.movements]
       .filter((movement) => movement.reconciliationState !== "Reconciled")
       .sort((a, b) => a.day.localeCompare(b.day) || a.id.localeCompare(b.id));
@@ -57,7 +88,7 @@ export default async function AccountsPage({
     return (
       <BankStep
         error={params.error}
-        fromInvoice={params.factura === "1"}
+        autoMatch={autoMatchFor(params, selected.id, current.id)}
         data={{
           accountHref: `/cuentas?cuenta=${selected.id}`,
           progress: `${selected.unreconciledCount} de ${selected.movements.length} sin conciliar`,
@@ -137,6 +168,11 @@ export default async function AccountsPage({
         {params.factura === "lista" ? (
           <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800" data-testid="invoice-reconciled">
             La factura quedó conciliada con el movimiento del banco.
+          </p>
+        ) : null}
+        {params.lote === "lista" ? (
+          <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800" data-testid="lote-reconciled">
+            El lote quedó conciliado con los movimientos del banco.
           </p>
         ) : null}
         {params.error ? <p className="text-sm text-red-700" data-testid="server-error">{params.error}</p> : null}
