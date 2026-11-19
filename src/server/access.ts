@@ -5,15 +5,15 @@ import { getIdentity } from "../../cursor/identity";
 const ACCESS_COOKIE = "sb_access";
 const ACCESS_PURPOSE = "serbell-access-v1";
 const VISITOR_ID = /^[a-f0-9]{32}$/;
-const MIN_PASSWORD_LENGTH = 12;
+const MIN_PASSWORD_LENGTH = 1;
 
 /**
- * A public lab cannot rest on a short or repetitive secret. Anything weaker
- * is treated as unset, so the gate stays closed.
+ * Any saved password opens the field. Treating a short secret as unset hid the
+ * box and left the owner with nowhere to type. An empty secret still keeps
+ * the gate shut.
  */
 export function passwordAccepted(value: string): boolean {
-  if (value.length < MIN_PASSWORD_LENGTH) return false;
-  return new Set(value).size >= 4;
+  return value.length >= MIN_PASSWORD_LENGTH;
 }
 
 function rawPassword(): string {
@@ -25,8 +25,7 @@ function rawPassword(): string {
  * The shared password that protects the published lab. It is read from the
  * environment and is never written into the files the app ships (a hardcoded
  * password would be a security finding). Set it in the app's secret settings
- * in Cursor as SERBELL_ACCESS_PASSWORD. When it is unset or too weak the gate
- * fails closed.
+ * in Cursor as SERBELL_ACCESS_PASSWORD. When it is unset the gate stays shut.
  */
 function configuredPassword(): string | null {
   const value = rawPassword();

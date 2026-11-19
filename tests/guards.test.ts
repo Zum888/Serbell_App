@@ -44,9 +44,12 @@ it("locks the password gate after eight failures", () => {
   expect(loginAllowed("203.0.113.4", now)).toBe(true);
 });
 
-it("no abre el laboratorio con una contraseña corta", () => {
+it("abre con la contraseña guardada y sigue cerrado si no hay ninguna", () => {
   const previous = process.env.SERBELL_ACCESS_PASSWORD;
   process.env.SERBELL_ACCESS_PASSWORD = "corta";
+  expect(passwordMatches("corta")).toBe(true);
+  expect(accessConfigured()).toBe(true);
+  process.env.SERBELL_ACCESS_PASSWORD = "";
   expect(passwordMatches("corta")).toBe(false);
   expect(accessConfigured()).toBe(false);
   process.env.SERBELL_ACCESS_PASSWORD = "clave-de-prueba";
