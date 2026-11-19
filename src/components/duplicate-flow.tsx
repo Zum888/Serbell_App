@@ -88,7 +88,7 @@ export function DuplicateFlow() {
         </div>
       ) : null}
 
-      {step >= 8 ? <p className="text-[15px] leading-7 text-slate-800">Te llevo a Movimientos para que decidas.</p> : null}
+      {step >= 8 ? <p className="text-[15px] leading-7 text-slate-800">Te llevo a Bancos para que decidas.</p> : null}
     </div>
   );
 }

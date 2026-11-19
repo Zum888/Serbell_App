@@ -17,7 +17,7 @@ export default async function MovementsPage({
 }) {
   const session = await pageContext();
   const params = await searchParams;
-  if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para ver sus movimientos." />;
+  if (!session.companyId) return <StateView variant="empty" title="Selecciona una empresa para ver sus bancos." />;
   const filter = params.filtro || "todos";
   const q = params.q || "";
   try {

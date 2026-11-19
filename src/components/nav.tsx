@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  ArrowLeftRight,
+  Landmark,
   BarChart3,
   CircleHelp,
   FileText,
@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 
 const items = [
   { href: "/", firmHref: "/firma", label: "Chat nuevo", icon: MessageSquare, testId: "nav-inicio" },
-  { href: "/movimientos", label: "Movimientos", icon: ArrowLeftRight, testId: "nav-movimientos" },
+  { href: "/movimientos", label: "Bancos", icon: Landmark, testId: "nav-movimientos" },
   { href: "/comprobantes", label: "Comprobantes", icon: FileText, testId: "nav-comprobantes" },
   { href: "/categorias", label: "Categorías", icon: Tags, testId: "nav-categorias" },
   { href: "/por-cobrar", label: "Por cobrar", icon: Wallet, testId: "nav-cobrar" },

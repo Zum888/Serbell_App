@@ -147,8 +147,14 @@ export async function movementCounts(db: Db, actor: Actor, companyId: string, ac
   }
   const rows = await db.bankTransaction.findMany({
     where: { companyId, ...(accountId ? { accountId } : {}) },
-    select: { accountingState: true, documentState: true, reviewState: true, reconciliationState: true },
+    select: { amountCents: true, accountingState: true, documentState: true, reviewState: true, reconciliationState: true },
   });
+  let inflows = 0;
+  let outflows = 0;
+  for (const row of rows) {
+    if (row.amountCents > 0) inflows += row.amountCents;
+    else if (row.amountCents < 0) outflows += Math.abs(row.amountCents);
+  }
   return {
     todos: rows.length,
     sinCategoria: rows.filter((row) => row.accountingState === "Uncategorized").length,
@@ -156,6 +162,8 @@ export async function movementCounts(db: Db, actor: Actor, companyId: string, ac
     porConciliar: rows.filter((row) => row.reconciliationState !== "Reconciled").length,
     porRevisar: rows.filter((row) => row.reviewState === "NeedsReview").length,
     aprobados: rows.filter((row) => row.reviewState === "Approved").length,
+    inflows,
+    outflows,
   };
 }
 
