@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ChatPinProvider } from "@/components/chat-pin";
 import { HomeChat } from "@/components/home-chat";
 import type { Briefing } from "@/lib/briefing";
 import type { HomeStart } from "@/lib/home-starts";
+
+const PIN_KEY = "serbell-chat";
+const FLOW_KEY = "serbell-flujo";
 
 export function ChatShell({
   name,
@@ -20,22 +23,38 @@ export function ChatShell({
 }) {
   const pathname = usePathname();
   const [pinned, setPinned] = useState(false);
-  const [fromUrl, setFromUrl] = useState(false);
   const [flujo, setFlujo] = useState<string | null>(null);
+  const [fromUrl, setFromUrl] = useState(false);
   const home = pathname === "/";
+  const bank = pathname.startsWith("/movimientos") || pathname.startsWith("/cuentas");
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setFromUrl(params.get("con") === "chat");
-    setFlujo(params.get("flujo"));
-  }, [pathname]);
+    if (sessionStorage.getItem(PIN_KEY) === "1") {
+      setPinned(true);
+      setFlujo((current) => current ?? sessionStorage.getItem(FLOW_KEY));
+    }
+  }, []);
 
-  const bank = pathname.startsWith("/movimientos") || pathname.startsWith("/cuentas");
+  function pin(next?: string) {
+    sessionStorage.setItem(PIN_KEY, "1");
+    if (next) {
+      sessionStorage.setItem(FLOW_KEY, next);
+      setFlujo(next);
+    }
+    setPinned(true);
+  }
+
   const show = home || ((pinned || fromUrl) && bank);
   const dock = show && !home;
 
   return (
-    <ChatPinProvider pin={() => setPinned(true)}>
+    <ChatPinProvider pin={pin}>
+      <Suspense fallback={null}>
+        <ChatQuery onQuery={(chat, flow) => {
+          setFromUrl(chat);
+          if (flow) setFlujo(flow);
+        }} />
+      </Suspense>
       <div className={dock ? "flex items-start gap-4" : show ? "space-y-8" : ""}>
         {show ? (
           <div className={dock ? "sticky top-0 flex h-[calc(100vh-5rem)] w-[320px] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-white p-3" : ""}>
@@ -46,4 +65,15 @@ export function ChatShell({
       </div>
     </ChatPinProvider>
   );
+}
+
+function ChatQuery({ onQuery }: { onQuery: (chat: boolean, flujo: string | null) => void }) {
+  const params = useSearchParams();
+  const pathname = usePathname();
+  const chat = params.get("con") === "chat";
+  const flujo = params.get("flujo");
+  useEffect(() => {
+    onQuery(chat, flujo);
+  }, [chat, flujo, pathname, onQuery]);
+  return null;
 }

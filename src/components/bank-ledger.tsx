@@ -149,8 +149,8 @@ export function BankLedger({
         </div>
         <div className="mt-4 rounded-2xl bg-slate-50 p-3">
           <div data-testid="bank-totals" className="grid grid-cols-3 gap-2">
-            <Total label="Ingresos" value={formatUsd(counts.inflows)} tone="text-emerald-600" points={lines.inflows} color="#059669" />
-            <Total label="Gastos" value={formatUsd(counts.outflows)} tone="text-rose-600" points={lines.outflows} color="#e11d48" />
+            <Total label="Ingresos" value={formatUsd(counts.inflows)} tone="text-emerald-600" points={lines.inflows} color="#059669" fill />
+            <Total label="Gastos" value={formatUsd(counts.outflows)} tone="text-rose-600" points={lines.outflows} color="#e11d48" fill />
             <Total
               label="Disponible"
               value={formatUsd(availableCents)}
@@ -293,13 +293,13 @@ function AccountTab({
   );
 }
 
-function Total({ label, value, tone, points, color, hint }: { label: string; value: string; tone: string; points: number[]; color: string; hint?: string }) {
+function Total({ label, value, tone, points, color, hint, fill = false }: { label: string; value: string; tone: string; points: number[]; color: string; hint?: string; fill?: boolean }) {
   return (
     <div className="rounded-xl bg-white px-3 py-3 shadow-sm ring-1 ring-slate-200">
       <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</p>
       <p className={`mt-1 text-lg font-semibold tabular-nums ${tone}`}>{value}</p>
       {hint ? <p className="mt-0.5 text-[11px] text-slate-500">{hint}</p> : null}
-      <Sparkline points={points} color={color} />
+      <Sparkline points={points} color={color} fill={fill} />
     </div>
   );
 }
