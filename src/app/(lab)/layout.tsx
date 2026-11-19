@@ -1,3 +1,4 @@
+import { ChatFrame } from "@/components/chat-frame";
 import { Shell } from "@/components/shell";
 import { StateView } from "@/components/state-view";
 import { pageSession } from "@/server/session";
@@ -47,7 +48,9 @@ export default async function LabLayout({ children }: { children: React.ReactNod
   }
   return (
     <Shell actor={session.actor} companies={session.companies} companyId={session.companyId} canSwitchProfiles={session.canSwitchProfiles}>
-      {children}
+      {session.actor.firmRole || !session.companyId ? children : (
+        <ChatFrame actor={session.actor} companyId={session.companyId}>{children}</ChatFrame>
+      )}
     </Shell>
   );
 }

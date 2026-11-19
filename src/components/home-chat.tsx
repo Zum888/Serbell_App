@@ -10,6 +10,7 @@ import { InvoiceFlow } from "@/components/ticket-flow";
 import { GUIDE_REPLY, isTalk, talkReply, type Briefing } from "@/lib/briefing";
 import type { HomeStart } from "@/lib/home-starts";
 import { UNSUPPORTED_REPLY, parseIntent } from "@/lib/intent";
+import { useChatPin } from "@/components/chat-pin";
 import { greetingName } from "@/lib/labels";
 
 const PROMPTS = [
@@ -42,20 +43,24 @@ export function HomeChat({
   const [messages, setMessages] = useState<Bubble[]>([]);
   const [text, setText] = useState("");
   const [flow, setFlow] = useState<"factura" | "lote" | "duplicado" | "faltantes" | null>(null);
+  const pin = useChatPin();
+
+  function openFlow(next: "factura" | "lote" | "duplicado" | "faltantes") {
+    pin();
+    setMessages([]);
+    setFlow(next);
+    setText("");
+  }
 
   function ask(raw: string) {
     const value = raw.trim();
     if (!value) return;
     if (/faltan comprobantes|comprobantes faltantes|pedir comprobantes/i.test(value)) {
-      setMessages([]);
-      setFlow("faltantes");
-      setText("");
+      openFlow("faltantes");
       return;
     }
     if (/duplicad/i.test(value)) {
-      setMessages([]);
-      setFlow("duplicado");
-      setText("");
+      openFlow("duplicado");
       return;
     }
     const intent = parseIntent(value);
@@ -84,10 +89,10 @@ export function HomeChat({
     <section data-testid="home-chat" className={dock ? "flex h-full min-h-0 flex-col" : "flex h-[calc(100vh-7.5rem)] flex-col"}>
       {dock ? (
         <div className="mb-3 flex flex-wrap gap-1.5" data-testid="flow-shortcuts">
-          <FlowChip label="Conciliar una factura" testId="flow-factura" onClick={() => { setMessages([]); setFlow("factura"); }} />
-          <FlowChip label="Conciliar un lote" testId="flow-lote" onClick={() => { setMessages([]); setFlow("lote"); }} />
-          <FlowChip label="Revisar duplicados" testId="flow-duplicado" onClick={() => { setMessages([]); setFlow("duplicado"); }} />
-          <FlowChip label="Pedir comprobantes" testId="flow-faltantes" onClick={() => { setMessages([]); setFlow("faltantes"); }} />
+          <FlowChip label="Conciliar una factura" testId="flow-factura" onClick={() => openFlow("factura")} />
+          <FlowChip label="Conciliar un lote" testId="flow-lote" onClick={() => openFlow("lote")} />
+          <FlowChip label="Revisar duplicados" testId="flow-duplicado" onClick={() => openFlow("duplicado")} />
+          <FlowChip label="Pedir comprobantes" testId="flow-faltantes" onClick={() => openFlow("faltantes")} />
         </div>
       ) : null}
       {talking ? (
@@ -151,7 +156,7 @@ export function HomeChat({
               <button
                 type="button"
                 data-testid="flow-factura"
-                onClick={() => setFlow("factura")}
+                onClick={() => openFlow("factura")}
                 className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:text-slate-950"
               >
                 Conciliar una factura
@@ -159,7 +164,7 @@ export function HomeChat({
               <button
                 type="button"
                 data-testid="flow-lote"
-                onClick={() => setFlow("lote")}
+                onClick={() => openFlow("lote")}
                 className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:text-slate-950"
               >
                 Conciliar un lote
@@ -167,7 +172,7 @@ export function HomeChat({
               <button
                 type="button"
                 data-testid="flow-duplicado"
-                onClick={() => setFlow("duplicado")}
+                onClick={() => openFlow("duplicado")}
                 className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:text-slate-950"
               >
                 Revisar duplicados
@@ -175,7 +180,7 @@ export function HomeChat({
               <button
                 type="button"
                 data-testid="flow-faltantes"
-                onClick={() => setFlow("faltantes")}
+                onClick={() => openFlow("faltantes")}
                 className="rounded-full bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:text-slate-950"
               >
                 Pedir comprobantes

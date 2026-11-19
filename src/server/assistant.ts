@@ -56,6 +56,7 @@ export async function loadBriefing(db: Db, actor: Actor, companyId: string): Pro
       .map(([name, totalCents]) => ({ name, totalCents }))
       .sort((a, b) => b.totalCents - a.totalCents || a.name.localeCompare(b.name, "es")),
     duplicates: duplicates.map((row) => ({
+      id: row.id,
       fileName: row.fileName,
       merchant: row.extraction?.merchant ?? null,
       amountCents: row.extraction?.amountCents ?? null,

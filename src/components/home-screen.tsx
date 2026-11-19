@@ -1,13 +1,9 @@
 import { AlertTriangle, Scale, TrendingDown, Wallet } from "lucide-react";
 import Link from "next/link";
-import { HomeChat } from "@/components/home-chat";
 import { Sparkline } from "@/components/charts";
-import type { Briefing } from "@/lib/briefing";
-import type { HomeStart } from "@/lib/home-starts";
 import { formatUsd } from "@/lib/money";
 
 export function HomeScreen({
-  name,
   balanceCents,
   accountCount,
   accounts,
@@ -17,10 +13,7 @@ export function HomeScreen({
   uncategorizedCount,
   uncategorizedExpenseCents,
   periodLabel,
-  briefing,
-  starts,
 }: {
-  name: string;
   balanceCents: number;
   accountCount: number;
   accounts: { institution: string; mask: string }[];
@@ -30,13 +23,10 @@ export function HomeScreen({
   uncategorizedCount: number;
   uncategorizedExpenseCents: number;
   periodLabel: string | null;
-  briefing: Briefing;
-  starts: HomeStart[];
 }) {
   const accountLine = accounts.map((account) => `${account.institution} ····${account.mask}`).join(" · ");
   return (
-    <div className="space-y-8">
-      <HomeChat name={name} briefing={briefing} starts={starts} />
+    <div>
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           icon={<Wallet className="size-4" />}

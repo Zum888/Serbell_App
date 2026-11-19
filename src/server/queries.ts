@@ -119,6 +119,8 @@ export async function listMovements(db: Db, actor: Actor, companyId: string, fil
     })
     .map((row) => ({
       id: row.id,
+      accountId: row.accountId,
+      accountingState: row.accountingState,
       postedOn: dayKey(row.postedOn) ?? "",
       merchant: row.merchant,
       description: row.description,

@@ -1,15 +1,13 @@
-import { ChatRail } from "@/components/chat-rail";
 import { FocusMode } from "@/components/focus-mode";
 import { MovementsScreen } from "@/components/movements-screen";
 import { StateView } from "@/components/state-view";
 import { isAppError } from "@/lib/errors";
 import { LOTE } from "@/lib/lote";
-import { formatUsd } from "@/lib/money";
 import { canReview } from "@/lib/permissions";
 import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
 import { focusQueue } from "@/server/focus";
-import { getHome, getMovement, getReceiptContext, listCategoryTree, listMovements, movementCounts } from "@/server/queries";
+import { getHome, getMovement, getReceiptContext, listCategoryTree, listMovements } from "@/server/queries";
 
 export default async function MovementsPage({
   searchParams,
@@ -49,10 +47,7 @@ export default async function MovementsPage({
     if (params.cuenta && !account) {
       return <StateView variant="error" title="Esa cuenta no está en esta empresa." testId="server-error" />;
     }
-    const [rows, counts] = await Promise.all([
-      listMovements((await db()), session.actor, session.companyId, filter, q, account?.id),
-      movementCounts((await db()), session.actor, session.companyId, account?.id),
-    ]);
+    const rows = await listMovements((await db()), session.actor, session.companyId, "todos", "");
     let detail = null;
     let receipt = null;
     if (params.fila) {
@@ -60,18 +55,15 @@ export default async function MovementsPage({
     } else if (params.movimiento) {
       detail = await getMovement((await db()), session.actor, params.movimiento);
     }
-    const withChat = params.con === "chat";
-    const screen = (
+    return (
       <MovementsScreen
         companyName={home.company.name}
         companyId={session.companyId}
-        balanceLabel={account ? `${account.institution} ····${account.mask} · ${formatUsd(account.availableBalanceCents)}` : `Disponible en las ${home.accountCount} cuentas · ${formatUsd(home.balanceCents)}`}
         accounts={home.accounts.map((item) => ({ id: item.id, institution: item.institution, mask: item.mask, availableBalanceCents: item.availableBalanceCents }))}
         accountId={account?.id}
         found={params.factura === "lista" ? ["tx_qpl_fs_20394"] : params.lote === "lista" ? LOTE.map((item) => item.id) : []}
         notice={params.factura === "lista" ? "factura" : params.lote === "lista" ? "lote" : undefined}
         rows={rows}
-        counts={counts}
         filter={filter}
         q={q}
         error={params.error}
@@ -82,16 +74,9 @@ export default async function MovementsPage({
         duplicate={params.duplicado === "sunpass"}
         decision={params.decision}
         missing={params.faltantes === "1"}
-        withChat={withChat}
+        withChat={params.con === "chat"}
         flujo={params.flujo}
       />
-    );
-    if (!withChat) return screen;
-    return (
-      <div className="flex items-start gap-4">
-        <ChatRail flujo={params.flujo} />
-        <div className="min-w-0 flex-1">{screen}</div>
-      </div>
     );
   } catch (error) {
     if (isAppError(error)) return <StateView variant="error" title={error.message} testId="server-error" />;
