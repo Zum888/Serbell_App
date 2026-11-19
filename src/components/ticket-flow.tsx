@@ -11,7 +11,7 @@ const CHECKS = [
   { label: "Concepto", value: "Combustible" },
 ];
 
-const MOVEMENT = "/movimientos?cuenta=acct_qpl_boa&movimiento=tx_qpl_fs_20394";
+const MOVEMENT = "/movimientos?cuenta=acct_qpl_boa&movimiento=tx_qpl_fs_20394&con=chat&flujo=factura";
 
 export function InvoiceFlow() {
   const router = useRouter();

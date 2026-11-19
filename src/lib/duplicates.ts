@@ -5,7 +5,7 @@ export const DUPLICATE_PAIR = [
   { id: DUPLICATE_IDS[1], merchant: "SunPass", date: "27 oct 2026", amount: "USD 10.00", amountCents: -1000 },
 ] as const;
 
-export const DUPLICATE_HREF = "/movimientos?duplicado=sunpass";
+export const DUPLICATE_HREF = "/movimientos?duplicado=sunpass&con=chat&flujo=duplicado";
 
 export const DUPLICATE_CHOICES = [
   { id: "distintos", label: "Son compras distintas", note: "Quedaron como compras distintas. Los dos cargos siguen en el banco." },

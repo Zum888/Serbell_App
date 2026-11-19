@@ -133,6 +133,8 @@ export function MovementsScreen({
   accountId,
   found = [],
   notice,
+  withChat = false,
+  flujo,
 }: {
   companyName: string;
   companyId: string;
@@ -153,6 +155,8 @@ export function MovementsScreen({
   accountId?: string;
   found?: string[];
   notice?: "factura" | "lote";
+  withChat?: boolean;
+  flujo?: string;
 }) {
   const countFor: Record<string, number> = {
     todos: counts.todos,
@@ -175,6 +179,10 @@ export function MovementsScreen({
     if (filtro) params.set("filtro", filtro);
     if (q) params.set("q", q);
     if (cuenta) params.set("cuenta", cuenta);
+    if (withChat) {
+      params.set("con", "chat");
+      if (flujo) params.set("flujo", flujo);
+    }
     const text = params.toString();
     return text ? `/movimientos?${text}` : "/movimientos";
   }
@@ -193,7 +201,7 @@ export function MovementsScreen({
               <p className="text-sm text-slate-500">{selectedAccount ? `${selectedAccount.institution} ····${selectedAccount.mask}` : periodOf(rows) || "Todos los bancos, por fecha"}</p>
             </div>
             {selectedAccount && rows.some((row) => row.reconciliationState !== "Reconciled") ? (
-              <Link href={`/cuentas?cuenta=${selectedAccount.id}&paso=conciliar`} className="text-sm font-medium text-primary">Conciliar con el banco</Link>
+              <Link href={`/cuentas?${new URLSearchParams({ cuenta: selectedAccount.id, paso: "conciliar", ...(withChat ? { con: "chat", ...(flujo ? { flujo } : {}) } : {}) }).toString()}`} className="text-sm font-medium text-primary">Conciliar con el banco</Link>
             ) : null}
           </div>
           <div className="mt-4 rounded-2xl bg-slate-50 p-3">
@@ -212,43 +220,38 @@ export function MovementsScreen({
                 <p className="mt-0.5 text-[11px] text-slate-500">{selectedAccount ? "Esta cuenta" : `Las ${accounts.length} cuentas`}</p>
               </div>
             </div>
-            <nav aria-label="Cambiar de cuenta" data-testid="account-switcher" className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-3">
-              <Link href={listHref({ cuenta: null })} aria-current={selectedAccount ? undefined : "page"} className={`flex min-h-[92px] flex-col justify-between rounded-2xl border bg-white px-3 py-3 text-left shadow-sm ${selectedAccount ? "border-slate-200 hover:border-slate-300" : "border-slate-900 ring-2 ring-slate-900"}`}>
-                <span className="flex items-center gap-2">
-                  <span className="flex size-9 items-center justify-center rounded-xl bg-slate-900 text-white"><LayoutGrid className="size-4" /></span>
+            <div className="mt-3 flex items-center gap-2">
+              <nav aria-label="Cambiar de cuenta" data-testid="account-switcher" className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
+                <Link href={listHref({ cuenta: null })} aria-current={selectedAccount ? undefined : "page"} className={`flex h-12 shrink-0 items-center gap-2 rounded-xl border bg-white px-2.5 ${selectedAccount ? "border-slate-200 hover:border-slate-300" : "border-slate-300 bg-slate-50"}`}>
+                  <span className="flex size-7 items-center justify-center rounded-lg bg-slate-100 text-slate-700"><LayoutGrid className="size-3.5" /></span>
                   <span>
-                    <span className="block text-sm font-semibold leading-tight">Todas</span>
-                    <span className="block text-[11px] text-slate-500">{accounts.length} cuentas</span>
+                    <span className="block text-sm font-medium leading-tight">Todas</span>
+                    <span className="block text-[11px] tabular-nums leading-tight text-slate-500">{formatUsd(allAvailable)}</span>
                   </span>
-                </span>
-                <span className="mt-3 block text-base font-semibold tabular-nums text-slate-900">{formatUsd(allAvailable)}</span>
-              </Link>
-              {accounts.map((account) => {
-                const active = account.id === accountId;
-                const accent = bankAccent(account.institution);
-                return (
-                  <Link
-                    key={account.id}
-                    href={listHref({ cuenta: account.id })}
-                    aria-current={active ? "page" : undefined}
-                    className={`relative flex min-h-[92px] flex-col justify-between overflow-hidden rounded-2xl border bg-white px-3 py-3 text-left shadow-sm ${active ? "border-slate-900 ring-2 ring-slate-900" : "border-slate-200 hover:border-slate-300"}`}
-                  >
-                    <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: accent }} />
-                    <span className="flex items-center gap-2">
-                      <span className="flex size-9 items-center justify-center rounded-xl text-xs font-semibold text-white" style={{ backgroundColor: accent }}>{accountInitials(account.institution)}</span>
+                </Link>
+                {accounts.map((account) => {
+                  const active = account.id === accountId;
+                  const accent = bankAccent(account.institution);
+                  return (
+                    <Link
+                      key={account.id}
+                      href={listHref({ cuenta: account.id })}
+                      aria-current={active ? "page" : undefined}
+                      className={`flex h-12 w-[188px] shrink-0 items-center gap-2 rounded-xl border bg-white px-2.5 ${active ? "border-slate-300 bg-slate-50" : "border-slate-200 hover:border-slate-300"}`}
+                    >
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold text-white" style={{ backgroundColor: accent }}>{accountInitials(account.institution)}</span>
                       <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold leading-tight">{account.institution}</span>
-                        <span className="block text-[11px] text-slate-500">····{account.mask}</span>
+                        <span className="block truncate text-sm font-medium leading-tight">{account.institution}</span>
+                        <span className="block truncate text-[11px] leading-tight text-slate-500">····{account.mask} · {formatUsd(account.availableBalanceCents)}</span>
                       </span>
-                    </span>
-                    <span className="mt-3 block text-base font-semibold tabular-nums text-slate-900">{formatUsd(account.availableBalanceCents)}</span>
-                  </Link>
-                );
-              })}
-              <Link href="/cuentas/conectar" data-testid="add-account" className="flex min-h-[92px] flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-slate-300 bg-white px-3 py-3 text-sm font-medium text-slate-600 hover:border-slate-400">
-                <Plus className="size-4" /> Agregar
+                    </Link>
+                  );
+                })}
+              </nav>
+              <Link href="/cuentas/conectar" data-testid="add-account" className="shrink-0 rounded-lg px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100">
+                <Plus className="mr-1 inline size-3.5" /> Agregar
               </Link>
-            </nav>
+            </div>
           </div>
           <div className="mt-3 flex gap-2">
             <Link href="/movimientos?vista=enfoque" className="rounded-full border border-border px-3 py-1.5 text-xs text-slate-600">Modo enfoque</Link>
@@ -270,6 +273,8 @@ export function MovementsScreen({
         <form className="px-4 pb-3" action="/movimientos">
           <input type="hidden" name="filtro" value={filter} />
           {accountId ? <input type="hidden" name="cuenta" value={accountId} /> : null}
+          {withChat ? <input type="hidden" name="con" value="chat" /> : null}
+          {withChat && flujo ? <input type="hidden" name="flujo" value={flujo} /> : null}
           <Input name="q" defaultValue={q} placeholder="Buscar movimiento..." />
         </form>
         {notice === "factura" ? <p data-testid="invoice-reconciled" className="px-4 pb-3 text-sm text-emerald-800">La factura quedó conciliada con el movimiento del banco.</p> : null}

@@ -11,13 +11,15 @@ export function loteItem(id: string | undefined) {
   return LOTE.find((item) => item.id === id) ?? null;
 }
 
+const CHAT = "con=chat&flujo=lote";
+
 export function loteStartHref() {
-  return `/cuentas?cuenta=${LOTE_ACCOUNT}&paso=conciliar&actual=${LOTE[0].id}&lote=1`;
+  return `/cuentas?cuenta=${LOTE_ACCOUNT}&paso=conciliar&actual=${LOTE[0].id}&lote=1&${CHAT}`;
 }
 
 export function loteNextHref(id: string) {
   const index = LOTE.findIndex((item) => item.id === id);
   const next = index >= 0 ? LOTE[index + 1] : undefined;
-  if (!next) return `/movimientos?cuenta=${LOTE_ACCOUNT}&lote=lista`;
-  return `/cuentas?cuenta=${LOTE_ACCOUNT}&paso=conciliar&actual=${next.id}&lote=1`;
+  if (!next) return `/movimientos?cuenta=${LOTE_ACCOUNT}&lote=lista&${CHAT}`;
+  return `/cuentas?cuenta=${LOTE_ACCOUNT}&paso=conciliar&actual=${next.id}&lote=1&${CHAT}`;
 }

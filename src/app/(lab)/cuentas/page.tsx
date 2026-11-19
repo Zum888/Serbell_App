@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BankStep } from "@/components/bank-step";
+import { ChatRail } from "@/components/chat-rail";
 import { StateView } from "@/components/state-view";
 import { movementRunningCents } from "@/lib/accounts";
 import { LOTE, LOTE_ACCOUNT, loteItem, loteNextHref } from "@/lib/lote";
@@ -69,7 +70,7 @@ function searchRows(movements: ScanMovement[], hitId: string) {
 export default async function AccountsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cuenta?: string; paso?: string; actual?: string; error?: string; factura?: string; lote?: string }>;
+  searchParams: Promise<{ cuenta?: string; paso?: string; actual?: string; error?: string; factura?: string; lote?: string; con?: string; flujo?: string }>;
 }) {
   const session = await pageContext();
   const params = await searchParams;
@@ -86,6 +87,10 @@ export default async function AccountsPage({
     if (params.factura) next.set("factura", params.factura);
     if (params.lote) next.set("lote", params.lote);
     if (params.error) next.set("error", params.error);
+    if (params.con === "chat") {
+      next.set("con", "chat");
+      if (params.flujo) next.set("flujo", params.flujo);
+    }
     const query = next.toString();
     redirect(query ? `/movimientos?${query}` : "/movimientos");
   }
@@ -101,10 +106,12 @@ export default async function AccountsPage({
       .filter((movement) => movement.reconciliationState !== "Reconciled")
       .sort((a, b) => a.day.localeCompare(b.day) || a.id.localeCompare(b.id));
     const current = open.find((movement) => movement.id === params.actual) ?? open[0] ?? null;
+    const chat = params.con === "chat";
+    const keep = (href: string) => (chat && !href.includes("con=chat") ? `${href}${href.includes("?") ? "&" : "?"}con=chat&flujo=${params.flujo || "lote"}` : href);
     if (!current) {
       return (
         <section>
-          <Link href={`/movimientos?cuenta=${selected.id}`} className="text-sm text-primary">Volver a la cuenta</Link>
+          <Link href={keep(`/movimientos?cuenta=${selected.id}`)} className="text-sm text-primary">Volver a la cuenta</Link>
           <div className="mt-4">
             <StateView variant="empty" title="Esta cuenta no tiene movimientos sin conciliar." />
           </div>
@@ -115,12 +122,12 @@ export default async function AccountsPage({
     const next = open[index + 1] ?? open.find((movement) => movement.id !== current.id) ?? null;
     const running = movementRunningCents(selected.movements, current.id) ?? 0;
     const done = selected.movements.length === 0 ? 0 : Math.round((selected.reconciledCount / selected.movements.length) * 100);
-    return (
+    const step = (
       <BankStep
         error={params.error}
         autoMatch={autoMatchFor(params, selected.id, current.id, selected.movements)}
         data={{
-          accountHref: `/movimientos?cuenta=${selected.id}`,
+          accountHref: keep(`/movimientos?cuenta=${selected.id}`),
           progress: `${selected.unreconciledCount} de ${selected.movements.length} sin conciliar`,
           donePercent: done,
           hints: "Enter concilia · S omite · Esc vuelve a la cuenta",
@@ -137,9 +144,16 @@ export default async function AccountsPage({
           reviewState: current.reviewState,
           accountingState: current.accountingState,
           transactionId: current.id,
-          nextSkip: next ? `/cuentas?cuenta=${selected.id}&paso=conciliar&actual=${next.id}` : null,
+          nextSkip: next ? keep(`/cuentas?cuenta=${selected.id}&paso=conciliar&actual=${next.id}${params.lote ? `&lote=${params.lote}` : ""}`) : null,
         }}
       />
+    );
+    if (!chat) return step;
+    return (
+      <div className="flex items-start gap-4">
+        <ChatRail flujo={params.flujo || "lote"} />
+        <div className="min-w-0 flex-1">{step}</div>
+      </div>
     );
   }
   redirect("/movimientos");

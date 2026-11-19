@@ -19,7 +19,26 @@ const PROMPTS = [
 
 type Bubble = { id: string; role: "user" | "assistant"; body: string };
 
-export function HomeChat({ name, briefing, starts }: { name: string; briefing: Briefing; starts: HomeStart[] }) {
+const LANDED: Record<string, string> = {
+  factura: "Te dejé en Bancos, en el movimiento de esa factura.",
+  lote: "Te dejé en Bancos para seguir el lote.",
+  duplicado: "Te dejé en Bancos para revisar los duplicados.",
+  faltantes: "Te dejé en Bancos con los comprobantes que faltaban.",
+};
+
+export function HomeChat({
+  name,
+  briefing,
+  starts,
+  dock = false,
+  landed = null,
+}: {
+  name: string;
+  briefing: Briefing;
+  starts: HomeStart[];
+  dock?: boolean;
+  landed?: string | null;
+}) {
   const [messages, setMessages] = useState<Bubble[]>([]);
   const [text, setText] = useState("");
   const [flow, setFlow] = useState<"factura" | "lote" | "duplicado" | "faltantes" | null>(null);
@@ -59,8 +78,18 @@ export function HomeChat({ name, briefing, starts }: { name: string; briefing: B
 
   const talking = flow || messages.length > 0;
 
+  const landedLine = dock && landed && !flow && messages.length === 0 ? LANDED[landed] : null;
+
   return (
-    <section data-testid="home-chat" className="flex h-[calc(100vh-7.5rem)] flex-col">
+    <section data-testid="home-chat" className={dock ? "flex h-full min-h-0 flex-col" : "flex h-[calc(100vh-7.5rem)] flex-col"}>
+      {dock ? (
+        <div className="mb-3 flex flex-wrap gap-1.5" data-testid="flow-shortcuts">
+          <FlowChip label="Conciliar una factura" testId="flow-factura" onClick={() => { setMessages([]); setFlow("factura"); }} />
+          <FlowChip label="Conciliar un lote" testId="flow-lote" onClick={() => { setMessages([]); setFlow("lote"); }} />
+          <FlowChip label="Revisar duplicados" testId="flow-duplicado" onClick={() => { setMessages([]); setFlow("duplicado"); }} />
+          <FlowChip label="Pedir comprobantes" testId="flow-faltantes" onClick={() => { setMessages([]); setFlow("faltantes"); }} />
+        </div>
+      ) : null}
       {talking ? (
         <div className="mb-2 flex justify-end">
           <button type="button" onClick={reset} className="text-xs text-slate-500 hover:text-slate-800">
@@ -89,6 +118,10 @@ export function HomeChat({ name, briefing, starts }: { name: string; briefing: B
           <div className="mx-auto w-full max-w-2xl flex-1">
             <h1 className="sr-only">Pedir comprobantes</h1>
             <MissingFlow />
+          </div>
+        ) : landedLine ? (
+          <div className="mx-auto w-full max-w-2xl flex-1">
+            <p className="text-[15px] leading-7 text-slate-800">{landedLine}</p>
           </div>
         ) : talking ? (
           <div className="mx-auto w-full max-w-2xl flex-1 space-y-6">
@@ -175,12 +208,20 @@ export function HomeChat({ name, briefing, starts }: { name: string; briefing: B
         )}
       </div>
 
-      {talking ? (
+      {talking || dock ? (
         <div className="mx-auto mt-4 w-full max-w-2xl">
           <Composer text={text} setText={setText} onSubmit={() => ask(text)} />
         </div>
       ) : null}
     </section>
+  );
+}
+
+function FlowChip({ label, testId, onClick }: { label: string; testId: string; onClick: () => void }) {
+  return (
+    <button type="button" data-testid={testId} onClick={onClick} className="rounded-full bg-slate-50 px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-100">
+      {label}
+    </button>
   );
 }
 
