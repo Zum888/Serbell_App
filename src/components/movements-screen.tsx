@@ -1,9 +1,11 @@
+import { LayoutGrid, Plus } from "lucide-react";
 import Link from "next/link";
 import { CategoryForm, pairsToGroups } from "@/components/category-form";
 import { DuplicatePanel } from "@/components/duplicate-panel";
 import { MissingPanel } from "@/components/missing-panel";
 import { MovementsTable } from "@/components/movements-table";
 import { ReceiptPanel } from "@/components/receipt-panel";
+import { accountInitials } from "@/lib/accounts";
 import { DUPLICATE_IDS } from "@/lib/duplicates";
 import { MISSING_IDS } from "@/lib/missing-receipts";
 import { ACCOUNTING_LABEL, RECONCILIATION_LABEL } from "@/lib/labels";
@@ -108,6 +110,10 @@ export function MovementsScreen({
   duplicate = false,
   decision,
   missing = false,
+  accounts = [],
+  accountId,
+  found = [],
+  notice,
 }: {
   companyName: string;
   companyId: string;
@@ -124,6 +130,10 @@ export function MovementsScreen({
   duplicate?: boolean;
   decision?: string;
   missing?: boolean;
+  accounts?: { id: string; institution: string; mask: string; availableBalanceCents: number }[];
+  accountId?: string;
+  found?: string[];
+  notice?: "factura" | "lote";
 }) {
   const countFor: Record<string, number> = {
     todos: counts.todos,
@@ -134,7 +144,18 @@ export function MovementsScreen({
     aprobados: counts.aprobados,
   };
   const side = receipt || detail;
-  const spotlight = duplicate ? (DUPLICATE_IDS as readonly string[]) : missing ? MISSING_IDS : [];
+  const spotlight = duplicate ? (DUPLICATE_IDS as readonly string[]) : missing ? MISSING_IDS : found;
+  const selectedAccount = accounts.find((account) => account.id === accountId) ?? null;
+  function listHref(overrides: { filtro?: string; cuenta?: string | null } = {}) {
+    const params = new URLSearchParams();
+    const filtro = overrides.filtro ?? filter;
+    const cuenta = overrides.cuenta === undefined ? accountId : overrides.cuenta;
+    if (filtro) params.set("filtro", filtro);
+    if (q) params.set("q", q);
+    if (cuenta) params.set("cuenta", cuenta);
+    const text = params.toString();
+    return text ? `/movimientos?${text}` : "/movimientos";
+  }
   const ordered = spotlight.length
     ? [...rows.filter((row) => spotlight.includes(row.id)), ...rows.filter((row) => !spotlight.includes(row.id))]
     : rows;
@@ -147,10 +168,40 @@ export function MovementsScreen({
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h1 className="text-2xl font-semibold">Movimientos</h1>
-              <p className="text-sm text-slate-500">{periodOf(rows) || balanceLabel}</p>
+              <p className="text-sm text-slate-500">{selectedAccount ? `${selectedAccount.institution} ····${selectedAccount.mask}` : periodOf(rows) || "Todos los bancos, por fecha"}</p>
             </div>
-            <p className="text-sm text-slate-500">{balanceLabel}</p>
+            <div className="text-right">
+              <p className="text-sm text-slate-500">{balanceLabel}</p>
+              {selectedAccount && rows.some((row) => row.reconciliationState !== "Reconciled") ? (
+                <Link href={`/cuentas?cuenta=${selectedAccount.id}&paso=conciliar`} className="text-sm font-medium text-primary">Conciliar con el banco</Link>
+              ) : null}
+            </div>
           </div>
+          <nav aria-label="Cambiar de cuenta" data-testid="account-switcher" className="mt-3 flex gap-2 overflow-x-auto pb-1">
+            <Link href={listHref({ cuenta: null })} aria-current={selectedAccount ? undefined : "page"} className={`flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2 text-sm ${selectedAccount ? "border-border bg-white text-slate-600 hover:border-slate-300" : "border-slate-900 bg-slate-900 text-white"}`}>
+              <LayoutGrid className="size-4" /> Todas
+            </Link>
+            {accounts.map((account) => {
+              const active = account.id === accountId;
+              return (
+                <Link
+                  key={account.id}
+                  href={listHref({ cuenta: account.id })}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-left transition ${active ? "border-slate-900 bg-slate-900 text-white" : "border-border bg-white hover:border-slate-300"}`}
+                >
+                  <span className={`flex size-7 items-center justify-center rounded-full text-[11px] font-semibold ${active ? "bg-white/15" : "bg-slate-100 text-slate-700"}`}>{accountInitials(account.institution)}</span>
+                  <span>
+                    <span className="block text-sm font-medium leading-tight">{account.institution}</span>
+                    <span className={`block text-[11px] tabular-nums leading-tight ${active ? "text-white/70" : "text-slate-500"}`}>{formatUsd(account.availableBalanceCents)}</span>
+                  </span>
+                </Link>
+              );
+            })}
+            <Link href="/cuentas/conectar" data-testid="add-account" className="flex shrink-0 items-center gap-1.5 rounded-xl border border-dashed border-border px-3 py-2 text-sm text-slate-600 hover:border-slate-300">
+              <Plus className="size-4" /> Agregar
+            </Link>
+          </nav>
           <div className="mt-3 flex gap-2">
             <Link href="/movimientos?vista=enfoque" className="rounded-full border border-border px-3 py-1.5 text-xs text-slate-600">Modo enfoque</Link>
             <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-800">Vista detallada</span>
@@ -160,7 +211,7 @@ export function MovementsScreen({
           {filters.map(([key, label]) => (
             <Link
               key={key}
-              href={`/movimientos?filtro=${key}`}
+              href={listHref({ filtro: key })}
               className={filter === key ? "rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-900" : "rounded-lg px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"}
             >
               {label}
@@ -170,8 +221,11 @@ export function MovementsScreen({
         </div>
         <form className="px-4 pb-3" action="/movimientos">
           <input type="hidden" name="filtro" value={filter} />
+          {accountId ? <input type="hidden" name="cuenta" value={accountId} /> : null}
           <Input name="q" defaultValue={q} placeholder="Buscar movimiento..." />
         </form>
+        {notice === "factura" ? <p data-testid="invoice-reconciled" className="px-4 pb-3 text-sm text-emerald-800">La factura quedó conciliada con el movimiento del banco.</p> : null}
+        {notice === "lote" ? <p data-testid="batch-reconciled" className="px-4 pb-3 text-sm text-emerald-800">El lote quedó conciliado con los movimientos del banco.</p> : null}
         {duplicate ? <DuplicatePanel decision={decision} /> : null}
         {missing ? <MissingPanel ready={ready} /> : null}
         {error && !detail && !receipt ? <div className="px-4 pb-3"><StateView variant="error" title={error} testId="server-error" /></div> : null}
@@ -180,10 +234,10 @@ export function MovementsScreen({
             <StateView variant="empty" title="No hay movimientos con este filtro." />
           </div>
         ) : (
-          <MovementsTable rows={ordered} categories={categories} canReview={canReview} filter={filter} q={q} companyId={companyId} marked={[...spotlight]} />
+          <MovementsTable rows={ordered} categories={categories} canReview={canReview} filter={filter} q={q} companyId={companyId} accountId={accountId} showBank={!selectedAccount} marked={[...spotlight]} />
         )}
       </section>
-      {receipt ? <ReceiptPanel receipt={receipt} filter={filter} q={q} error={error} /> : detail ? <Drawer detail={detail} error={error} filter={filter} q={q} /> : null}
+      {receipt ? <ReceiptPanel receipt={receipt} filter={filter} q={q} error={error} /> : detail ? <Drawer detail={detail} error={error} filter={filter} q={q} accountId={accountId} /> : null}
     </div>
   );
 }
@@ -197,7 +251,16 @@ function periodOf(rows: { postedOn: string }[]) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-function Drawer({ detail, error, filter, q }: { detail: Detail; error?: string; filter: string; q: string }) {
+function stay(filter: string, q: string, accountId: string | undefined, extra = "") {
+  const params = new URLSearchParams();
+  if (filter) params.set("filtro", filter);
+  if (q) params.set("q", q);
+  if (accountId) params.set("cuenta", accountId);
+  const text = params.toString();
+  return `/movimientos${text ? `?${text}` : ""}${extra ? `${text ? "&" : "?"}${extra}` : ""}`;
+}
+
+function Drawer({ detail, error, filter, q, accountId }: { detail: Detail; error?: string; filter: string; q: string; accountId?: string }) {
   return (
     <aside data-testid="drawer" className="rounded-2xl border border-border bg-white p-4">
       <div className="flex items-start justify-between gap-3">
@@ -206,7 +269,7 @@ function Drawer({ detail, error, filter, q }: { detail: Detail; error?: string; 
           <h2 className="text-lg font-semibold">{detail.merchant}</h2>
           <p className="text-sm">{formatUsd(detail.amountCents)}</p>
         </div>
-        <Link href={`/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}`} className="text-sm text-slate-500">Cerrar</Link>
+        <Link href={stay(filter, q, accountId)} className="text-sm text-slate-500">Cerrar</Link>
       </div>
       <p data-testid="drawer-classification" className="mt-3 text-sm text-slate-700">{detail.categoryLabel || "Sin categoría"}</p>
       <CategoryForm
@@ -215,7 +278,7 @@ function Drawer({ detail, error, filter, q }: { detail: Detail; error?: string; 
         categories={pairsToGroups(detail.pairs)}
         canReview={detail.canReview}
         sealed={detail.sealed}
-        next={`/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}&movimiento=${detail.id}`}
+        next={stay(filter, q, accountId, `movimiento=${detail.id}`)}
         testId="save-classification"
       />
       {error ? <div className="mt-3"><StateView variant="error" title={error} testId="server-error" /></div> : null}
@@ -247,7 +310,7 @@ function Drawer({ detail, error, filter, q }: { detail: Detail; error?: string; 
           <p className="mt-1 text-slate-500">Faltante. No hay un comprobante vinculado.</p>
         )}
       </section>
-      <JournalBlock detail={detail} filter={filter} q={q} />
+      <JournalBlock detail={detail} filter={filter} q={q} accountId={accountId} />
       <section data-testid="drawer-conversation" className="mt-4">
         <h3 className="text-sm font-medium">Conversación</h3>
         {detail.messages.length === 0 ? <p className="mt-1 text-sm text-slate-500">Todavía no hay mensajes sobre este movimiento.</p> : (
@@ -279,7 +342,7 @@ function Drawer({ detail, error, filter, q }: { detail: Detail; error?: string; 
       <div className="mt-4 flex flex-wrap gap-2">
         {detail.reconciliationState === "Reconciled" ? null : (
           <form action={`/api/transactions/${detail.id}/reconcile`} method="post" className="mt-4">
-            <input type="hidden" name="next" value={`/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}&movimiento=${detail.id}`} />
+            <input type="hidden" name="next" value={stay(filter, q, accountId, `movimiento=${detail.id}`)} />
             <Button type="submit" variant="outline" data-testid={`reconcile-${detail.id}`}>Conciliar</Button>
           </form>
         )}
@@ -306,7 +369,7 @@ function Drawer({ detail, error, filter, q }: { detail: Detail; error?: string; 
   );
 }
 
-function JournalBlock({ detail, filter, q }: { detail: Detail; filter: string; q: string }) {
+function JournalBlock({ detail, filter, q, accountId }: { detail: Detail; filter: string; q: string; accountId?: string }) {
   const debit = detail.journal?.lines.reduce((sum, line) => sum + line.debitCents, 0) ?? 0;
   const credit = detail.journal?.lines.reduce((sum, line) => sum + line.creditCents, 0) ?? 0;
   return (
@@ -346,7 +409,7 @@ function JournalBlock({ detail, filter, q }: { detail: Detail; filter: string; q
       ) : null}
       {detail.canReview && !detail.sealed ? (
         <form action={`/api/transactions/${detail.id}/asiento`} method="post" className="mt-3 space-y-2">
-          <input type="hidden" name="next" value={`/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}&movimiento=${detail.id}`} />
+          <input type="hidden" name="next" value={stay(filter, q, accountId, `movimiento=${detail.id}`)} />
           <label className="block text-xs text-slate-500">
             Categoría y subcategoría
             <select name="subcategoryId" defaultValue={detail.subcategoryId} required className="mt-1 h-10 w-full rounded-xl border border-border bg-white px-3 text-sm">

@@ -712,7 +712,7 @@ export async function nextBankStep(db: Db, actor: Actor, transactionId: string) 
     select: { id: true },
   });
   const next = open.find((row) => row.id !== transactionId) ?? open[0] ?? null;
-  if (!next || next.id === transactionId) return `/cuentas?cuenta=${transaction.accountId}`;
+  if (!next || next.id === transactionId) return `/movimientos?cuenta=${transaction.accountId}`;
   return `/cuentas?cuenta=${transaction.accountId}&paso=conciliar&actual=${next.id}`;
 }
 

@@ -111,7 +111,7 @@ export function PlaidLinkDemo({ companyName }: { companyName: string }) {
             <span className="grid size-5 place-items-center rounded bg-slate-900 text-[9px] font-bold text-white">P</span>
             PLAID <span className="font-normal text-amber-700">· demostración</span>
           </p>
-          <Link href="/cuentas" aria-label="Cerrar" className="rounded-md p-1 hover:bg-slate-100"><X className="size-4" /></Link>
+          <Link href="/movimientos" aria-label="Cerrar" className="rounded-md p-1 hover:bg-slate-100"><X className="size-4" /></Link>
         </div>
 
         {step === "intro" ? (
@@ -246,7 +246,7 @@ export function PlaidLinkDemo({ companyName }: { companyName: string }) {
               {created.length === 1 ? "Se agregó 1 cuenta" : `Se agregaron ${created.length} cuentas`} de demostración. Aún no trae movimientos.
             </p>
             <div className="mt-5 grid gap-2">
-              <Link href={`/cuentas?cuenta=${created[0]}`} className="flex items-center justify-center gap-1 rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white">
+              <Link href={`/movimientos?cuenta=${created[0]}`} className="flex items-center justify-center gap-1 rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white">
                 Ver la cuenta <ChevronRight className="size-4" />
               </Link>
               <button type="button" onClick={() => { setBank(null); setQuery(""); setStep("banks"); }} className="rounded-xl border border-border py-3 text-sm font-medium">

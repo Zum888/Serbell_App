@@ -101,7 +101,7 @@ export function AccountsBoard({
             return (
               <Link
                 key={card.id}
-                href={`/cuentas?cuenta=${card.id}`}
+                href={`/movimientos?cuenta=${card.id}`}
                 data-testid={`account-${card.id}`}
                 className="rounded-2xl border border-border bg-white p-4 transition hover:border-blue-300"
               >
@@ -128,7 +128,7 @@ export function AccountsBoard({
         <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-white">
           {cards.map((card) => (
             <li key={card.id}>
-              <Link href={`/cuentas?cuenta=${card.id}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
+              <Link href={`/movimientos?cuenta=${card.id}`} className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50">
                 <span>
                   <span className="block text-sm font-medium">{card.institution} ···· {card.mask}</span>
                   <span className="block text-xs text-slate-500">{originLabel(card)}</span>

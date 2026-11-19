@@ -40,6 +40,8 @@ export function MovementsTable({
   filter,
   q,
   companyId,
+  accountId,
+  showBank = false,
   marked = [],
 }: {
   rows: Row[];
@@ -48,6 +50,8 @@ export function MovementsTable({
   filter: string;
   q: string;
   companyId: string;
+  accountId?: string;
+  showBank?: boolean;
   marked?: string[];
 }) {
   const [done, setDone] = useState<Record<string, true>>({});
@@ -60,7 +64,11 @@ export function MovementsTable({
   const [suggestions, setSuggestions] = useState<Record<string, boolean>>({});
   const [closing, setClosing] = useState(false);
   const router = useRouter();
-  const next = `/movimientos?filtro=${filter}&q=${encodeURIComponent(q)}`;
+  const nextParams = new URLSearchParams();
+  nextParams.set("filtro", filter);
+  if (q) nextParams.set("q", q);
+  if (accountId) nextParams.set("cuenta", accountId);
+  const next = `/movimientos?${nextParams}`;
   const markedKey = marked.join(",");
 
   useEffect(() => {
@@ -124,6 +132,7 @@ export function MovementsTable({
     const params = new URLSearchParams();
     if (filter && filter !== "todos") params.set("filtro", filter);
     if (q) params.set("q", q);
+    if (accountId) params.set("cuenta", accountId);
     params.set("fila", row.id);
     if (row.documentId) params.set("recibo", row.documentId);
     return `/movimientos?${params}`;
@@ -195,7 +204,8 @@ export function MovementsTable({
               </th>
               <th className="w-16 px-3 py-2 font-medium">Fecha</th>
               <th className="px-3 py-2 font-medium">Movimiento</th>
-              <th className="w-[220px] px-3 py-2 font-medium">Categoría</th>
+              {showBank ? <th className="w-36 px-2 py-2 font-medium">Banco</th> : null}
+              <th className={`${showBank ? "w-[180px]" : "w-[220px]"} px-3 py-2 font-medium`}>Categoría</th>
               <th className="w-10 px-2 py-2 font-medium"><span className="sr-only">Comentario</span></th>
               <th className="w-24 px-2 py-2 text-right font-medium">Ingresos USD</th>
               <th className="w-24 px-2 py-2 text-right font-medium">Gastos USD</th>
@@ -253,7 +263,13 @@ export function MovementsTable({
                     <Link href={detailHref(row)} className="font-medium text-slate-900 hover:underline">{row.merchant}</Link>
                     <p className="text-xs text-slate-500">{row.description}</p>
                   </td>
-                  <td className="w-[220px] px-3 py-2.5">
+                  {showBank ? (
+                    <td className="px-2 py-2.5 text-slate-600">
+                      <span className="block truncate">{row.institution}</span>
+                      <span className="text-xs text-slate-400">····{row.mask}</span>
+                    </td>
+                  ) : null}
+                  <td className={`${showBank ? "w-[180px]" : "w-[220px]"} px-3 py-2.5`}>
                     <div className="flex items-center gap-1.5">
                       <p data-testid={`category-label-${row.id}`} className="sr-only">{label}</p>
                       <ClassifyInline
