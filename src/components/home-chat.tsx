@@ -46,7 +46,7 @@ export function HomeChat({
   const pin = useChatPin();
 
   function openFlow(next: "factura" | "lote" | "duplicado" | "faltantes") {
-    pin();
+    pin(next);
     setMessages([]);
     setFlow(next);
     setText("");

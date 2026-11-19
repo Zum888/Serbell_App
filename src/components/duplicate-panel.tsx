@@ -21,7 +21,7 @@ export function DuplicatePanel({ decision }: { decision?: string }) {
           {DUPLICATE_CHOICES.map((choice) => (
             <Link
               key={choice.id}
-              href={`/movimientos?duplicado=sunpass&decision=${choice.id}`}
+              href={`/movimientos?duplicado=sunpass&decision=${choice.id}&con=chat&flujo=duplicado`}
               data-testid={`duplicate-${choice.id}`}
               className="rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-800 shadow-sm hover:text-slate-950"
             >

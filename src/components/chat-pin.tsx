@@ -2,9 +2,9 @@
 
 import { createContext, useContext } from "react";
 
-const PinContext = createContext<() => void>(() => {});
+const PinContext = createContext<(flujo?: string) => void>(() => {});
 
-export function ChatPinProvider({ pin, children }: { pin: () => void; children: React.ReactNode }) {
+export function ChatPinProvider({ pin, children }: { pin: (flujo?: string) => void; children: React.ReactNode }) {
   return <PinContext.Provider value={pin}>{children}</PinContext.Provider>;
 }
 
