@@ -6,15 +6,27 @@ import { redirectError, redirectTo, wantsJson } from "@/server/http";
 import { requireActor } from "@/server/session";
 
 export async function POST(request: Request) {
-  const form = await request.formData();
-  const parentId = String(form.get("parentId") ?? "");
   const json = wantsJson(request);
+  let companyId = "";
+  let parentId = "";
+  let name = "";
+  if (json) {
+    const body = (await request.json()) as { companyId?: string; parentId?: string; name?: string };
+    companyId = String(body.companyId ?? "");
+    parentId = String(body.parentId ?? "");
+    name = String(body.name ?? "");
+  } else {
+    const form = await request.formData();
+    companyId = String(form.get("companyId") ?? "");
+    parentId = String(form.get("parentId") ?? "");
+    name = String(form.get("name") ?? "");
+  }
   try {
     const { actor } = await requireActor();
     const created = await addCategory((await db()), actor, {
-      companyId: String(form.get("companyId") ?? ""),
+      companyId,
       parentId: parentId || null,
-      name: String(form.get("name") ?? ""),
+      name,
     });
     if (json) return NextResponse.json(created);
     return redirectTo(request, "/categorias");

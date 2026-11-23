@@ -79,7 +79,14 @@ export function ReportScreen({
   ];
   const mix = categorySlices(report.categories);
   const period = report.firstDay && report.lastDay ? `${formatDay(report.firstDay)} – ${formatDay(report.lastDay)}` : monthName(monthKey);
-  const uncategorized = report.uncategorizedExpenseCents > 0;
+  const incomeLines = report.incomeCategories.filter((row) => row.category !== "Sin categoría");
+  const expenseLines = report.categories.filter((row) => row.category !== "Sin categoría");
+  const classifiedIncome = incomeLines.reduce((sum, row) => sum + row.totalCents, 0);
+  const classifiedExpense = expenseLines.reduce((sum, row) => sum + row.totalCents, 0);
+  const classifiedNet = classifiedIncome - classifiedExpense;
+  const asideIncome = report.uncategorizedIncomeCents;
+  const asideExpense = report.uncategorizedExpenseCents;
+  const uncategorized = asideExpense > 0 || asideIncome > 0;
 
   return (
     <div className="space-y-4">
@@ -154,27 +161,50 @@ export function ReportScreen({
                   </tr>
                 </thead>
                 <tbody>
-                  <StatementRow label="Ingresos" current={report.inflows} previous={previous?.inflows ?? null} kind="income" />
-                  {mix.slices.filter((slice) => slice.label !== "Otros" || slice.cents > 0).map((slice) => (
+                  <tr>
+                    <td className="px-5 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-400" colSpan={4}>Ingresos</td>
+                  </tr>
+                  {incomeLines.map((line) => (
                     <StatementRow
-                      key={slice.label}
-                      label={`– ${slice.label}`}
-                      current={slice.cents}
-                      previous={previous?.categories.find((row) => row.category === slice.label)?.totalCents ?? null}
+                      key={`in-${line.category}`}
+                      label={line.category}
+                      current={line.totalCents}
+                      previous={null}
+                      kind="income"
+                      muted
+                    />
+                  ))}
+                  <StatementRow label="Total de ingresos" current={classifiedIncome} previous={asideIncome > 0 ? null : (previous?.inflows ?? null)} kind="income" />
+                  <tr>
+                    <td className="px-5 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-400" colSpan={4}>Gastos</td>
+                  </tr>
+                  {expenseLines.map((line) => (
+                    <StatementRow
+                      key={`out-${line.category}`}
+                      label={`– ${line.category}`}
+                      current={line.totalCents}
+                      previous={previous?.categories.find((row) => row.category === line.category)?.totalCents ?? null}
                       kind="expense"
                       muted
                     />
                   ))}
-                  <StatementRow label="Utilidad neta" current={report.net} previous={previous?.net ?? null} kind="net" emphasis />
+                  <StatementRow label="Total de gastos" current={classifiedExpense} previous={asideExpense > 0 ? null : (previous?.outflows ?? null)} kind="expense" />
+                  <StatementRow label="Utilidad de lo clasificado" current={classifiedNet} previous={uncategorized ? null : (previous?.net ?? null)} kind="net" emphasis />
                 </tbody>
               </table>
+              {asideIncome > 0 || asideExpense > 0 ? (
+                <p className="px-5 py-4 text-sm leading-6 text-slate-600" data-testid="report-uncategorized">
+                  Fuera de este estado, porque todavía no tienen categoría:{" "}
+                  {[asideIncome > 0 ? `${formatUsd(asideIncome)} de ingresos` : null, asideExpense > 0 ? `${formatUsd(asideExpense)} de gastos` : null].filter(Boolean).join(" y ")}.
+                  No entran en la utilidad de arriba.
+                </p>
+              ) : null}
             </article>
             <article className="rounded-2xl border border-violet-100 bg-violet-50/60 p-5">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-violet-950">
                 <Sparkles className="size-4 text-violet-600" /> Conclusión del mes
               </h2>
               <p className="mt-3 text-sm leading-6 text-slate-700">{headline(current, previous)} {subline(current, previous)}</p>
-              {uncategorized ? <p className="mt-2 text-sm leading-6 text-slate-600">{formatUsd(report.uncategorizedExpenseCents)} de gasto sigue sin categoría.</p> : null}
               <div className="mt-4 flex flex-wrap gap-3 text-xs font-medium">
                 <button type="button" onClick={() => setDetail((open) => !open)} className="text-violet-700">
                   {detail ? "Ocultar análisis" : "Ver análisis completo →"}

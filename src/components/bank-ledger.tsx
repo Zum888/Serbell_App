@@ -77,6 +77,7 @@ export function BankLedger({
   error,
   withChat = false,
   flujo,
+  priorMonth = null,
 }: {
   companyName: string;
   companyId: string;
@@ -95,6 +96,7 @@ export function BankLedger({
   error?: string;
   withChat?: boolean;
   flujo?: string;
+  priorMonth?: { inflows: number; outflows: number } | null;
 }) {
   const [accountId, setAccountId] = useState(initialAccountId ?? "");
   const [filter, setFilter] = useState(initialFilter || "todos");
@@ -122,8 +124,9 @@ export function BankLedger({
   const allAvailable = accounts.reduce((sum, account) => sum + account.availableBalanceCents, 0);
   const availableCents = selected ? selected.availableBalanceCents : allAvailable;
   const lines = seriesFor(periodRows, start, end, availableCents);
-  const inflowDelta = deltaLabel(counts.inflows, sumSigned(ofAccount, start, end, "in", span));
-  const outflowDelta = deltaLabel(counts.outflows, sumSigned(ofAccount, start, end, "out", span));
+  const monthNote = span === "30" ? monthWord(start) : null;
+  const inflowDelta = span === "30" ? versusMonth(counts.inflows, priorMonth?.inflows) ?? monthNote : null;
+  const outflowDelta = span === "30" ? versusMonth(counts.outflows, priorMonth?.outflows) ?? monthNote : null;
   const focusHref = `/movimientos?${new URLSearchParams({ vista: "enfoque", ...(withChat ? { con: "chat", ...(flujo ? { flujo } : {}) } : {}) }).toString()}`;
   const countFor: Record<string, number> = {
     todos: counts.todos,
@@ -489,32 +492,16 @@ function seriesFor(rows: Row[], start: string, end: string, availableCents: numb
   };
 }
 
-function sumSigned(rows: Row[], start: string, end: string, kind: "in" | "out", span: Span) {
-  const length = eachDay(start, end).length || 1;
-  const previousWindow = span === "30" ? monthBounds(addDays(start, -1)) : { start: addDays(addDays(start, -1), -(length - 1)), end: addDays(start, -1) };
-  let previous = 0;
-  let early = 0;
-  let late = 0;
-  const mid = addDays(start, Math.floor(length / 2));
-  for (const row of rows) {
-    const amount = kind === "in" ? (row.amountCents > 0 ? row.amountCents : 0) : row.amountCents < 0 ? Math.abs(row.amountCents) : 0;
-    if (!amount) continue;
-    if (row.postedOn >= previousWindow.start && row.postedOn <= previousWindow.end) previous += amount;
-    else if (row.postedOn >= start && row.postedOn < mid) early += amount;
-    else if (row.postedOn >= mid && row.postedOn <= end) late += amount;
-  }
-  if (previous > 0) return { currentBase: previous, label: span === "30" ? "vs. mes anterior" : "vs. periodo anterior" };
-  if (early > 0) return { currentBase: early, compare: late, label: "vs. la primera mitad" };
-  return null;
+function versusMonth(current: number, prior: number | null | undefined) {
+  if (prior === null || prior === undefined || prior <= 0) return null;
+  const pct = Math.round(((current - prior) / prior) * 100);
+  if (!Number.isFinite(pct) || pct === 0) return null;
+  return `${pct > 0 ? "+" : ""}${pct}% vs. mes anterior`;
 }
 
-function deltaLabel(current: number, prior: { currentBase: number; compare?: number; label: string } | null) {
-  if (!prior || prior.currentBase <= 0) return null;
-  const next = prior.compare ?? current;
-  const pct = Math.round(((next - prior.currentBase) / prior.currentBase) * 100);
-  if (!Number.isFinite(pct) || pct === 0) return null;
-  const sign = pct > 0 ? "+" : "";
-  return `${sign}${pct}% ${prior.label}`;
+function monthWord(iso: string) {
+  const name = new Intl.DateTimeFormat("es-MX", { month: "long", timeZone: "UTC" }).format(new Date(`${iso.slice(0, 7)}-01T12:00:00.000Z`));
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 function latestDay(rows: Row[]) {

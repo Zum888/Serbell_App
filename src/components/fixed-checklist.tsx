@@ -2,11 +2,11 @@
 
 import { Check, Landmark, Plus, Tag, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatDay } from "@/lib/dates";
 import type { FixedStatus } from "@/lib/fixed";
 import { formatUsd } from "@/lib/money";
-import type { FixedRowView } from "@/server/planning";
+import type { FixedProposal, FixedRowView } from "@/server/planning";
 
 type Option = { id: string; label: string };
 
@@ -32,17 +32,22 @@ export function FixedChecklist({
   monthLabel,
   referenceDay,
   rows: initialRows,
+  proposals = [],
   accounts,
   categories,
 }: {
   monthLabel: string;
   referenceDay: number;
   rows: FixedRowView[];
+  proposals?: FixedProposal[];
   accounts: Option[];
   categories: Option[];
 }) {
   const router = useRouter();
   const [rows, setRows] = useState(initialRows);
+  useEffect(() => {
+    setRows(initialRows);
+  }, [initialRows]);
   const [filter, setFilter] = useState("todos");
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -92,13 +97,13 @@ export function FixedChecklist({
   const percent = summary.total === 0 ? 0 : Math.round((summary.paid / summary.total) * 100);
 
   return (
-    <section className="rounded-2xl border border-border bg-white" data-testid="fixed-checklist">
+    <section id="gastos-fijos" className="rounded-2xl border border-border bg-white" data-testid="fixed-checklist">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border p-4">
         <div>
           <p className="text-xs uppercase tracking-wide text-slate-400">Gastos fijos · {monthLabel}</p>
           <h2 className="mt-1 text-lg font-semibold tracking-tight">Lo que pagas cada mes</h2>
           <p className="text-sm text-slate-500">
-            {summary.paidCount} de {rows.length} pagados. Se marcan solos cuando el pago aparece en el banco.
+            {summary.paidCount} de {rows.length} pagados. Si salió del banco se marca solo. El efectivo se queda aquí y no se vuelve un movimiento.
           </p>
         </div>
         <button
@@ -123,6 +128,17 @@ export function FixedChecklist({
         </div>
         <p className="mt-1 text-xs text-slate-500">{percent}% del mes cubierto</p>
       </div>
+
+      {proposals.filter((proposal) => !rows.some((row) => row.vendor.toLowerCase() === proposal.merchant.toLowerCase() || row.name.toLowerCase() === proposal.merchant.toLowerCase())).length > 0 ? (
+        <div className="mx-4 mt-3 space-y-2" data-testid="fixed-proposals">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Serbell vio cargos que se repiten</p>
+          {proposals
+            .filter((proposal) => !rows.some((row) => row.vendor.toLowerCase() === proposal.merchant.toLowerCase() || row.name.toLowerCase() === proposal.merchant.toLowerCase()))
+            .map((proposal) => (
+              <Proposal key={proposal.merchant} proposal={proposal} onDone={() => router.refresh()} />
+            ))}
+        </div>
+      ) : null}
 
       {adding ? (
         <AddFixed
@@ -159,8 +175,8 @@ export function FixedChecklist({
                 type="button"
                 onClick={() => void toggle(row)}
                 disabled={row.source === "banco"}
-                aria-label={paid ? `Desmarcar ${row.name}` : `Marcar ${row.name} como pagado`}
-                title={row.source === "banco" ? "Detectado en el banco" : paid ? "Desmarcar" : "Marcar como pagado"}
+                aria-label={row.source === "banco" ? `${row.name} salió del banco` : paid ? `Desmarcar ${row.name}` : `Lo pagué en efectivo: ${row.name}`}
+                title={row.source === "banco" ? "Salió del banco" : paid ? "Desmarcar" : "Lo pagué en efectivo"}
                 className={`grid size-6 shrink-0 place-items-center rounded-full border transition ${
                   paid ? "border-emerald-500 bg-emerald-500 text-white" : row.status === "vencido" ? "border-rose-300 bg-white" : "border-slate-300 bg-white hover:border-slate-400"
                 } disabled:cursor-default`}
@@ -186,9 +202,9 @@ export function FixedChecklist({
                 </span>
                 <p className="mt-0.5 text-[11px] text-slate-500">
                   {row.source === "banco" && row.movement
-                    ? `Detectado en el banco · ${formatDay(row.movement.day)}`
+                    ? `Salió del banco · ${formatDay(row.movement.day)}`
                     : row.source === "manual"
-                      ? "Marcado a mano"
+                      ? "Lo pagué en efectivo"
                       : row.status === "vencido"
                         ? `Venció el día ${row.dueDay}`
                         : `Vence el día ${row.dueDay}`}
@@ -199,6 +215,56 @@ export function FixedChecklist({
         })}
       </ul>
     </section>
+  );
+}
+
+function Proposal({ proposal, onDone }: { proposal: FixedProposal; onDone: () => void }) {
+  const [amount, setAmount] = useState((proposal.amountCents / 100).toFixed(2));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function confirm() {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/fixed-expenses", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: proposal.merchant,
+          vendor: proposal.merchant,
+          amount,
+          dueDay: String(proposal.dueDay),
+          accountId: "",
+          subcategoryId: "",
+        }),
+      });
+      const body = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(body.error || "No se pudo agregar.");
+      onDone();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo agregar.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#e6e1d8] bg-[#f7f6f4] px-3 py-2">
+      <p className="min-w-[180px] flex-1 text-sm text-stone-800">
+        {proposal.merchant} apareció {proposal.count} veces. ¿Lo dejas como gasto fijo?
+      </p>
+      <input
+        value={amount}
+        onChange={(event) => setAmount(event.target.value)}
+        aria-label={`Monto de ${proposal.merchant}`}
+        className="h-8 w-28 rounded-lg border border-[#e6e1d8] bg-white px-2 text-sm"
+      />
+      <button type="button" disabled={busy} onClick={() => void confirm()} className="rounded-lg bg-stone-900 px-3 py-1.5 text-sm font-medium text-[#f7f6f4] disabled:opacity-50">
+        {busy ? "Guardando…" : "Confirmar"}
+      </button>
+      {error ? <p className="text-sm text-rose-700">{error}</p> : null}
+    </div>
   );
 }
 

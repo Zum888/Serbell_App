@@ -26,6 +26,8 @@ const items = [
   { href: "/configuracion", label: "Configuración", icon: Settings, testId: "nav-configuracion" },
 ];
 
+const DOCK = ["/movimientos", "/cuentas", "/por-cobrar", "/por-pagar", "/reportes", "/categorias"];
+
 export function SideNav({ firm }: { firm: boolean }) {
   const pathname = usePathname();
   return (
@@ -39,6 +41,12 @@ export function SideNav({ firm }: { firm: boolean }) {
             key={item.testId}
             href={href}
             data-testid={item.testId}
+            onClick={(event) => {
+              if (item.testId !== "nav-inicio") return;
+              window.dispatchEvent(new Event("serbell-chat-reset"));
+              const stays = pathname === "/" || DOCK.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+              if (stays) event.preventDefault();
+            }}
             className={cn(
               "flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-600",
               active && "bg-[#efede8] font-medium text-stone-900",
