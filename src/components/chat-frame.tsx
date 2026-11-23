@@ -7,13 +7,20 @@ import { buildPulse } from "@/lib/pulse";
 import { loadBriefing } from "@/server/assistant";
 import { db } from "@/server/db";
 import { invoiceDesk } from "@/server/invoices";
+import { monthHistory } from "@/server/planning";
 import { companyReport } from "@/server/queries";
+
+function monthWord(iso: string | null) {
+  if (!iso) return "Este mes";
+  const name = new Intl.DateTimeFormat("es-MX", { month: "long", timeZone: "UTC" }).format(new Date(`${iso.slice(0, 7)}-01T12:00:00.000Z`));
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
 
 export async function ChatFrame({ actor, companyId, children }: { actor: Actor; companyId: string; children: React.ReactNode }) {
   const database = await db();
   const today = todayKey();
   const soon = new Date(Date.parse(`${today}T12:00:00.000Z`) + 7 * 86_400_000).toISOString().slice(0, 10);
-  const [briefing, report, receivable, payable, movements, duplicateCharges] = await Promise.all([
+  const [briefing, report, receivable, payable, movements, duplicateCharges, history] = await Promise.all([
     loadBriefing(database, actor, companyId),
     companyReport(database, actor, companyId),
     invoiceDesk(database, actor, companyId, "receivable", today),
@@ -23,7 +30,10 @@ export async function ChatFrame({ actor, companyId, children }: { actor: Actor; 
       select: { reconciliationState: true, accountingState: true, documentState: true, amountCents: true },
     }),
     database.bankTransaction.count({ where: { companyId, id: { in: [...DUPLICATE_IDS] } } }),
+    monthHistory(database, actor, companyId),
   ]);
+  const month = report.lastDay?.slice(0, 7) ?? "";
+  const prior = history.filter((row) => row.month < month).at(-1) ?? null;
   const openDebtors = briefing.debtors.filter((debtor) => debtor.openCents > 0);
   const topDebtor = openDebtors[0] ?? null;
   const largest = report.largestExpenses[0] ?? null;
@@ -44,8 +54,8 @@ export async function ChatFrame({ actor, companyId, children }: { actor: Actor; 
   const pulse = buildPulse({
     companyName: briefing.companyName,
     balanceCents: report.storedBalanceCents,
-    earlyNet: report.early?.net ?? null,
-    lateNet: report.late?.net ?? null,
+    monthLabel: monthWord(report.lastDay),
+    priorBalanceCents: prior?.closingBalanceCents ?? null,
     receivableCents: receivable.summary.openCents,
     receivableCount: openReceivable.length,
     payableCents: payable.summary.openCents,

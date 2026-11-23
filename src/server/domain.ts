@@ -1528,6 +1528,19 @@ export async function addCategory(
   return { id: created.id, name: created.name, parentId: created.parentId };
 }
 
+export async function moveCategory(db: Db, actor: Actor, categoryId: string, parentId: string) {
+  const category = await db.accountingCategory.findUnique({ where: { id: categoryId } });
+  if (!category) throw new AppError("No existe esa categoría.", 404, "NOT_FOUND");
+  assertCompanyAccess(actor, category.companyId);
+  if (!category.parentId) throw new AppError("La categoría principal se queda donde está.", 400, "CATEGORY_INVALID");
+  const parent = await db.accountingCategory.findUnique({ where: { id: parentId } });
+  if (!parent || parent.companyId !== category.companyId || parent.parentId) {
+    throw new AppError("Suéltala sobre una categoría.", 400, "CATEGORY_INVALID");
+  }
+  if (parent.id === category.parentId) return;
+  await db.accountingCategory.update({ where: { id: categoryId }, data: { parentId: parent.id } });
+}
+
 export async function renameCategory(db: Db, actor: Actor, categoryId: string, name: string) {
   const category = await db.accountingCategory.findUnique({ where: { id: categoryId } });
   if (!category) throw new AppError("No existe esa categoría.", 404, "NOT_FOUND");

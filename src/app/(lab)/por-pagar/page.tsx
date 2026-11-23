@@ -25,7 +25,6 @@ export default async function PayablesPage({
     invoiceDesk(database, session.actor, session.companyId, "payable"),
     fixedChecklist(database, session.actor, session.companyId),
   ]);
-  const fixedSelected = params.parte === "gastos-fijos";
   const folder = folders.find((item) => item.partyId === params.parte) ?? null;
   let panel = null;
   let panelError = params.error;
@@ -49,7 +48,7 @@ export default async function PayablesPage({
     name: "Gastos fijos",
     totalCents: fixed.summary.totalCents,
     detail: `${paid} de ${fixed.rows.length} pagados este mes`,
-    href: "/por-pagar?parte=gastos-fijos",
+    href: "/por-pagar#gastos-fijos",
   };
   const extra = fixed.summary.overdueCents > 0
     ? [{ title: "Gastos fijos vencidos", detail: formatUsd(fixed.summary.overdueCents), href: pin.href }]
@@ -58,19 +57,7 @@ export default async function PayablesPage({
     <div className={panel ? "grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]" : ""}>
       <section>
         {panelError && !panel ? <p className="mb-3 text-sm text-red-700" data-testid="server-error">{panelError}</p> : null}
-        {fixedSelected ? (
-          <div className="space-y-3">
-            <Link href={indexHref} className="text-sm text-primary">Todas las facturas</Link>
-            <h2 className="text-lg font-semibold">Gastos fijos · {monthName(fixed.period)}</h2>
-            <FixedChecklist
-              monthLabel={monthName(fixed.period)}
-              referenceDay={fixed.referenceDay}
-              rows={fixed.rows}
-              accounts={fixed.accounts}
-              categories={fixed.categories}
-            />
-          </div>
-        ) : folder ? (
+        {folder ? (
           <div className="space-y-4">
             <Link href={indexHref} className="text-sm text-primary">Todas las facturas</Link>
             <PartyReport
@@ -85,7 +72,16 @@ export default async function PayablesPage({
             <InvoiceList invoices={folder.invoices} base="/por-pagar" partyId={folder.partyId} activeId={params.factura} />
           </div>
         ) : (
-          <InvoiceBoard
+          <div className="space-y-4">
+            <FixedChecklist
+              monthLabel={monthName(fixed.period)}
+              referenceDay={fixed.referenceDay}
+              rows={fixed.rows}
+              proposals={fixed.proposals}
+              accounts={fixed.accounts}
+              categories={fixed.categories}
+            />
+            <InvoiceBoard
             title="Cuentas por pagar"
             subtitle="Facturas pendientes de pago y seguimiento de tus proveedores."
             partyNoun="Proveedor"
@@ -112,6 +108,7 @@ export default async function PayablesPage({
             activeId={params.factura}
             extraSuggestions={extra}
           />
+          </div>
         )}
       </section>
       {panel && panel.direction === "payable" && panel.companyId === session.companyId ? (

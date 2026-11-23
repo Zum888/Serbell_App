@@ -33,6 +33,7 @@ export function HomeChat({
   pulse,
   dock = false,
   landed = null,
+  onFresh,
 }: {
   name: string;
   briefing: Briefing;
@@ -40,6 +41,7 @@ export function HomeChat({
   pulse: Pulse | null;
   dock?: boolean;
   landed?: string | null;
+  onFresh?: () => void;
 }) {
   const [messages, setMessages] = useState<Bubble[]>([]);
   const [text, setText] = useState("");
@@ -130,8 +132,17 @@ export function HomeChat({
             <NarratedFlow testId={`${flow}-flow`} story={pulse.stories[flow]} />
           </div>
         ) : landedLine ? (
-          <div className="mx-auto w-full max-w-2xl flex-1">
+          <div className="mx-auto w-full max-w-2xl flex-1 space-y-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-[#3f6b4e]">Listo</p>
             <p className="text-[15px] leading-7 text-slate-800">{landedLine}</p>
+            <button
+              type="button"
+              data-testid="empezar-otro"
+              onClick={() => (onFresh ?? reset)()}
+              className="rounded-full border border-[#e6e1d8] bg-white px-3 py-1.5 text-sm font-medium text-stone-800"
+            >
+              Empezar otro
+            </button>
           </div>
         ) : talking ? (
           <div className="mx-auto w-full max-w-2xl flex-1 space-y-6">

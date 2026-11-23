@@ -738,8 +738,10 @@ export async function companyReport(db: Db, actor: Actor, companyId: string) {
   let outflows = 0;
   let uncategorizedCount = 0;
   let uncategorizedExpenseCents = 0;
+  let uncategorizedIncomeCents = 0;
   const byDay = new Map<string, { inflows: number; outflows: number }>();
   const byCategory = new Map<string, { category: string; totalCents: number; count: number }>();
+  const byIncome = new Map<string, { category: string; totalCents: number; count: number }>();
   const byGroup = new Map<string, { category: string; subcategory: string; totalCents: number; count: number }>();
 
   for (const row of transactions) {
@@ -757,6 +759,14 @@ export async function companyReport(db: Db, actor: Actor, companyId: string) {
     if (uncategorized) {
       uncategorizedCount += 1;
       if (row.amountCents < 0) uncategorizedExpenseCents += Math.abs(row.amountCents);
+    }
+    if (row.amountCents > 0) {
+      const category = row.classification?.category?.name ?? "Sin categoría";
+      const incomeRow = byIncome.get(category) ?? { category, totalCents: 0, count: 0 };
+      incomeRow.totalCents += row.amountCents;
+      incomeRow.count += 1;
+      byIncome.set(category, incomeRow);
+      if (uncategorized) uncategorizedIncomeCents += row.amountCents;
     }
     if (row.amountCents < 0) {
       const category = row.classification?.category?.name ?? "Sin categoría";
@@ -832,6 +842,8 @@ export async function companyReport(db: Db, actor: Actor, companyId: string) {
     lastDay: days[days.length - 1] ?? null,
     uncategorizedCount,
     uncategorizedExpenseCents,
+    uncategorizedIncomeCents,
+    incomeCategories: [...byIncome.values()].sort((a, b) => b.totalCents - a.totalCents || a.category.localeCompare(b.category)),
     largestExpenses,
     categories: [...byCategory.values()].sort((a, b) => b.totalCents - a.totalCents || a.category.localeCompare(b.category)),
     groups: [...byGroup.values()].sort((a, b) => b.totalCents - a.totalCents || a.category.localeCompare(b.category)),

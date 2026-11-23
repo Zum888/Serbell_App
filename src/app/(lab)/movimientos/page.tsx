@@ -7,6 +7,7 @@ import { canReview } from "@/lib/permissions";
 import { db } from "@/server/db";
 import { pageContext } from "@/server/context";
 import { focusQueue } from "@/server/focus";
+import { monthHistory } from "@/server/planning";
 import { getHome, getMovement, getReceiptContext, listCategoryTree, listMovements } from "@/server/queries";
 
 export default async function MovementsPage({
@@ -47,7 +48,11 @@ export default async function MovementsPage({
     if (params.cuenta && !account) {
       return <StateView variant="error" title="Esa cuenta no está en esta empresa." testId="server-error" />;
     }
-    const rows = await listMovements((await db()), session.actor, session.companyId, "todos", "");
+    const database = await db();
+    const rows = await listMovements(database, session.actor, session.companyId, "todos", "");
+    const history = await monthHistory(database, session.actor, session.companyId);
+    const latest = rows.reduce((max, row) => (row.postedOn > max ? row.postedOn : max), "");
+    const prior = history.filter((row) => row.month < latest.slice(0, 7)).at(-1) ?? null;
     let detail = null;
     let receipt = null;
     if (params.fila) {
@@ -76,6 +81,7 @@ export default async function MovementsPage({
         missing={params.faltantes === "1"}
         withChat={params.con === "chat"}
         flujo={params.flujo}
+        priorMonth={prior ? { inflows: prior.inflows, outflows: prior.outflows } : null}
       />
     );
   } catch (error) {

@@ -111,6 +111,7 @@ export function MovementsScreen({
   notice,
   withChat = false,
   flujo,
+  priorMonth = null,
 }: {
   companyName: string;
   companyId: string;
@@ -131,6 +132,7 @@ export function MovementsScreen({
   notice?: "factura" | "lote";
   withChat?: boolean;
   flujo?: string;
+  priorMonth?: { inflows: number; outflows: number } | null;
 }) {
   const side = receipt || detail;
   const wide = Boolean(detail?.match);
@@ -154,6 +156,7 @@ export function MovementsScreen({
         error={error && !detail && !receipt ? error : undefined}
         withChat={withChat}
         flujo={flujo}
+        priorMonth={accountId ? null : priorMonth}
       />
       {receipt ? <ReceiptPanel receipt={receipt} filter={filter} q={q} error={error} /> : detail?.match ? (
         <MovementMatch

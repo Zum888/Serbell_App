@@ -1,9 +1,17 @@
 import { dayKey } from "@/lib/dates";
+import { DUPLICATE_IDS } from "@/lib/duplicates";
 import { AppError } from "@/lib/errors";
 import { findFixedPayment, fixedStatus, type FixedStatus } from "@/lib/fixed";
 import { assertCompanyAccess, type Actor } from "@/lib/permissions";
 import type { Db } from "@/server/db";
 import { nid } from "@/server/ids";
+
+export type FixedProposal = {
+  merchant: string;
+  amountCents: number;
+  count: number;
+  dueDay: number;
+};
 
 export type FixedRowView = {
   id: string;
@@ -73,6 +81,27 @@ export async function fixedChecklist(db: Db, actor: Actor, companyId: string) {
       movement,
     };
   });
+  const hints = expenses.map((expense) => expense.matchHint.toLowerCase()).filter(Boolean);
+  const grouped = new Map<string, { merchant: string; amounts: number[]; dueDay: number }>();
+  for (const movement of movements) {
+    if (!movement.day.startsWith(period) || (DUPLICATE_IDS as readonly string[]).includes(movement.id)) continue;
+    const merchant = movement.merchant.trim();
+    const key = merchant.toLowerCase();
+    if (key.length < 2 || hints.some((hint) => key.includes(hint) || hint.includes(key))) continue;
+    const group = grouped.get(key) ?? { merchant, amounts: [], dueDay: Number(movement.day.slice(8, 10)) || 1 };
+    group.amounts.push(Math.abs(movement.amountCents));
+    grouped.set(key, group);
+  }
+  const proposals: FixedProposal[] = [...grouped.values()]
+    .filter((group) => group.amounts.length >= 2)
+    .sort((a, b) => b.amounts.length - a.amounts.length || b.amounts[b.amounts.length - 1] - a.amounts[a.amounts.length - 1])
+    .slice(0, 4)
+    .map((group) => ({
+      merchant: group.merchant,
+      amountCents: group.amounts[group.amounts.length - 1],
+      count: group.amounts.length,
+      dueDay: group.dueDay,
+    }));
   const totalCents = rows.reduce((sum, row) => sum + row.amountCents, 0);
   const paidCents = rows.filter((row) => row.status === "pagado").reduce((sum, row) => sum + row.amountCents, 0);
   const overdueCents = rows.filter((row) => row.status === "vencido").reduce((sum, row) => sum + row.amountCents, 0);
@@ -80,6 +109,7 @@ export async function fixedChecklist(db: Db, actor: Actor, companyId: string) {
     period,
     referenceDay,
     rows,
+    proposals,
     summary: { totalCents, paidCents, pendingCents: totalCents - paidCents, overdueCents },
     accounts: accounts.map((account) => ({ id: account.id, label: `${account.institution} ····${account.mask}` })),
     categories: categories

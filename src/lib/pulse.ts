@@ -40,8 +40,8 @@ export type Pulse = {
 export function buildPulse(input: {
   companyName: string;
   balanceCents: number;
-  earlyNet: number | null;
-  lateNet: number | null;
+  monthLabel: string;
+  priorBalanceCents: number | null;
   receivableCents: number;
   receivableCount: number;
   payableCents: number;
@@ -137,7 +137,7 @@ export function buildPulse(input: {
   return {
     companyName: input.companyName,
     balanceCents: input.balanceCents,
-    balanceNote: balanceNote(input.earlyNet, input.lateNet),
+    balanceNote: balanceNote(input.monthLabel, input.balanceCents, input.priorBalanceCents),
     receivableCents: input.receivableCents,
     receivableNote,
     payableCents: input.payableCents,
@@ -148,9 +148,9 @@ export function buildPulse(input: {
   };
 }
 
-function balanceNote(early: number | null, late: number | null) {
-  if (early === null || late === null || early === 0) return null;
-  const pct = Math.round(((late - early) / Math.abs(early)) * 100);
-  if (!Number.isFinite(pct) || pct === 0 || Math.abs(pct) > 99) return null;
-  return `${pct > 0 ? "+" : ""}${pct}% vs. la primera mitad`;
+function balanceNote(monthLabel: string, currentBalance: number, priorBalance: number | null) {
+  if (priorBalance === null || priorBalance === 0) return monthLabel;
+  const pct = Math.round(((currentBalance - priorBalance) / Math.abs(priorBalance)) * 100);
+  if (!Number.isFinite(pct) || pct === 0) return monthLabel;
+  return `${pct > 0 ? "+" : ""}${pct}% vs. mes anterior`;
 }
