@@ -1,8 +1,7 @@
-import { FixedChecklist } from "@/components/fixed-checklist";
+import { FixedDueWindow } from "@/components/fixed-checklist";
 import { InvoiceBoard, type DeskRow } from "@/components/invoice-board";
 import { InvoiceList, InvoicePanel, PartyReport } from "@/components/invoice-desk";
 import { monthName } from "@/lib/fixed";
-import { formatUsd } from "@/lib/money";
 import { fixedChecklist } from "@/server/planning";
 import { StateView } from "@/components/state-view";
 import { todayKey } from "@/lib/aging";
@@ -42,17 +41,6 @@ export default async function PayablesPage({
   if (params.factura) nextParams.set("factura", params.factura);
   const next = `/por-pagar${nextParams.size ? `?${nextParams}` : ""}`;
   const indexHref = "/por-pagar";
-  const paid = fixed.rows.filter((row) => row.status === "pagado").length;
-  const pin = {
-    id: "gastos-fijos",
-    name: "Gastos fijos",
-    totalCents: fixed.summary.totalCents,
-    detail: `${paid} de ${fixed.rows.length} pagados este mes`,
-    href: "/por-pagar#gastos-fijos",
-  };
-  const extra = fixed.summary.overdueCents > 0
-    ? [{ title: "Gastos fijos vencidos", detail: formatUsd(fixed.summary.overdueCents), href: pin.href }]
-    : [];
   return (
     <div className={panel ? "grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]" : ""}>
       <section>
@@ -73,7 +61,7 @@ export default async function PayablesPage({
           </div>
         ) : (
           <div className="space-y-4">
-            <FixedChecklist
+            <FixedDueWindow
               monthLabel={monthName(fixed.period)}
               referenceDay={fixed.referenceDay}
               rows={fixed.rows}
@@ -104,9 +92,7 @@ export default async function PayablesPage({
               } satisfies DeskRow)),
             )}
             folders={folders}
-            pins={[pin]}
             activeId={params.factura}
-            extraSuggestions={extra}
           />
           </div>
         )}

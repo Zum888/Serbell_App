@@ -1,8 +1,7 @@
 import { Bell, Building2, ChevronDown } from "lucide-react";
-import Link from "next/link";
 import { PROFILES } from "@/lib/ids";
 import type { Actor } from "@/lib/permissions";
-import { SideNav } from "@/components/nav";
+import { SideRail } from "@/components/side-rail";
 import { PostLink } from "@/components/post-link";
 import { Simulator } from "@/components/simulator";
 
@@ -23,12 +22,7 @@ export function Shell({
   const company = companies.find((item) => item.id === companyId);
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      <aside className="flex w-[232px] shrink-0 flex-col border-r border-border bg-white py-4">
-        <Link href={actor.firmRole ? "/firma" : "/"} className="px-5 pb-5">
-          <img src="/brand/serbell-logo.png" alt="Serbell" width={68} height={32} className="h-8 w-auto" />
-        </Link>
-        <SideNav firm={Boolean(actor.firmRole)} />
-      </aside>
+      <SideRail firm={Boolean(actor.firmRole)} homeHref={actor.firmRole ? "/firma" : "/"} />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-16 items-center justify-between border-b border-border bg-white px-4">
           <div>
