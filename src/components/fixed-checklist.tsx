@@ -36,8 +36,11 @@ export function FixedDueWindow(props: {
   accounts: Option[];
   categories: Option[];
 }) {
-  const overdue = props.rows.filter((row) => row.status === "vencido").length;
-  const soon = props.rows.filter((row) => row.status === "pendiente").length;
+  const total = props.rows.reduce((sum, row) => sum + row.amountCents, 0);
+  const paid = props.rows.filter((row) => row.status === "pagado").reduce((sum, row) => sum + row.amountCents, 0);
+  const pending = total - paid;
+  const paidPct = total === 0 ? 0 : Math.round((paid / total) * 100);
+  const pendingPct = total === 0 ? 0 : 100 - paidPct;
   const [open, setOpen] = useState(false);
 
   return (
@@ -47,13 +50,32 @@ export function FixedDueWindow(props: {
         data-testid="fixed-open"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left"
+        className="w-full px-4 py-3 text-left"
       >
-        <span className="text-sm font-semibold text-stone-900">Gastos fijos</span>
-        <span className="text-xs text-slate-500">{props.monthLabel}</span>
-        {overdue > 0 ? <span className="rounded-full bg-rose-50 px-2 py-0.5 text-xs text-rose-700">{overdue} vencidos</span> : null}
-        {soon > 0 ? <span className="rounded-full bg-[#efede8] px-2 py-0.5 text-xs text-stone-700">{soon} por vencer</span> : null}
-        <ChevronDown className={`ml-auto size-4 text-stone-500 transition ${open ? "rotate-180" : ""}`} />
+        <span className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-stone-900">Gastos fijos</span>
+          <ChevronDown className={`ml-auto size-4 text-stone-500 transition ${open ? "rotate-180" : ""}`} />
+        </span>
+        <span className="mt-0.5 block text-xs text-slate-500">{props.monthLabel}</span>
+        <span className="mt-3 flex items-center gap-3">
+          <span
+            className="grid size-[4.5rem] shrink-0 place-items-center rounded-full"
+            style={{ background: `conic-gradient(#3f6b4e 0% ${paidPct}%, #e7e5e4 ${paidPct}% 100%)` }}
+            data-testid="fixed-paid-pct"
+            data-paid={paidPct}
+            data-pending={pendingPct}
+          >
+            <span className="grid size-14 place-items-center rounded-full bg-white text-center">
+              <span className="text-sm font-semibold leading-none text-stone-900">{paidPct}%</span>
+            </span>
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-medium text-[#3f6b4e]">Ya pagados</span>
+            <span className="block text-xs text-slate-500">{formatUsd(paid)} · {paidPct}%</span>
+            <span className="mt-1.5 block text-sm font-medium text-stone-800">Por pagar</span>
+            <span className="block text-xs text-slate-500">{formatUsd(pending)} · {pendingPct}%</span>
+          </span>
+        </span>
       </button>
       {open ? (
         <div data-testid="fixed-list" className="border-t border-[#e6e1d8]">
@@ -190,6 +212,7 @@ export function FixedChecklist({
         <AddFixed
           accounts={accounts}
           categories={categories}
+          stacked={windowed}
           onDone={() => {
             setAdding(false);
             router.refresh();
@@ -304,7 +327,7 @@ function DueGroup({
           {rows.map((row) => {
             const paid = row.status === "pagado";
             return (
-              <li key={row.id} data-testid={`fixed-${row.id}`} data-status={row.status} className="flex flex-wrap items-center gap-3 px-3 py-3">
+              <li key={row.id} data-testid={`fixed-${row.id}`} data-status={row.status} className="flex items-center gap-2 px-2 py-2.5">
                 <button
                   type="button"
                   onClick={() => onToggle(row)}
@@ -317,7 +340,7 @@ function DueGroup({
                 >
                   {paid ? <Check className="size-3.5" /> : null}
                 </button>
-                <div className="min-w-[180px] flex-1">
+                <div className="min-w-0 flex-1">
                   <p className={`font-medium ${paid ? "text-slate-500" : ""}`}>{row.name}</p>
                   <p className="mt-0.5 text-xs text-slate-500">{row.vendor} · día {row.dueDay}</p>
                 </div>
@@ -401,7 +424,7 @@ function Figure({ label, value, tone }: { label: string; value: string; tone?: s
   );
 }
 
-function AddFixed({ accounts, categories, onDone }: { accounts: Option[]; categories: Option[]; onDone: () => void }) {
+function AddFixed({ accounts, categories, onDone, stacked = false }: { accounts: Option[]; categories: Option[]; onDone: () => void; stacked?: boolean }) {
   const [form, setForm] = useState({ name: "", vendor: "", amount: "", dueDay: "1", accountId: "", subcategoryId: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -428,7 +451,7 @@ function AddFixed({ accounts, categories, onDone }: { accounts: Option[]; catego
   }
 
   return (
-    <form onSubmit={submit} className="mx-4 mt-3 grid gap-2 rounded-xl border border-border bg-slate-50/60 p-3 sm:grid-cols-6" data-testid="add-fixed">
+    <form onSubmit={submit} className={stacked ? "mx-3 mt-3 grid gap-2 rounded-xl border border-border bg-slate-50/60 p-3" : "mx-4 mt-3 grid gap-2 rounded-xl border border-border bg-slate-50/60 p-3 sm:grid-cols-6"} data-testid="add-fixed">
       <input className={`${field} sm:col-span-2`} placeholder="Qué es (ej. Renta)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} aria-label="Nombre del gasto" />
       <input className={`${field} sm:col-span-2`} placeholder="A quién se le paga" value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} aria-label="Proveedor" />
       <input className={field} placeholder="Monto USD" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} aria-label="Monto" />
