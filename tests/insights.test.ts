@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { findFixedPayment, fixedStatus, monthName } from "@/lib/fixed";
+import { findFixedPayment, fixedKind, fixedStatus, monthName } from "@/lib/fixed";
 import { cashDays, change, headline, waterfall, weekly } from "@/lib/insights";
 
 it("la cascada va del saldo inicial al saldo final guardado", () => {
@@ -50,4 +50,7 @@ it("un gasto fijo se marca pagado solo con un movimiento del mes, del comercio y
   expect(fixedStatus({ paid: false, dueDay: 5, referenceDay: 20 })).toBe("vencido");
   expect(fixedStatus({ paid: false, dueDay: 25, referenceDay: 20 })).toBe("pendiente");
   expect(monthName("2026-10")).toBe("Octubre 2026");
+  expect(fixedKind({ name: "Renta del patio", vendor: "Miami Truck Yard" }).label).toBe("Renta");
+  expect(fixedKind({ name: "Luz del patio", vendor: "FPL" }).label).toBe("Luz");
+  expect(fixedKind({ name: "Teléfonos e internet", vendor: "Verizon" }).label).toBe("Internet");
 });

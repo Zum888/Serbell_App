@@ -1,7 +1,7 @@
 import { dayKey } from "@/lib/dates";
 import { DUPLICATE_IDS } from "@/lib/duplicates";
 import { AppError } from "@/lib/errors";
-import { findFixedPayment, fixedStatus, type FixedStatus } from "@/lib/fixed";
+import { findFixedPayment, fixedKind, fixedStatus, type FixedStatus } from "@/lib/fixed";
 import { assertCompanyAccess, type Actor } from "@/lib/permissions";
 import type { Db } from "@/server/db";
 import { nid } from "@/server/ids";
@@ -23,6 +23,9 @@ export type FixedRowView = {
   source: "banco" | "manual" | null;
   accountLabel: string | null;
   categoryLabel: string | null;
+  categoryKey: string;
+  category: string;
+  paidOn: string | null;
   movement: { id: string; day: string; merchant: string; amountCents: number } | null;
 };
 
@@ -53,7 +56,9 @@ export async function fixedChecklist(db: Db, actor: Actor, companyId: string) {
     day: dayKey(row.postedOn) ?? "",
     merchant: row.merchant,
     amountCents: row.amountCents,
+    accountId: row.accountId,
   }));
+  const accountByMovement = new Map(movements.map((row) => [row.id, row.accountId]));
   const accountLabel = (id: string | null) => {
     const account = accounts.find((item) => item.id === id);
     return account ? `${account.institution} ····${account.mask}` : null;
@@ -68,6 +73,8 @@ export async function fixedChecklist(db: Db, actor: Actor, companyId: string) {
     const movement = findFixedPayment(expense, period, movements);
     const manual = expense.payments.length > 0;
     const paid = Boolean(movement) || manual;
+    const kind = fixedKind({ name: expense.name, vendor: expense.vendor });
+    const source = movement ? "banco" : manual ? "manual" : null;
     return {
       id: expense.id,
       name: expense.name,
@@ -75,9 +82,14 @@ export async function fixedChecklist(db: Db, actor: Actor, companyId: string) {
       amountCents: expense.amountCents,
       dueDay: expense.dueDay,
       status: fixedStatus({ paid, dueDay: expense.dueDay, referenceDay }),
-      source: movement ? "banco" : manual ? "manual" : null,
-      accountLabel: accountLabel(expense.accountId),
+      source,
+      accountLabel: source === "manual"
+        ? "Efectivo"
+        : accountLabel(movement ? accountByMovement.get(movement.id) ?? expense.accountId : expense.accountId),
       categoryLabel: categoryLabel(expense.subcategoryId),
+      categoryKey: kind.key,
+      category: kind.label,
+      paidOn: movement?.day ?? (manual ? dayKey(expense.payments[0]?.paidAt) : null),
       movement,
     };
   });

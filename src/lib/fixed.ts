@@ -26,6 +26,26 @@ export function fixedStatus(input: { paid: boolean; dueDay: number; referenceDay
   return input.dueDay < input.referenceDay ? "vencido" : "pendiente";
 }
 
+export type FixedKind = "renta" | "luz" | "internet" | "nomina" | "seguro" | "equipo" | "honorarios" | "otro";
+
+const KIND_RULES: { key: FixedKind; label: string; test: RegExp }[] = [
+  { key: "luz", label: "Luz", test: /luz|electric|energia|fpl/ },
+  { key: "internet", label: "Internet", test: /internet|verizon|wifi|telefono|godaddy|dominio|pagina web/ },
+  { key: "nomina", label: "Nómina", test: /nomina|payroll|\bgusto\b|\badp\b/ },
+  { key: "seguro", label: "Seguro", test: /seguro|insurance|state farm|liberty/ },
+  { key: "honorarios", label: "Honorarios", test: /honorario|contable|despacho/ },
+  { key: "equipo", label: "Equipo", test: /maquinaria|tractocamion|penske|leasing/ },
+  { key: "renta", label: "Renta", test: /renta|yard|oficina/ },
+];
+
+export function fixedKind(input: { name: string; vendor: string }): { key: FixedKind; label: string } {
+  const value = `${input.name} ${input.vendor}`
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase();
+  return KIND_RULES.find((rule) => rule.test.test(value)) ?? { key: "otro", label: "Otros" };
+}
+
 const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
 export function monthName(period: string): string {
