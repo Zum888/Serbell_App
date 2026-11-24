@@ -24,7 +24,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "impuestos", label: "Impuestos" },
 ];
 
-const SLICE_COLORS = ["#1d4ed8", "#2563eb", "#3b82f6", "#60a5fa", "#93c5fd"];
+const SLICE_COLORS = ["#8eafc8", "#a9c4da", "#c5d7e6", "#d7e5f0", "#e8f1f6"];
 
 function compact(cents: number): string {
   const value = Math.abs(cents) / 100;
@@ -93,7 +93,7 @@ export function ReportScreen({
       <header className="flex flex-wrap items-end justify-between gap-3" data-testid="report-hero">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-slate-900">
-            <BarChart3 className="size-5 text-violet-600" /> Reportes
+            <BarChart3 className="size-5 text-[#6f93b3]" /> Reportes
           </h1>
           <p className="mt-1 text-sm text-slate-500">Analiza el desempeño de {companyName} con los movimientos guardados.</p>
         </div>
@@ -108,7 +108,7 @@ export function ReportScreen({
             key={item.id}
             type="button"
             onClick={() => setTab(item.id)}
-            className={item.id === tab ? "rounded-full bg-violet-600 px-3 py-1.5 text-xs font-medium whitespace-nowrap text-white" : "rounded-full px-3 py-1.5 text-xs whitespace-nowrap text-slate-500 hover:bg-white"}
+            className={item.id === tab ? "rounded-full bg-[#c5d7e6] px-3 py-1.5 text-xs font-medium whitespace-nowrap text-stone-900" : "rounded-full px-3 py-1.5 text-xs whitespace-nowrap text-slate-500 hover:bg-white"}
           >
             {item.label}
           </button>
@@ -136,8 +136,8 @@ export function ReportScreen({
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-sm font-semibold">Pérdidas y Ganancias</h2>
                 <p className="flex items-center gap-3 text-[11px] text-slate-500">
-                  <span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-blue-600" /> Ingresos</span>
-                  <span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-blue-200" /> Gastos</span>
+                  <span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-[#8eafc8]" /> Ingresos</span>
+                  <span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-[#d7e5f0]" /> Gastos</span>
                 </p>
               </div>
               <MonthBars months={months} />
@@ -200,13 +200,13 @@ export function ReportScreen({
                 </p>
               ) : null}
             </article>
-            <article className="rounded-2xl border border-violet-100 bg-violet-50/60 p-5">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-violet-950">
-                <Sparkles className="size-4 text-violet-600" /> Conclusión del mes
+            <article className="rounded-2xl border border-[#d7e5f0] bg-[#eef4f8] p-5">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-stone-900">
+                <Sparkles className="size-4 text-[#6f93b3]" /> Conclusión del mes
               </h2>
               <p className="mt-3 text-sm leading-6 text-slate-700">{headline(current, previous)} {subline(current, previous)}</p>
               <div className="mt-4 flex flex-wrap gap-3 text-xs font-medium">
-                <button type="button" onClick={() => setDetail((open) => !open)} className="text-violet-700">
+                <button type="button" onClick={() => setDetail((open) => !open)} className="text-[#4f7596]">
                   {detail ? "Ocultar análisis" : "Ver análisis completo →"}
                 </button>
                 {uncategorized ? <Link href="/movimientos?filtro=sin-categoria" className="text-slate-600">Clasificar</Link> : null}
@@ -229,7 +229,7 @@ export function ReportScreen({
               {fixed.pendingCents > 0 ? `Faltan ${formatUsd(fixed.pendingCents)}.` : "No hay gastos fijos pendientes."}
               {fixed.overdueCount > 0 ? ` ${fixed.overdueCount} vencidos por ${formatUsd(fixed.overdueCents)}.` : ""}
             </p>
-            <Link href="/por-pagar" className="mt-3 inline-flex text-xs font-medium text-violet-700">Abrir por pagar</Link>
+            <Link href="/por-pagar" className="mt-3 inline-flex text-xs font-medium text-[#4f7596]">Abrir por pagar</Link>
           </article>
         </div>
       ) : null}
@@ -282,8 +282,8 @@ function MonthBars({ months }: { months: { label: string; inflows: number; outfl
       {months.map((month) => (
         <div key={month.label} className="flex flex-1 flex-col items-center gap-2">
           <div className="flex h-44 w-full items-end justify-center gap-1">
-            <div className="w-5 rounded-t-md bg-blue-600" style={{ height: `${Math.max(4, (month.inflows / max) * 168)}px` }} title={`Ingresos ${formatUsd(month.inflows)}`} />
-            <div className="w-5 rounded-t-md bg-blue-200" style={{ height: `${Math.max(4, (month.outflows / max) * 168)}px` }} title={`Gastos ${formatUsd(month.outflows)}`} />
+            <div className="w-5 rounded-t-md bg-[#8eafc8]" style={{ height: `${Math.max(4, (month.inflows / max) * 168)}px` }} title={`Ingresos ${formatUsd(month.inflows)}`} />
+            <div className="w-5 rounded-t-md bg-[#d7e5f0]" style={{ height: `${Math.max(4, (month.outflows / max) * 168)}px` }} title={`Gastos ${formatUsd(month.outflows)}`} />
           </div>
           <p className="text-[11px] text-slate-500">{month.label}</p>
         </div>
@@ -357,7 +357,7 @@ function StatementRow({
 }) {
   const delta = change(current, previous);
   return (
-    <tr className={emphasis ? "bg-violet-50 font-semibold" : "border-b border-border last:border-0"}>
+    <tr className={emphasis ? "bg-[#eef4f8] font-semibold" : "border-b border-border last:border-0"}>
       <td className={`px-5 py-2.5 ${muted ? "text-slate-500" : ""}`}>{label}</td>
       <td className="px-3 py-2.5 text-right tabular-nums">{formatUsd(current)}</td>
       <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{previous === null ? "—" : formatUsd(previous)}</td>
@@ -470,7 +470,7 @@ function DeskPanel({ title, desk, href, empty, noun }: { title: string; desk: De
         </div>
       )}
       <p className="mt-3 text-xs text-slate-500">{desk.invoiceCount} facturas {noun}.</p>
-      <Link href={href} className="mt-3 inline-flex text-xs font-medium text-violet-700">Abrir la carpeta</Link>
+      <Link href={href} className="mt-3 inline-flex text-xs font-medium text-[#4f7596]">Abrir la carpeta</Link>
     </article>
   );
 }

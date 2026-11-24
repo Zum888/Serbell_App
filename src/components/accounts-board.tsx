@@ -21,7 +21,7 @@ type Card = {
   delta: number | null;
 };
 
-const COLORS = ["#1d4ed8", "#2563eb", "#0ea5e9", "#38bdf8"];
+const COLORS = ["#7ea3c4", "#8eafc8", "#a9c4da", "#c5d7e6"];
 
 function running(series: number[]) {
   let sum = 0;
