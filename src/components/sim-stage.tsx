@@ -376,7 +376,7 @@ function Cash({ scene, mark }: { scene: Scene; mark: string | null }) {
       <div data-sim="cash-chart" className={`mt-4 flex h-48 items-end gap-3 rounded-2xl border border-border bg-white p-4 ${ring(mark === "cash-chart")}`}>
         {rows.map((row) => (
           <div key={row.day} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-            <div className="w-full rounded-t-md" style={{ height: `${Math.max(8, (Math.abs(row.cents) / max) * 100)}%`, background: row.cents < 0 ? "#fb7185" : "#6d5efc" }} />
+            <div className="w-full rounded-t-md" style={{ height: `${Math.max(8, (Math.abs(row.cents) / max) * 100)}%`, background: row.cents < 0 ? "#fb7185" : "#2563eb" }} />
             <span className="text-[10px] text-slate-400">{row.day.split(" ")[0]}</span>
           </div>
         ))}

@@ -24,7 +24,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "impuestos", label: "Impuestos" },
 ];
 
-const SLICE_COLORS = ["#6d5efc", "#8b7cff", "#5b8def", "#3d4d8f", "#d9d2ff"];
+const SLICE_COLORS = ["#1d4ed8", "#2563eb", "#3b82f6", "#60a5fa", "#93c5fd"];
 
 function compact(cents: number): string {
   const value = Math.abs(cents) / 100;
@@ -136,8 +136,8 @@ export function ReportScreen({
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-sm font-semibold">Pérdidas y Ganancias</h2>
                 <p className="flex items-center gap-3 text-[11px] text-slate-500">
-                  <span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-violet-600" /> Ingresos</span>
-                  <span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-violet-200" /> Gastos</span>
+                  <span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-blue-600" /> Ingresos</span>
+                  <span className="flex items-center gap-1"><span className="size-2 rounded-sm bg-blue-200" /> Gastos</span>
                 </p>
               </div>
               <MonthBars months={months} />
@@ -282,8 +282,8 @@ function MonthBars({ months }: { months: { label: string; inflows: number; outfl
       {months.map((month) => (
         <div key={month.label} className="flex flex-1 flex-col items-center gap-2">
           <div className="flex h-44 w-full items-end justify-center gap-1">
-            <div className="w-5 rounded-t-md bg-violet-600" style={{ height: `${Math.max(4, (month.inflows / max) * 168)}px` }} title={`Ingresos ${formatUsd(month.inflows)}`} />
-            <div className="w-5 rounded-t-md bg-violet-200" style={{ height: `${Math.max(4, (month.outflows / max) * 168)}px` }} title={`Gastos ${formatUsd(month.outflows)}`} />
+            <div className="w-5 rounded-t-md bg-blue-600" style={{ height: `${Math.max(4, (month.inflows / max) * 168)}px` }} title={`Ingresos ${formatUsd(month.inflows)}`} />
+            <div className="w-5 rounded-t-md bg-blue-200" style={{ height: `${Math.max(4, (month.outflows / max) * 168)}px` }} title={`Gastos ${formatUsd(month.outflows)}`} />
           </div>
           <p className="text-[11px] text-slate-500">{month.label}</p>
         </div>

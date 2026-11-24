@@ -397,7 +397,7 @@ function ColumnChart({ series }: { series: { month: string; cents: number }[] })
             className="w-full rounded-t-md"
             style={{
               height: item.cents === 0 ? "0%" : `${Math.max(8, (item.cents / max) * 100)}%`,
-              background: index === series.length - 1 ? "#6d5efc" : "#ddd6fe",
+              background: index === series.length - 1 ? "#2563eb" : "#bfdbfe",
             }}
             title={formatUsd(item.cents)}
           />
