@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { X } from "lucide-react";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ChatPinProvider } from "@/components/chat-pin";
@@ -32,6 +32,7 @@ export function ChatShell({
   const [fromUrl, setFromUrl] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [drawer, setDrawer] = useState(false);
+  const [overDrawer, setOverDrawer] = useState(false);
   const [epoch, setEpoch] = useState(0);
   const home = pathname === "/";
   const bank = pathname.startsWith("/movimientos") || pathname.startsWith("/cuentas") || pathname.startsWith("/por-cobrar") || pathname.startsWith("/por-pagar") || pathname.startsWith("/reportes") || pathname.startsWith("/categorias");
@@ -56,6 +57,7 @@ export function ChatShell({
       setFlujo(null);
       setPinned(true);
       setCollapsed(false);
+      setOverDrawer(true);
       setEpoch((value) => value + 1);
     }
     window.addEventListener("serbell-chat-reset", onReset);
@@ -66,6 +68,7 @@ export function ChatShell({
     sessionStorage.setItem(PIN_KEY, "1");
     sessionStorage.setItem(FOLD_KEY, "0");
     setCollapsed(false);
+    setOverDrawer(true);
     if (next) {
       sessionStorage.setItem(FLOW_KEY, next);
       setFlujo(next);
@@ -73,17 +76,19 @@ export function ChatShell({
     setPinned(true);
   }
 
-  function toggleFold() {
-    setCollapsed((value) => {
-      const next = !value;
-      sessionStorage.setItem(FOLD_KEY, next ? "1" : "0");
-      return next;
-    });
+  function closeTab() {
+    sessionStorage.setItem(FOLD_KEY, "1");
+    setOverDrawer(false);
+    setCollapsed(true);
   }
+
+  useEffect(() => {
+    setOverDrawer(false);
+  }, [drawer]);
 
   const show = home || ((pinned || fromUrl) && bank);
   const dock = show && !home;
-  const folded = dock && (collapsed || drawer);
+  const folded = dock && !overDrawer && (collapsed || drawer);
 
   return (
     <ChatPinProvider pin={pin}>
@@ -94,48 +99,32 @@ export function ChatShell({
           setDrawer(movementOpen);
         }} />
       </Suspense>
-      <div className={dock ? "flex items-start" : show ? "space-y-8" : ""}>
-        {dock && folded ? (
-          <ChatTab
-            folded
-            label={drawer && !collapsed ? "El chat vuelve cuando cierres el movimiento" : "Abrir el chat"}
-            onClick={() => {
-              if (drawer && !collapsed) return;
-              toggleFold();
-            }}
-          />
-        ) : null}
+      <div className={dock && !folded ? "flex items-start gap-3" : show ? "space-y-8" : ""}>
         {show && !folded ? (
-          <div className={dock ? "relative sticky top-0 mr-3 flex h-[calc(100vh-5rem)] w-[320px] shrink-0 flex-col" : ""}>
-            {dock ? <ChatTab folded={false} label="Retraer el chat" onClick={toggleFold} /> : null}
-            <div className={dock ? "flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-white p-3" : ""}>
+          <div className={dock ? "sticky top-0 flex h-[calc(100vh-5rem)] w-[320px] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-white" : ""}>
+            {dock ? (
+              <div className="flex items-center justify-between border-b border-[#e6e1d8] px-3 py-2">
+                <span className="text-sm font-medium text-stone-800">Chat</span>
+                <button
+                  type="button"
+                  data-testid="chat-close"
+                  aria-label="Cerrar el chat"
+                  title="Cerrar el chat"
+                  onClick={closeTab}
+                  className="grid size-7 place-items-center rounded-md text-stone-500 hover:bg-[#efede8] hover:text-stone-900"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            ) : null}
+            <div className={dock ? "flex min-h-0 flex-1 flex-col p-3" : ""}>
               <HomeChat key={epoch} dock={dock} landed={dock ? flujo : null} name={name} briefing={briefing} starts={starts} pulse={pulse} onFresh={() => window.dispatchEvent(new Event("serbell-chat-reset"))} />
             </div>
           </div>
         ) : null}
-        <div className="min-w-0 flex-1">{children}</div>
+        <div className={dock && !folded ? "min-w-0 flex-1" : ""}>{children}</div>
       </div>
     </ChatPinProvider>
-  );
-}
-
-function ChatTab({ folded, label, onClick }: { folded: boolean; label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      data-testid="chat-tab"
-      aria-expanded={!folded}
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className={
-        folded
-          ? "sticky top-24 z-10 -ml-4 flex h-14 w-5 shrink-0 items-center justify-center rounded-r-md border border-l-0 border-[#e6e1d8] bg-white text-stone-500 shadow-sm hover:bg-[#efede8] hover:text-stone-900"
-          : "absolute top-1/2 -left-2.5 z-10 flex h-14 w-5 -translate-y-1/2 items-center justify-center rounded-l-md border border-[#e6e1d8] bg-white text-stone-500 shadow-sm hover:bg-[#efede8] hover:text-stone-900"
-      }
-    >
-      {folded ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
-    </button>
   );
 }
 
