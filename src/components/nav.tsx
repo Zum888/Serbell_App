@@ -49,17 +49,14 @@ export function SideNav({ firm, collapsed = false }: { firm: boolean; collapsed?
             className={cn(
               "flex w-full items-center rounded-xl py-2 text-sm",
               collapsed ? "justify-center px-2" : "gap-3 px-3",
-              create ? "font-medium text-stone-900" : "text-slate-600",
-              active && "bg-[#efede8]",
-              !create && active && "font-medium text-stone-900",
+              "text-slate-600",
+              active && "bg-[#efede8] font-medium text-stone-900",
             )}
           >
             {create ? (
               <>
                 {collapsed ? <span className="sr-only">{item.label}</span> : item.label}
-                <span className={cn("grid size-5 shrink-0 place-items-center rounded-md bg-stone-900 text-[#f7f6f4]", collapsed ? "" : "ml-auto")}>
-                  <Plus className="size-3.5" strokeWidth={2.5} />
-                </span>
+                <Plus className={cn("size-4 shrink-0", collapsed ? "" : "ml-auto")} />
               </>
             ) : (
               <>
