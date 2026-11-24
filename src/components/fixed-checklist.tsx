@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Landmark, Plus, Tag, X } from "lucide-react";
+import { Check, ChevronDown, Landmark, Plus, Tag, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { formatDay } from "@/lib/dates";
@@ -38,44 +38,29 @@ export function FixedDueWindow(props: {
 }) {
   const overdue = props.rows.filter((row) => row.status === "vencido").length;
   const soon = props.rows.filter((row) => row.status === "pendiente").length;
-  const [open, setOpen] = useState(overdue + soon > 0);
+  const [open, setOpen] = useState(false);
 
   return (
-    <>
+    <section className="rounded-2xl border border-[#e6e1d8] bg-white" data-testid="fixed-slot">
       <button
         type="button"
         data-testid="fixed-open"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-full border border-[#e6e1d8] bg-white px-3 py-1.5 text-sm font-medium text-stone-800 hover:bg-[#efede8]"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left"
       >
-        Gastos fijos
+        <span className="text-sm font-semibold text-stone-900">Gastos fijos</span>
+        <span className="text-xs text-slate-500">{props.monthLabel}</span>
         {overdue > 0 ? <span className="rounded-full bg-rose-50 px-2 py-0.5 text-xs text-rose-700">{overdue} vencidos</span> : null}
         {soon > 0 ? <span className="rounded-full bg-[#efede8] px-2 py-0.5 text-xs text-stone-700">{soon} por vencer</span> : null}
+        <ChevronDown className={`ml-auto size-4 text-stone-500 transition ${open ? "rotate-180" : ""}`} />
       </button>
       {open ? (
-        <div className="fixed inset-0 z-40 flex items-start justify-center bg-stone-900/30 p-4 pt-[10vh]" role="presentation" onClick={() => setOpen(false)}>
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="fixed-window-title"
-            data-testid="fixed-window"
-            className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[#e6e1d8] bg-white shadow-xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3 border-b border-[#e6e1d8] px-5 py-4">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-400">Gastos fijos · {props.monthLabel}</p>
-                <h2 id="fixed-window-title" className="mt-1 text-lg font-semibold tracking-tight">Vencido y por vencer</h2>
-              </div>
-              <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar gastos fijos" className="grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-[#efede8]">
-                <X className="size-4" />
-              </button>
-            </div>
-            <FixedChecklist {...props} windowed />
-          </div>
+        <div data-testid="fixed-list" className="border-t border-[#e6e1d8]">
+          <FixedChecklist {...props} windowed />
         </div>
       ) : null}
-    </>
+    </section>
   );
 }
 
