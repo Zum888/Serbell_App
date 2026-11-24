@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, Landmark, Plus, Tag, X } from "lucide-react";
+import { Briefcase, Check, ChevronDown, Home, Landmark, Plus, Receipt, Shield, Tag, Users, Wifi, Wrench, X, Zap, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { formatDay } from "@/lib/dates";
@@ -28,6 +28,19 @@ const FILTERS: [string, string][] = [
   ["pagado", "Pagados"],
 ];
 
+const KIND_ICON: Record<string, LucideIcon> = {
+  renta: Home,
+  luz: Zap,
+  internet: Wifi,
+  nomina: Users,
+  seguro: Shield,
+  equipo: Wrench,
+  honorarios: Briefcase,
+  otro: Receipt,
+};
+
+const KIND_ORDER = ["renta", "luz", "internet", "nomina", "seguro", "equipo", "honorarios", "otro"];
+
 export function FixedDueWindow(props: {
   monthLabel: string;
   referenceDay: number;
@@ -36,53 +49,256 @@ export function FixedDueWindow(props: {
   accounts: Option[];
   categories: Option[];
 }) {
-  const total = props.rows.reduce((sum, row) => sum + row.amountCents, 0);
-  const paid = props.rows.filter((row) => row.status === "pagado").reduce((sum, row) => sum + row.amountCents, 0);
+  const [rows, setRows] = useState(props.rows);
+  useEffect(() => {
+    setRows(props.rows);
+  }, [props.rows]);
+  const total = rows.reduce((sum, row) => sum + row.amountCents, 0);
+  const paid = rows.filter((row) => row.status === "pagado").reduce((sum, row) => sum + row.amountCents, 0);
   const pending = total - paid;
   const paidPct = total === 0 ? 0 : Math.round((paid / total) * 100);
   const pendingPct = total === 0 ? 0 : 100 - paidPct;
   const [open, setOpen] = useState(false);
 
   return (
-    <section className="rounded-2xl border border-[#e6e1d8] bg-white" data-testid="fixed-slot">
-      <button
-        type="button"
-        data-testid="fixed-open"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className="w-full px-4 py-3 text-left"
-      >
-        <span className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-stone-900">Gastos fijos</span>
-          <ChevronDown className={`ml-auto size-4 text-stone-500 transition ${open ? "rotate-180" : ""}`} />
-        </span>
-        <span className="mt-0.5 block text-xs text-slate-500">{props.monthLabel}</span>
-        <span className="mt-3 flex items-center gap-3">
-          <span
-            className="grid size-[4.5rem] shrink-0 place-items-center rounded-full"
-            style={{ background: `conic-gradient(#3f6b4e 0% ${paidPct}%, #e7e5e4 ${paidPct}% 100%)` }}
-            data-testid="fixed-paid-pct"
-            data-paid={paidPct}
-            data-pending={pendingPct}
-          >
-            <span className="grid size-14 place-items-center rounded-full bg-white text-center">
-              <span className="text-sm font-semibold leading-none text-stone-900">{paidPct}%</span>
+    <>
+      <section className="rounded-2xl border border-[#e6e1d8] bg-white" data-testid="fixed-slot">
+        <button
+          type="button"
+          data-testid="fixed-open"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+          className="w-full px-4 py-3 text-left"
+        >
+          <span className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-stone-900">Gastos fijos</span>
+            <ChevronDown className={`ml-auto size-4 text-stone-500 transition ${open ? "rotate-180" : ""}`} />
+          </span>
+          <span className="mt-0.5 block text-xs text-slate-500">{props.monthLabel}</span>
+          <span className="mt-3 flex items-center gap-3">
+            <span
+              className="grid size-[4.5rem] shrink-0 place-items-center rounded-full"
+              style={{ background: `conic-gradient(#3f6b4e 0% ${paidPct}%, #e7e5e4 ${paidPct}% 100%)` }}
+              data-testid="fixed-paid-pct"
+              data-paid={paidPct}
+              data-pending={pendingPct}
+            >
+              <span className="grid size-14 place-items-center rounded-full bg-white text-center">
+                <span className="text-sm font-semibold leading-none text-stone-900">{paidPct}%</span>
+              </span>
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-[#3f6b4e]">Ya pagados</span>
+              <span className="block text-xs text-slate-500">{formatUsd(paid)} · {paidPct}%</span>
+              <span className="mt-1.5 block text-sm font-medium text-stone-800">Por pagar</span>
+              <span className="block text-xs text-slate-500">{formatUsd(pending)} · {pendingPct}%</span>
             </span>
           </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-medium text-[#3f6b4e]">Ya pagados</span>
-            <span className="block text-xs text-slate-500">{formatUsd(paid)} · {paidPct}%</span>
-            <span className="mt-1.5 block text-sm font-medium text-stone-800">Por pagar</span>
-            <span className="block text-xs text-slate-500">{formatUsd(pending)} · {pendingPct}%</span>
-          </span>
-        </span>
-      </button>
+        </button>
+      </section>
       {open ? (
-        <div data-testid="fixed-list" className="border-t border-[#e6e1d8]">
-          <FixedChecklist {...props} windowed />
-        </div>
+        <FixedTab
+          monthLabel={props.monthLabel}
+          referenceDay={props.referenceDay}
+          rows={rows}
+          setRows={setRows}
+          proposals={props.proposals}
+          accounts={props.accounts}
+          categories={props.categories}
+          onClose={() => setOpen(false)}
+        />
       ) : null}
+    </>
+  );
+}
+
+function FixedTab({
+  monthLabel,
+  referenceDay,
+  rows,
+  setRows,
+  proposals = [],
+  accounts,
+  categories,
+  onClose,
+}: {
+  monthLabel: string;
+  referenceDay: number;
+  rows: FixedRowView[];
+  setRows: (rows: FixedRowView[]) => void;
+  proposals?: FixedProposal[];
+  accounts: Option[];
+  categories: Option[];
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const missing = rows.filter((row) => row.status !== "pagado");
+  const paid = rows.filter((row) => row.status === "pagado");
+
+  async function toggle(row: FixedRowView) {
+    if (row.source === "banco") return;
+    const nextPaid = row.status !== "pagado";
+    const previous = rows;
+    setRows(
+      rows.map((item) =>
+        item.id === row.id
+          ? {
+              ...item,
+              status: nextPaid ? "pagado" : item.dueDay < referenceDay ? "vencido" : "pendiente",
+              source: nextPaid ? "manual" : null,
+              accountLabel: nextPaid ? "Efectivo" : item.accountLabel,
+              paidOn: nextPaid ? new Date().toISOString().slice(0, 10) : null,
+            }
+          : item,
+      ),
+    );
+    setError(null);
+    try {
+      const response = await fetch(`/api/fixed-expenses/${row.id}/payment`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ paid: nextPaid }),
+      });
+      const body = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(body.error || "No se pudo guardar.");
+    } catch (cause) {
+      setRows(previous);
+      setError(cause instanceof Error ? cause.message : "No se pudo guardar.");
+    }
+  }
+
+  return (
+    <aside data-testid="fixed-list" className="fixed bottom-0 right-0 top-16 z-40 flex w-[440px] max-w-full flex-col border-l border-[#e6e1d8] bg-[#f7f6f4] shadow-xl">
+      <header className="flex items-center gap-3 border-b border-[#e6e1d8] bg-white px-4 py-3">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-stone-900">Gastos fijos</h2>
+          <p className="text-xs text-slate-500">{monthLabel}</p>
+        </div>
+        <button
+          type="button"
+          data-testid="fixed-close"
+          aria-label="Cerrar gastos fijos"
+          onClick={onClose}
+          className="ml-auto grid size-7 place-items-center rounded-md text-stone-500 hover:bg-[#efede8] hover:text-stone-900"
+        >
+          <X className="size-4" />
+        </button>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        {error ? <p className="mb-3 text-sm text-rose-700">{error}</p> : null}
+        <ChecklistSection title="Faltan" rows={missing} empty="Nada pendiente este mes." onToggle={(row) => void toggle(row)} />
+        <ChecklistSection title="Ya pagados" rows={paid} empty="Todavía no hay pagados." onToggle={(row) => void toggle(row)} />
+        {proposals.filter((proposal) => !rows.some((row) => row.vendor.toLowerCase() === proposal.merchant.toLowerCase() || row.name.toLowerCase() === proposal.merchant.toLowerCase())).length > 0 ? (
+          <div className="mt-4 space-y-2" data-testid="fixed-proposals">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Serbell vio cargos que se repiten</p>
+            {proposals
+              .filter((proposal) => !rows.some((row) => row.vendor.toLowerCase() === proposal.merchant.toLowerCase() || row.name.toLowerCase() === proposal.merchant.toLowerCase()))
+              .map((proposal) => (
+                <Proposal key={proposal.merchant} proposal={proposal} onDone={() => router.refresh()} />
+              ))}
+          </div>
+        ) : null}
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => setAdding((value) => !value)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-[#e6e1d8] bg-white px-3 py-1.5 text-sm font-medium text-slate-700"
+          >
+            {adding ? <X className="size-4" /> : <Plus className="size-4" />}
+            {adding ? "Cerrar" : "Agregar gasto fijo"}
+          </button>
+        </div>
+        {adding ? (
+          <AddFixed
+            accounts={accounts}
+            categories={categories}
+            stacked
+            onDone={() => {
+              setAdding(false);
+              router.refresh();
+            }}
+          />
+        ) : null}
+      </div>
+    </aside>
+  );
+}
+
+function ChecklistSection({
+  title,
+  rows,
+  empty,
+  onToggle,
+}: {
+  title: string;
+  rows: FixedRowView[];
+  empty: string;
+  onToggle: (row: FixedRowView) => void;
+}) {
+  const groups = KIND_ORDER.flatMap((key) => {
+    const items = rows.filter((row) => row.categoryKey === key);
+    if (items.length === 0) return [];
+    return [{ key, label: items[0]?.category ?? key, items }];
+  });
+  return (
+    <section className="mb-5">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-500">{title}</h3>
+      {rows.length === 0 ? <p className="mt-2 text-sm text-slate-500">{empty}</p> : (
+        <div className="mt-2 space-y-3">
+          {groups.map((group) => {
+            const Icon = KIND_ICON[group.key] ?? Receipt;
+            return (
+              <div key={group.key} data-category={group.key} className="overflow-hidden rounded-2xl border border-[#e6e1d8] bg-white">
+                <p className="flex items-center gap-2 border-b border-[#e6e1d8] px-3 py-2 text-sm font-medium text-stone-800">
+                  <span className="grid size-7 place-items-center rounded-lg bg-[#efede8] text-stone-700">
+                    <Icon className="size-3.5" />
+                  </span>
+                  {group.label}
+                </p>
+                <ul>
+                  {group.items.map((row) => (
+                    <FixedLine key={row.id} row={row} onToggle={onToggle} />
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </section>
+  );
+}
+
+function FixedLine({ row, onToggle }: { row: FixedRowView; onToggle: (row: FixedRowView) => void }) {
+  const paid = row.status === "pagado";
+  const Icon = KIND_ICON[row.categoryKey] ?? Receipt;
+  const when = paid
+    ? row.paidOn ? formatDay(row.paidOn) : "Pagado"
+    : row.status === "vencido" ? `Venció el día ${row.dueDay}` : `Vence el día ${row.dueDay}`;
+  return (
+    <li data-testid={`fixed-${row.id}`} data-status={row.status} className="flex items-start gap-2 border-b border-[#f3f1ec] px-3 py-2.5 last:border-b-0">
+      <button
+        type="button"
+        onClick={() => onToggle(row)}
+        disabled={row.source === "banco"}
+        aria-label={row.source === "banco" ? `${row.name} salió del banco` : paid ? `Desmarcar ${row.name}` : `Lo pagué en efectivo: ${row.name}`}
+        className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border ${
+          paid ? "border-emerald-500 bg-emerald-500 text-white" : row.status === "vencido" ? "border-rose-300 bg-white" : "border-slate-300 bg-white"
+        } disabled:cursor-default`}
+      >
+        {paid ? <Check className="size-3" /> : null}
+      </button>
+      <span className="mt-0.5 grid size-5 shrink-0 place-items-center text-stone-500">
+        <Icon className="size-3.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className={`block text-sm font-medium ${paid ? "text-slate-500" : "text-stone-900"}`}>{row.name}</span>
+        <span className="mt-0.5 block text-xs text-slate-500">{when} · {row.accountLabel ?? "Sin cuenta"}</span>
+      </span>
+      <span className="text-sm font-semibold tabular-nums text-stone-900">{formatUsd(row.amountCents)}</span>
+    </li>
   );
 }
 
