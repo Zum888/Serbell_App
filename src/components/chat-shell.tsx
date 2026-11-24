@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ChatPinProvider } from "@/components/chat-pin";
@@ -93,32 +94,48 @@ export function ChatShell({
           setDrawer(movementOpen);
         }} />
       </Suspense>
-      <div className={dock ? "flex items-start gap-3" : show ? "space-y-8" : ""}>
-        {dock ? (
-          <button
-            type="button"
-            data-testid="chat-spine"
-            aria-expanded={!folded}
-            aria-label={folded ? "Abrir el chat" : "Ocultar el chat"}
-            title={drawer && !collapsed ? "El chat vuelve cuando cierres el movimiento" : folded ? "Abrir el chat" : "Ocultar el chat"}
+      <div className={dock ? "flex items-start" : show ? "space-y-8" : ""}>
+        {dock && folded ? (
+          <ChatTab
+            folded
+            label={drawer && !collapsed ? "El chat vuelve cuando cierres el movimiento" : "Abrir el chat"}
             onClick={() => {
               if (drawer && !collapsed) return;
               toggleFold();
             }}
-            className="sticky top-0 flex h-[calc(100vh-5rem)] w-10 shrink-0 items-center justify-center rounded-2xl border border-[#e6e1d8] bg-white text-sm font-medium tracking-[0.2em] text-stone-700"
-            style={{ writingMode: "vertical-rl" }}
-          >
-            Serbell
-          </button>
+          />
         ) : null}
         {show && !folded ? (
-          <div className={dock ? "sticky top-0 flex h-[calc(100vh-5rem)] w-[320px] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-white p-3" : ""}>
-            <HomeChat key={epoch} dock={dock} landed={dock ? flujo : null} name={name} briefing={briefing} starts={starts} pulse={pulse} onFresh={() => window.dispatchEvent(new Event("serbell-chat-reset"))} />
+          <div className={dock ? "relative sticky top-0 mr-3 flex h-[calc(100vh-5rem)] w-[320px] shrink-0 flex-col" : ""}>
+            {dock ? <ChatTab folded={false} label="Retraer el chat" onClick={toggleFold} /> : null}
+            <div className={dock ? "flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border bg-white p-3" : ""}>
+              <HomeChat key={epoch} dock={dock} landed={dock ? flujo : null} name={name} briefing={briefing} starts={starts} pulse={pulse} onFresh={() => window.dispatchEvent(new Event("serbell-chat-reset"))} />
+            </div>
           </div>
         ) : null}
         <div className="min-w-0 flex-1">{children}</div>
       </div>
     </ChatPinProvider>
+  );
+}
+
+function ChatTab({ folded, label, onClick }: { folded: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      data-testid="chat-tab"
+      aria-expanded={!folded}
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={
+        folded
+          ? "sticky top-24 z-10 -ml-4 flex h-14 w-5 shrink-0 items-center justify-center rounded-r-md border border-l-0 border-[#e6e1d8] bg-white text-stone-500 shadow-sm hover:bg-[#efede8] hover:text-stone-900"
+          : "absolute top-1/2 -left-2.5 z-10 flex h-14 w-5 -translate-y-1/2 items-center justify-center rounded-l-md border border-[#e6e1d8] bg-white text-stone-500 shadow-sm hover:bg-[#efede8] hover:text-stone-900"
+      }
+    >
+      {folded ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
+    </button>
   );
 }
 

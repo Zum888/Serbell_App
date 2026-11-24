@@ -28,6 +28,57 @@ const FILTERS: [string, string][] = [
   ["pagado", "Pagados"],
 ];
 
+export function FixedDueWindow(props: {
+  monthLabel: string;
+  referenceDay: number;
+  rows: FixedRowView[];
+  proposals?: FixedProposal[];
+  accounts: Option[];
+  categories: Option[];
+}) {
+  const overdue = props.rows.filter((row) => row.status === "vencido").length;
+  const soon = props.rows.filter((row) => row.status === "pendiente").length;
+  const [open, setOpen] = useState(overdue + soon > 0);
+
+  return (
+    <>
+      <button
+        type="button"
+        data-testid="fixed-open"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-2 rounded-full border border-[#e6e1d8] bg-white px-3 py-1.5 text-sm font-medium text-stone-800 hover:bg-[#efede8]"
+      >
+        Gastos fijos
+        {overdue > 0 ? <span className="rounded-full bg-rose-50 px-2 py-0.5 text-xs text-rose-700">{overdue} vencidos</span> : null}
+        {soon > 0 ? <span className="rounded-full bg-[#efede8] px-2 py-0.5 text-xs text-stone-700">{soon} por vencer</span> : null}
+      </button>
+      {open ? (
+        <div className="fixed inset-0 z-40 flex items-start justify-center bg-stone-900/30 p-4 pt-[10vh]" role="presentation" onClick={() => setOpen(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fixed-window-title"
+            data-testid="fixed-window"
+            className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[#e6e1d8] bg-white shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-[#e6e1d8] px-5 py-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-400">Gastos fijos · {props.monthLabel}</p>
+                <h2 id="fixed-window-title" className="mt-1 text-lg font-semibold tracking-tight">Vencido y por vencer</h2>
+              </div>
+              <button type="button" onClick={() => setOpen(false)} aria-label="Cerrar gastos fijos" className="grid size-8 place-items-center rounded-lg text-slate-500 hover:bg-[#efede8]">
+                <X className="size-4" />
+              </button>
+            </div>
+            <FixedChecklist {...props} windowed />
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 export function FixedChecklist({
   monthLabel,
   referenceDay,
@@ -35,6 +86,7 @@ export function FixedChecklist({
   proposals = [],
   accounts,
   categories,
+  windowed = false,
 }: {
   monthLabel: string;
   referenceDay: number;
@@ -42,6 +94,7 @@ export function FixedChecklist({
   proposals?: FixedProposal[];
   accounts: Option[];
   categories: Option[];
+  windowed?: boolean;
 }) {
   const router = useRouter();
   const [rows, setRows] = useState(initialRows);
@@ -96,9 +149,13 @@ export function FixedChecklist({
 
   const percent = summary.total === 0 ? 0 : Math.round((summary.paid / summary.total) * 100);
 
+  const overdueRows = rows.filter((row) => row.status === "vencido");
+  const soonRows = rows.filter((row) => row.status === "pendiente");
+  const paidRows = rows.filter((row) => row.status === "pagado");
+
   return (
-    <section id="gastos-fijos" className="rounded-2xl border border-border bg-white" data-testid="fixed-checklist">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border p-4">
+    <section id={windowed ? undefined : "gastos-fijos"} className={windowed ? "" : "rounded-2xl border border-border bg-white"} data-testid="fixed-checklist">
+      {windowed ? null : <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border p-4">
         <div>
           <p className="text-xs uppercase tracking-wide text-slate-400">Gastos fijos · {monthLabel}</p>
           <h2 className="mt-1 text-lg font-semibold tracking-tight">Lo que pagas cada mes</h2>
@@ -114,20 +171,24 @@ export function FixedChecklist({
           {adding ? <X className="size-4" /> : <Plus className="size-4" />}
           {adding ? "Cerrar" : "Agregar gasto fijo"}
         </button>
-      </div>
+      </div>}
 
-      <div className="grid gap-px bg-border sm:grid-cols-4">
-        <Figure label="Total mensual" value={formatUsd(summary.total)} />
-        <Figure label="Pagado" value={formatUsd(summary.paid)} tone="text-emerald-700" />
-        <Figure label="Falta pagar" value={formatUsd(summary.pending)} />
-        <Figure label="Vencido" value={formatUsd(summary.overdue)} tone={summary.overdue > 0 ? "text-rose-700" : undefined} />
-      </div>
-      <div className="px-4 pt-3">
-        <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-          <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${percent}%` }} />
-        </div>
-        <p className="mt-1 text-xs text-slate-500">{percent}% del mes cubierto</p>
-      </div>
+      {windowed ? null : (
+        <>
+          <div className="grid gap-px bg-border sm:grid-cols-4">
+            <Figure label="Total mensual" value={formatUsd(summary.total)} />
+            <Figure label="Pagado" value={formatUsd(summary.paid)} tone="text-emerald-700" />
+            <Figure label="Falta pagar" value={formatUsd(summary.pending)} />
+            <Figure label="Vencido" value={formatUsd(summary.overdue)} tone={summary.overdue > 0 ? "text-rose-700" : undefined} />
+          </div>
+          <div className="px-4 pt-3">
+            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${percent}%` }} />
+            </div>
+            <p className="mt-1 text-xs text-slate-500">{percent}% del mes cubierto</p>
+          </div>
+        </>
+      )}
 
       {proposals.filter((proposal) => !rows.some((row) => row.vendor.toLowerCase() === proposal.merchant.toLowerCase() || row.name.toLowerCase() === proposal.merchant.toLowerCase())).length > 0 ? (
         <div className="mx-4 mt-3 space-y-2" data-testid="fixed-proposals">
@@ -151,21 +212,40 @@ export function FixedChecklist({
         />
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2 px-4 pt-3">
-        {FILTERS.map(([key, label]) => (
+      {windowed ? (
+        <div className="flex justify-end px-4 pt-3">
           <button
-            key={key}
             type="button"
-            onClick={() => setFilter(key)}
-            className={filter === key ? "rounded-full bg-slate-900 px-3 py-1 text-xs text-white" : "rounded-full border border-border px-3 py-1 text-xs text-slate-600"}
+            onClick={() => setAdding((value) => !value)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-slate-300"
           >
-            {label}
+            {adding ? <X className="size-4" /> : <Plus className="size-4" />}
+            {adding ? "Cerrar" : "Agregar gasto fijo"}
           </button>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2 px-4 pt-3">
+          {FILTERS.map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setFilter(key)}
+              className={filter === key ? "rounded-full bg-slate-900 px-3 py-1 text-xs text-white" : "rounded-full border border-border px-3 py-1 text-xs text-slate-600"}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
       {error ? <p className="px-4 pt-2 text-sm text-rose-700">{error}</p> : null}
 
-      <ul className="mt-2 divide-y divide-border">
+      {windowed ? (
+        <div className="mt-2 pb-2">
+          <DueGroup title="Vencido" rows={overdueRows} empty="Nada vencido." tone="text-rose-700" onToggle={(row) => void toggle(row)} />
+          <DueGroup title="Por vencer" rows={soonRows} empty="Nada por vencer." tone="text-stone-700" onToggle={(row) => void toggle(row)} />
+          <DueGroup title="Pagados" rows={paidRows} empty="Todavía no hay pagados." tone="text-emerald-700" onToggle={(row) => void toggle(row)} />
+        </div>
+      ) : <ul className="mt-2 divide-y divide-border">
         {visible.length === 0 ? <li className="px-4 py-6 text-center text-sm text-slate-500">No hay gastos fijos con este filtro.</li> : null}
         {visible.map((row) => {
           const paid = row.status === "pagado";
@@ -213,7 +293,66 @@ export function FixedChecklist({
             </li>
           );
         })}
-      </ul>
+      </ul>}
+    </section>
+  );
+}
+
+function DueGroup({
+  title,
+  rows,
+  empty,
+  tone,
+  onToggle,
+}: {
+  title: string;
+  rows: FixedRowView[];
+  empty: string;
+  tone: string;
+  onToggle: (row: FixedRowView) => void;
+}) {
+  return (
+    <section className="px-2 pt-3">
+      <h3 className={`px-3 text-xs font-semibold uppercase tracking-wide ${tone}`}>{title}</h3>
+      {rows.length === 0 ? <p className="px-3 py-3 text-sm text-slate-500">{empty}</p> : (
+        <ul className="mt-1 divide-y divide-border">
+          {rows.map((row) => {
+            const paid = row.status === "pagado";
+            return (
+              <li key={row.id} data-testid={`fixed-${row.id}`} data-status={row.status} className="flex flex-wrap items-center gap-3 px-3 py-3">
+                <button
+                  type="button"
+                  onClick={() => onToggle(row)}
+                  disabled={row.source === "banco"}
+                  aria-label={row.source === "banco" ? `${row.name} salió del banco` : paid ? `Desmarcar ${row.name}` : `Lo pagué en efectivo: ${row.name}`}
+                  title={row.source === "banco" ? "Salió del banco" : paid ? "Desmarcar" : "Lo pagué en efectivo"}
+                  className={`grid size-6 shrink-0 place-items-center rounded-full border transition ${
+                    paid ? "border-emerald-500 bg-emerald-500 text-white" : row.status === "vencido" ? "border-rose-300 bg-white" : "border-slate-300 bg-white hover:border-slate-400"
+                  } disabled:cursor-default`}
+                >
+                  {paid ? <Check className="size-3.5" /> : null}
+                </button>
+                <div className="min-w-[180px] flex-1">
+                  <p className={`font-medium ${paid ? "text-slate-500" : ""}`}>{row.name}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">{row.vendor} · día {row.dueDay}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold tabular-nums">{formatUsd(row.amountCents)}</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    {row.source === "banco" && row.movement
+                      ? `Salió del banco · ${formatDay(row.movement.day)}`
+                      : row.source === "manual"
+                        ? "Lo pagué en efectivo"
+                        : row.status === "vencido"
+                          ? `Venció el día ${row.dueDay}`
+                          : `Vence el día ${row.dueDay}`}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }

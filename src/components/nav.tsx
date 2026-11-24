@@ -28,10 +28,10 @@ const items = [
 
 const DOCK = ["/movimientos", "/cuentas", "/por-cobrar", "/por-pagar", "/reportes", "/categorias"];
 
-export function SideNav({ firm }: { firm: boolean }) {
+export function SideNav({ firm, collapsed = false }: { firm: boolean; collapsed?: boolean }) {
   const pathname = usePathname();
   return (
-    <nav className="flex flex-1 flex-col gap-1 px-3">
+    <nav className={cn("flex flex-1 flex-col gap-1", collapsed ? "px-2" : "px-3")}>
       {items.map((item) => {
         const href = item.firmHref && firm ? item.firmHref : item.href;
         const active = pathname === href || (href === "/movimientos" && pathname.startsWith("/cuentas"));
@@ -41,6 +41,7 @@ export function SideNav({ firm }: { firm: boolean }) {
             key={item.testId}
             href={href}
             data-testid={item.testId}
+            title={collapsed ? item.label : undefined}
             onClick={(event) => {
               if (item.testId !== "nav-inicio") return;
               window.dispatchEvent(new Event("serbell-chat-reset"));
@@ -48,18 +49,19 @@ export function SideNav({ firm }: { firm: boolean }) {
               if (stays) event.preventDefault();
             }}
             className={cn(
-              "flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-600",
+              "flex items-center rounded-xl py-2 text-sm text-slate-600",
+              collapsed ? "justify-center px-2" : "gap-3 px-3",
               active && "bg-[#efede8] font-medium text-stone-900",
             )}
           >
-            <Icon className="size-4" />
-            {item.label}
+            <Icon className="size-4 shrink-0" />
+            {collapsed ? <span className="sr-only">{item.label}</span> : item.label}
           </Link>
         );
       })}
-      <Link href="/ayuda" className="mt-auto flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-500">
-        <CircleHelp className="size-4" />
-        Ayuda
+      <Link href="/ayuda" title={collapsed ? "Ayuda" : undefined} className={cn("mt-auto flex items-center rounded-xl py-2 text-sm text-slate-500", collapsed ? "justify-center px-2" : "gap-3 px-3")}>
+        <CircleHelp className="size-4 shrink-0" />
+        {collapsed ? <span className="sr-only">Ayuda</span> : "Ayuda"}
       </Link>
     </nav>
   );
