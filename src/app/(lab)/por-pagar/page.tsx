@@ -60,16 +60,7 @@ export default async function PayablesPage({
             <InvoiceList invoices={folder.invoices} base="/por-pagar" partyId={folder.partyId} activeId={params.factura} />
           </div>
         ) : (
-          <div className="space-y-4">
-            <FixedDueWindow
-              monthLabel={monthName(fixed.period)}
-              referenceDay={fixed.referenceDay}
-              rows={fixed.rows}
-              proposals={fixed.proposals}
-              accounts={fixed.accounts}
-              categories={fixed.categories}
-            />
-            <InvoiceBoard
+          <InvoiceBoard
             title="Cuentas por pagar"
             subtitle="Facturas pendientes de pago y seguimiento de tus proveedores."
             partyNoun="Proveedor"
@@ -93,8 +84,17 @@ export default async function PayablesPage({
             )}
             folders={folders}
             activeId={params.factura}
+            aside={
+              <FixedDueWindow
+                monthLabel={monthName(fixed.period)}
+                referenceDay={fixed.referenceDay}
+                rows={fixed.rows}
+                proposals={fixed.proposals}
+                accounts={fixed.accounts}
+                categories={fixed.categories}
+              />
+            }
           />
-          </div>
         )}
       </section>
       {panel && panel.direction === "payable" && panel.companyId === session.companyId ? (

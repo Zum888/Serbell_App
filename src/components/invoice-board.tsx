@@ -91,6 +91,7 @@ export function InvoiceBoard({
   pins = [],
   activeId,
   extraSuggestions = [],
+  aside,
 }: {
   title: string;
   subtitle: string;
@@ -104,6 +105,7 @@ export function InvoiceBoard({
   pins?: { id: string; name: string; totalCents: number; detail: string; href: string }[];
   activeId?: string;
   extraSuggestions?: Suggestion[];
+  aside?: ReactNode;
 }) {
   const [tab, setTab] = useState<Tab>("facturas");
   const [query, setQuery] = useState("");
@@ -211,7 +213,8 @@ export function InvoiceBoard({
         </div>
 
         <aside className="space-y-3">
-          <div className="rounded-2xl border border-border bg-white p-4">
+          {aside}
+          <div className="rounded-2xl border border-border bg-white p-4" data-testid="desk-chart">
             <p className="text-sm font-medium">{chartTitle}</p>
             <p className="text-xs text-slate-400">Últimos 6 meses, por fecha de emisión</p>
             <ColumnChart series={series} />

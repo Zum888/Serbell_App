@@ -47,7 +47,7 @@ export function SideNav({ firm, collapsed = false }: { firm: boolean; collapsed?
               if (pathname === href) event.preventDefault();
             }}
             className={cn(
-              "flex items-center rounded-xl py-2 text-sm",
+              "flex w-full items-center rounded-xl py-2 text-sm",
               collapsed ? "justify-center px-2" : "gap-3 px-3",
               create ? "font-medium text-stone-900" : "text-slate-600",
               active && "bg-[#efede8]",
@@ -55,13 +55,18 @@ export function SideNav({ firm, collapsed = false }: { firm: boolean; collapsed?
             )}
           >
             {create ? (
-              <span className="grid size-5 shrink-0 place-items-center rounded-md bg-stone-900 text-[#f7f6f4]">
-                <Plus className="size-3.5" strokeWidth={2.5} />
-              </span>
+              <>
+                {collapsed ? <span className="sr-only">{item.label}</span> : item.label}
+                <span className={cn("grid size-5 shrink-0 place-items-center rounded-md bg-stone-900 text-[#f7f6f4]", collapsed ? "" : "ml-auto")}>
+                  <Plus className="size-3.5" strokeWidth={2.5} />
+                </span>
+              </>
             ) : (
-              <Icon className="size-4 shrink-0" />
+              <>
+                <Icon className="size-4 shrink-0" />
+                {collapsed ? <span className="sr-only">{item.label}</span> : item.label}
+              </>
             )}
-            {collapsed ? <span className="sr-only">{item.label}</span> : item.label}
           </Link>
         );
       })}

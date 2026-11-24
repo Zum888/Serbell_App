@@ -6,7 +6,11 @@ test("Nuevo chat vuelve al inicio y la pregunta sigue en la sección", async ({ 
   await expect(page.getByText("Lo que hice por ti")).toBeVisible();
   const nuevo = page.getByTestId("nav-inicio");
   await expect(nuevo).toContainText("Nuevo chat");
-  await expect(nuevo.locator("svg")).toBeVisible();
+  const plus = nuevo.locator("svg");
+  await expect(plus).toBeVisible();
+  const row = await nuevo.boundingBox();
+  const mark = await plus.boundingBox();
+  expect(row && mark && mark.x > row.x + row.width / 2).toBeTruthy();
 
   await page.getByLabel("Mensaje para Serbell").fill("¿Quién debe?");
   await page.getByRole("button", { name: "Enviar" }).click();
