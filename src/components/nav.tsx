@@ -5,7 +5,7 @@ import {
   BarChart3,
   CircleHelp,
   FileText,
-  MessageSquare,
+  Plus,
   Receipt,
   Settings,
   Tags,
@@ -16,7 +16,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const items = [
-  { href: "/", firmHref: "/firma", label: "Chat nuevo", icon: MessageSquare, testId: "nav-inicio" },
+  { href: "/", firmHref: "/firma", label: "Nuevo chat", icon: Plus, testId: "nav-inicio", create: true },
   { href: "/movimientos", label: "Bancos", icon: Landmark, testId: "nav-movimientos" },
   { href: "/comprobantes", label: "Comprobantes", icon: FileText, testId: "nav-comprobantes" },
   { href: "/categorias", label: "Categorías", icon: Tags, testId: "nav-categorias" },
@@ -26,16 +26,15 @@ const items = [
   { href: "/configuracion", label: "Configuración", icon: Settings, testId: "nav-configuracion" },
 ];
 
-const DOCK = ["/movimientos", "/cuentas", "/por-cobrar", "/por-pagar", "/reportes", "/categorias"];
-
 export function SideNav({ firm, collapsed = false }: { firm: boolean; collapsed?: boolean }) {
   const pathname = usePathname();
   return (
     <nav className={cn("flex flex-1 flex-col gap-1", collapsed ? "px-2" : "px-3")}>
       {items.map((item) => {
-        const href = item.firmHref && firm ? item.firmHref : item.href;
+        const href = "firmHref" in item && item.firmHref && firm ? item.firmHref : item.href;
         const active = pathname === href || (href === "/movimientos" && pathname.startsWith("/cuentas"));
         const Icon = item.icon;
+        const create = "create" in item && item.create;
         return (
           <Link
             key={item.testId}
@@ -43,18 +42,25 @@ export function SideNav({ firm, collapsed = false }: { firm: boolean; collapsed?
             data-testid={item.testId}
             title={collapsed ? item.label : undefined}
             onClick={(event) => {
-              if (item.testId !== "nav-inicio") return;
+              if (!create) return;
               window.dispatchEvent(new Event("serbell-chat-reset"));
-              const stays = pathname === "/" || DOCK.some((path) => pathname === path || pathname.startsWith(`${path}/`));
-              if (stays) event.preventDefault();
+              if (pathname === href) event.preventDefault();
             }}
             className={cn(
-              "flex items-center rounded-xl py-2 text-sm text-slate-600",
+              "flex items-center rounded-xl py-2 text-sm",
               collapsed ? "justify-center px-2" : "gap-3 px-3",
-              active && "bg-[#efede8] font-medium text-stone-900",
+              create ? "font-medium text-stone-900" : "text-slate-600",
+              active && "bg-[#efede8]",
+              !create && active && "font-medium text-stone-900",
             )}
           >
-            <Icon className="size-4 shrink-0" />
+            {create ? (
+              <span className="grid size-5 shrink-0 place-items-center rounded-md bg-stone-900 text-[#f7f6f4]">
+                <Plus className="size-3.5" strokeWidth={2.5} />
+              </span>
+            ) : (
+              <Icon className="size-4 shrink-0" />
+            )}
             {collapsed ? <span className="sr-only">{item.label}</span> : item.label}
           </Link>
         );

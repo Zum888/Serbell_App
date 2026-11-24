@@ -2,6 +2,7 @@
 
 import { ArrowUp, Mic, Sparkles } from "lucide-react";
 import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { DuplicateFlow } from "@/components/duplicate-flow";
 import { MissingFlow } from "@/components/missing-flow";
 import { NarratedFlow } from "@/components/narrated-flow";
@@ -9,6 +10,7 @@ import { ProactiveHome } from "@/components/proactive-home";
 import { LoteFlow } from "@/components/lote-flow";
 import { InvoiceFlow } from "@/components/ticket-flow";
 import { GUIDE_REPLY, isTalk, talkReply, type Briefing } from "@/lib/briefing";
+import { chatRoute } from "@/lib/chat-route";
 import type { HomeStart } from "@/lib/home-starts";
 import { UNSUPPORTED_REPLY, parseIntent } from "@/lib/intent";
 import type { Pulse, PulseFlow } from "@/lib/pulse";
@@ -33,7 +35,6 @@ export function HomeChat({
   pulse,
   dock = false,
   landed = null,
-  onFresh,
 }: {
   name: string;
   briefing: Briefing;
@@ -41,12 +42,13 @@ export function HomeChat({
   pulse: Pulse | null;
   dock?: boolean;
   landed?: string | null;
-  onFresh?: () => void;
 }) {
   const [messages, setMessages] = useState<Bubble[]>([]);
   const [text, setText] = useState("");
   const [flow, setFlow] = useState<PulseFlow | null>(null);
   const pin = useChatPin();
+  const pathname = usePathname();
+  const router = useRouter();
 
   function openFlow(next: PulseFlow) {
     pin(next);
@@ -58,16 +60,14 @@ export function HomeChat({
   function ask(raw: string) {
     const value = raw.trim();
     if (!value) return;
-    if (/faltan comprobantes|comprobantes faltantes|pedir comprobantes/i.test(value)) {
-      openFlow("faltantes");
-      return;
-    }
-    if (/duplicad/i.test(value)) {
-      openFlow("duplicado");
+    const route = chatRoute(value);
+    if (route?.kind === "flow") {
+      openFlow(route.flow);
       return;
     }
     const intent = parseIntent(value);
-    const body = isTalk(intent.type) ? talkReply(intent.type, briefing) : intent.type === "unsupported" ? UNSUPPORTED_REPLY : GUIDE_REPLY;
+    const spoken = isTalk(intent.type) ? talkReply(intent.type, briefing) : intent.type === "unsupported" ? UNSUPPORTED_REPLY : GUIDE_REPLY;
+    const body = route?.kind === "section" ? [isTalk(intent.type) ? spoken : null, route.handoff].filter(Boolean).join(" ") : spoken;
     const stamp = `${Date.now()}-${messages.length}`;
     setFlow(null);
     setMessages((current) => [
@@ -76,12 +76,15 @@ export function HomeChat({
       { id: `a-${stamp}`, role: "assistant", body },
     ]);
     setText("");
+    if (route?.kind === "section") {
+      pin(route.flujo);
+      router.push(route.href);
+    }
   }
 
-  function reset() {
-    setMessages([]);
-    setText("");
-    setFlow(null);
+  function fresh() {
+    window.dispatchEvent(new Event("serbell-chat-reset"));
+    if (pathname !== "/") router.push("/");
   }
 
   const talking = flow || messages.length > 0;
@@ -100,7 +103,7 @@ export function HomeChat({
       ) : null}
       {talking ? (
         <div className="mb-2 flex justify-end">
-          <button type="button" onClick={reset} className="text-xs text-slate-500 hover:text-slate-800">
+          <button type="button" onClick={fresh} className="text-xs text-slate-500 hover:text-slate-800">
             Nuevo chat
           </button>
         </div>
@@ -138,7 +141,7 @@ export function HomeChat({
             <button
               type="button"
               data-testid="empezar-otro"
-              onClick={() => (onFresh ?? reset)()}
+              onClick={fresh}
               className="rounded-full border border-[#e6e1d8] bg-white px-3 py-1.5 text-sm font-medium text-stone-800"
             >
               Empezar otro

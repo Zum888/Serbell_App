@@ -48,16 +48,13 @@ export function ChatShell({
   useEffect(() => {
     function onReset() {
       sessionStorage.removeItem(FLOW_KEY);
-      sessionStorage.setItem(PIN_KEY, "1");
+      sessionStorage.removeItem(PIN_KEY);
       sessionStorage.setItem(FOLD_KEY, "0");
-      const url = new URL(window.location.href);
-      url.searchParams.delete("flujo");
-      url.searchParams.delete("con");
-      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
       setFlujo(null);
-      setPinned(true);
+      setPinned(false);
+      setFromUrl(false);
       setCollapsed(false);
-      setOverDrawer(true);
+      setOverDrawer(false);
       setEpoch((value) => value + 1);
     }
     window.addEventListener("serbell-chat-reset", onReset);
@@ -82,6 +79,12 @@ export function ChatShell({
     setCollapsed(true);
   }
 
+  function openTab() {
+    sessionStorage.setItem(FOLD_KEY, "0");
+    setCollapsed(false);
+    setOverDrawer(true);
+  }
+
   useEffect(() => {
     setOverDrawer(false);
   }, [drawer]);
@@ -99,9 +102,9 @@ export function ChatShell({
           setDrawer(movementOpen);
         }} />
       </Suspense>
-      <div className={dock && !folded ? "flex items-start gap-3" : show ? "space-y-8" : ""}>
-        {show && !folded ? (
-          <div className={dock ? "sticky top-0 flex h-[calc(100vh-5rem)] w-[320px] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-white" : ""}>
+      <div className={dock && !folded ? "flex items-start gap-3" : show && !folded ? "space-y-8" : ""}>
+        {show ? (
+          <div className={folded ? "hidden" : dock ? "sticky top-0 flex h-[calc(100vh-5rem)] w-[320px] shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-white" : ""}>
             {dock ? (
               <div className="flex items-center justify-between border-b border-[#e6e1d8] px-3 py-2">
                 <span className="text-sm font-medium text-stone-800">Chat</span>
@@ -118,11 +121,23 @@ export function ChatShell({
               </div>
             ) : null}
             <div className={dock ? "flex min-h-0 flex-1 flex-col p-3" : ""}>
-              <HomeChat key={epoch} dock={dock} landed={dock ? flujo : null} name={name} briefing={briefing} starts={starts} pulse={pulse} onFresh={() => window.dispatchEvent(new Event("serbell-chat-reset"))} />
+              <HomeChat key={epoch} dock={dock} landed={dock ? flujo : null} name={name} briefing={briefing} starts={starts} pulse={pulse} />
             </div>
           </div>
         ) : null}
-        <div className={dock && !folded ? "min-w-0 flex-1" : ""}>{children}</div>
+        <div className={dock && !folded ? "min-w-0 flex-1" : ""}>
+          {folded ? (
+            <button
+              type="button"
+              data-testid="chat-open"
+              onClick={openTab}
+              className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-[#e6e1d8] bg-white px-3 py-1.5 text-sm font-medium text-stone-800"
+            >
+              Chat
+            </button>
+          ) : null}
+          {children}
+        </div>
       </div>
     </ChatPinProvider>
   );
